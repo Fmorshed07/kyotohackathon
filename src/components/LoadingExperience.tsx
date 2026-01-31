@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState, useMemo } from "react";
+import { motion, AnimatePresence, type Transition } from "framer-motion";
 import tokyoAbstract from "@/assets/tokyo-abstract.jpg";
 
 interface LoadingExperienceProps {
@@ -9,21 +9,33 @@ interface LoadingExperienceProps {
 const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
   const [stage, setStage] = useState(0);
 
+  // Memoize particle positions to avoid recalculation
+  const particles = useMemo(() => 
+    Array.from({ length: 40 }).map((_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      delay: Math.random() * 2,
+      duration: 5 + Math.random() * 4,
+      blur: Math.random() * 2,
+      size: 1 + Math.random() * 2,
+    })), []
+  );
+
   useEffect(() => {
     const stages = [
-      { delay: 500, stage: 1 },   // Particles appear
-      { delay: 1200, stage: 2 },  // Line draws
-      { delay: 2000, stage: 3 },  // Title appears
-      { delay: 2800, stage: 4 },  // Subtitle appears
-      { delay: 3600, stage: 5 },  // Start reveal
-      { delay: 4200, stage: 6 },  // Complete
+      { delay: 400, stage: 1 },   // Particles appear
+      { delay: 1000, stage: 2 },  // Line draws
+      { delay: 1800, stage: 3 },  // Title appears
+      { delay: 2500, stage: 4 },  // Subtitle appears
+      { delay: 3300, stage: 5 },  // Start reveal
+      { delay: 4000, stage: 6 },  // Complete
     ];
 
     const timers = stages.map(({ delay, stage }) =>
       setTimeout(() => setStage(stage), delay)
     );
 
-    const completeTimer = setTimeout(onComplete, 4500);
+    const completeTimer = setTimeout(onComplete, 4200);
 
     return () => {
       timers.forEach(clearTimeout);
@@ -31,21 +43,35 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
     };
   }, [onComplete]);
 
+  // Smooth spring transition
+  const springTransition: Transition = {
+    type: "spring" as const,
+    stiffness: 100,
+    damping: 20,
+  };
+
   return (
     <AnimatePresence>
       {stage < 6 && (
         <motion.div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-background"
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, scale: 1.1 }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
+          exit={{ 
+            opacity: 0,
+            scale: 1.05,
+            filter: "blur(10px)",
+          }}
+          transition={{ duration: 1, ease: "easeInOut" }}
         >
-          {/* Background Image */}
+          {/* Background Image with smooth reveal */}
           <motion.div
             className="absolute inset-0"
-            initial={{ scale: 1.2, opacity: 0 }}
-            animate={{ scale: 1, opacity: 0.3 }}
-            transition={{ duration: 2, ease: "easeOut" }}
+            initial={{ scale: 1.3, opacity: 0 }}
+            animate={{ 
+              scale: stage >= 1 ? 1.1 : 1.3, 
+              opacity: stage >= 1 ? 0.25 : 0 
+            }}
+            transition={{ duration: 2.5, ease: "easeOut" }}
           >
             <img
               src={tokyoAbstract}
@@ -55,62 +81,78 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/60" />
           </motion.div>
 
-          {/* Floating Particles */}
-          <div className="absolute inset-0 overflow-hidden">
-            {Array.from({ length: 30 }).map((_, i) => (
+          {/* Floating Particles - Optimized */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {particles.map((particle) => (
               <motion.div
-                key={i}
-                className="absolute h-1 w-1 rounded-full bg-primary/60"
+                key={particle.id}
+                className="absolute rounded-full bg-primary/70"
                 initial={{
-                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000),
-                  y: (typeof window !== 'undefined' ? window.innerHeight : 800) + 50,
+                  x: `${particle.x}vw`,
+                  y: "110vh",
                   opacity: 0,
                 }}
                 animate={stage >= 1 ? {
-                  y: -50,
-                  opacity: [0, 1, 1, 0],
+                  y: "-10vh",
+                  opacity: [0, 0.8, 0.8, 0],
                 } : {}}
                 transition={{
-                  duration: 4 + Math.random() * 3,
-                  delay: Math.random() * 2,
+                  duration: particle.duration,
+                  delay: particle.delay,
                   repeat: Infinity,
                   ease: "linear",
                 }}
                 style={{
-                  left: `${Math.random() * 100}%`,
-                  filter: `blur(${Math.random() * 2}px)`,
+                  width: particle.size,
+                  height: particle.size,
+                  filter: `blur(${particle.blur}px)`,
+                  willChange: "transform, opacity",
                 }}
               />
             ))}
           </div>
 
           {/* Animated Lines */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {/* Horizontal Line */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            {/* Main Horizontal Line */}
             <motion.div
-              className="absolute h-[1px] bg-gradient-to-r from-transparent via-primary to-transparent"
+              className="absolute h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent"
               initial={{ width: 0, opacity: 0 }}
-              animate={stage >= 2 ? { width: "80%", opacity: 1 } : {}}
-              transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+              animate={stage >= 2 ? { width: "85%", opacity: 1 } : {}}
+              transition={{ duration: 1.5, ease: "easeOut" }}
               style={{
-                boxShadow: "0 0 30px hsl(185 100% 50% / 0.8), 0 0 60px hsl(185 100% 50% / 0.4)",
+                boxShadow: "0 0 40px hsl(185 100% 50% / 0.8), 0 0 80px hsl(185 100% 50% / 0.4)",
               }}
+            />
+
+            {/* Secondary horizontal lines */}
+            <motion.div
+              className="absolute h-[1px] w-[60%] bg-gradient-to-r from-transparent via-secondary/30 to-transparent"
+              initial={{ opacity: 0, y: -40 }}
+              animate={stage >= 2 ? { opacity: 1, y: -60 } : {}}
+              transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+            />
+            <motion.div
+              className="absolute h-[1px] w-[60%] bg-gradient-to-r from-transparent via-secondary/30 to-transparent"
+              initial={{ opacity: 0, y: 40 }}
+              animate={stage >= 2 ? { opacity: 1, y: 60 } : {}}
+              transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
             />
 
             {/* Vertical accent lines */}
             <motion.div
-              className="absolute h-32 w-[1px] bg-gradient-to-b from-transparent via-secondary/50 to-transparent"
+              className="absolute h-40 w-[1px] bg-gradient-to-b from-transparent via-primary/40 to-transparent"
               initial={{ scaleY: 0, opacity: 0 }}
               animate={stage >= 2 ? { scaleY: 1, opacity: 1 } : {}}
-              transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-              style={{ left: "10%" }}
+              transition={{ duration: 1, delay: 0.4, ease: "easeOut" }}
+              style={{ left: "8%" }}
             />
             <motion.div
-              className="absolute h-32 w-[1px] bg-gradient-to-b from-transparent via-secondary/50 to-transparent"
+              className="absolute h-40 w-[1px] bg-gradient-to-b from-transparent via-primary/40 to-transparent"
               initial={{ scaleY: 0, opacity: 0 }}
               animate={stage >= 2 ? { scaleY: 1, opacity: 1 } : {}}
-              transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
-              style={{ right: "10%" }}
+              transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
+              style={{ right: "8%" }}
             />
           </div>
 
@@ -118,94 +160,124 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
           <div className="relative z-10 flex flex-col items-center">
             {/* Japanese Text */}
             <motion.span
-              className="mb-4 font-display text-sm tracking-[0.5em] text-primary/60"
-              initial={{ opacity: 0, y: 20 }}
-              animate={stage >= 3 ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="mb-4 font-display text-sm tracking-[0.5em] text-primary/70"
+              initial={{ opacity: 0, y: 30, filter: "blur(10px)" }}
+              animate={stage >= 3 ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
+              transition={{ duration: 0.8, ease: "easeOut" }}
             >
               インパクト東京
             </motion.span>
 
-            {/* Title with character animation */}
+            {/* Title with smooth mask reveal */}
             <div className="overflow-hidden">
               <motion.h1
                 className="font-display text-5xl font-bold tracking-[0.15em] md:text-7xl lg:text-8xl"
-                initial={{ y: 100 }}
-                animate={stage >= 3 ? { y: 0 } : {}}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                initial={{ y: 120, opacity: 0 }}
+                animate={stage >= 3 ? { y: 0, opacity: 1 } : {}}
+                transition={{ 
+                  duration: 1.2, 
+                  ease: "easeOut",
+                }}
               >
-                <span className="text-gradient-cyan">IMPACT</span>{" "}
+                <motion.span 
+                  className="text-gradient-cyan inline-block"
+                  animate={stage >= 3 ? {
+                    textShadow: [
+                      "0 0 20px hsl(185 100% 50% / 0.3)",
+                      "0 0 50px hsl(185 100% 50% / 0.6)",
+                      "0 0 20px hsl(185 100% 50% / 0.3)",
+                    ],
+                  } : {}}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  IMPACT
+                </motion.span>{" "}
                 <span className="text-foreground">TOKYO</span>
               </motion.h1>
             </div>
 
-            {/* Year */}
+            {/* Year with staggered reveal */}
             <motion.div
-              className="mt-2 overflow-hidden"
+              className="mt-3 overflow-hidden"
               initial={{ opacity: 0 }}
               animate={stage >= 3 ? { opacity: 1 } : {}}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
             >
               <motion.span
-                className="font-display text-3xl font-light tracking-[0.3em] text-foreground/80 md:text-4xl"
-                initial={{ y: 50 }}
-                animate={stage >= 3 ? { y: 0 } : {}}
-                transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+                className="font-display text-3xl font-light tracking-[0.4em] text-foreground/70 md:text-4xl"
+                initial={{ y: 60, opacity: 0 }}
+                animate={stage >= 3 ? { y: 0, opacity: 1 } : {}}
+                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
               >
                 2026
               </motion.span>
             </motion.div>
 
-            {/* Subtitle */}
+            {/* Subtitle with glow */}
             <motion.p
-              className="mt-6 font-display text-lg tracking-[0.2em] text-secondary md:text-xl"
-              initial={{ opacity: 0, y: 20 }}
-              animate={stage >= 4 ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="mt-8 font-display text-lg tracking-[0.25em] text-secondary md:text-xl"
+              initial={{ opacity: 0, y: 30, filter: "blur(5px)" }}
+              animate={stage >= 4 ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
+              transition={{ duration: 0.8, ease: "easeOut" }}
               style={{
-                textShadow: "0 0 30px hsl(270 70% 60% / 0.5)",
+                textShadow: stage >= 4 ? "0 0 40px hsl(270 70% 60% / 0.6)" : "none",
               }}
             >
               AI FOR GLOBAL GOOD
             </motion.p>
 
-            {/* Loading indicator */}
+            {/* Elegant loading indicator */}
             <motion.div
-              className="mt-12 flex items-center gap-2"
+              className="mt-14 flex items-center gap-3"
               initial={{ opacity: 0 }}
               animate={stage >= 4 ? { opacity: 1 } : {}}
-              transition={{ duration: 0.4, delay: 0.3 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
             >
-              <motion.div
-                className="h-1 w-1 rounded-full bg-primary"
-                animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1, repeat: Infinity, delay: 0 }}
-              />
-              <motion.div
-                className="h-1 w-1 rounded-full bg-primary"
-                animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-              />
-              <motion.div
-                className="h-1 w-1 rounded-full bg-primary"
-                animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-              />
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="h-1.5 w-1.5 rounded-full bg-primary"
+                  animate={{ 
+                    scale: [1, 1.8, 1], 
+                    opacity: [0.4, 1, 0.4],
+                  }}
+                  transition={{ 
+                    duration: 1.2, 
+                    repeat: Infinity, 
+                    delay: i * 0.15,
+                    ease: "easeInOut",
+                  }}
+                />
+              ))}
             </motion.div>
           </div>
 
-          {/* Corner decorations */}
+          {/* Corner decorations with smoother animation */}
           <motion.div
-            className="absolute left-8 top-8 h-16 w-16 border-l-2 border-t-2 border-primary/30"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={stage >= 2 ? { opacity: 1, scale: 1 } : {}}
-            transition={{ duration: 0.6, delay: 0.4 }}
+            className="absolute left-6 top-6 h-20 w-20 border-l-2 border-t-2 border-primary/40"
+            initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
+            animate={stage >= 2 ? { opacity: 1, scale: 1, rotate: 0 } : {}}
+            transition={{ ...springTransition, delay: 0.5 }}
           />
           <motion.div
-            className="absolute bottom-8 right-8 h-16 w-16 border-b-2 border-r-2 border-primary/30"
-            initial={{ opacity: 0, scale: 0.8 }}
+            className="absolute bottom-6 right-6 h-20 w-20 border-b-2 border-r-2 border-primary/40"
+            initial={{ opacity: 0, scale: 0.5, rotate: 10 }}
+            animate={stage >= 2 ? { opacity: 1, scale: 1, rotate: 0 } : {}}
+            transition={{ ...springTransition, delay: 0.6 }}
+          />
+
+          {/* Additional corner accents */}
+          <motion.div
+            className="absolute right-6 top-6 h-20 w-20 border-r-2 border-t-2 border-secondary/30"
+            initial={{ opacity: 0, scale: 0.5 }}
             animate={stage >= 2 ? { opacity: 1, scale: 1 } : {}}
-            transition={{ duration: 0.6, delay: 0.5 }}
+            transition={{ ...springTransition, delay: 0.7 }}
+          />
+          <motion.div
+            className="absolute bottom-6 left-6 h-20 w-20 border-b-2 border-l-2 border-secondary/30"
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={stage >= 2 ? { opacity: 1, scale: 1 } : {}}
+            transition={{ ...springTransition, delay: 0.8 }}
           />
         </motion.div>
       )}
