@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import tokyoStation from "@/assets/tokyo-station.jpg";
 
 const milestones = [
   { phase: "Phase 1", title: "Registration Opens", time: "Early 2026", kanji: "登録開始" },
@@ -17,7 +18,22 @@ const TimelineSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen px-6 py-32" id="timeline">
+    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="timeline">
+      {/* Background Image */}
+      <motion.div
+        className="absolute inset-0 -z-10"
+        initial={{ opacity: 0 }}
+        animate={headerVisible ? { opacity: 1 } : {}}
+        transition={{ duration: 1.5 }}
+      >
+        <img
+          src={tokyoStation}
+          alt=""
+          className="h-full w-full object-cover opacity-15"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
+      </motion.div>
+
       <div className="mx-auto max-w-5xl">
         {/* Section Header */}
         <motion.div

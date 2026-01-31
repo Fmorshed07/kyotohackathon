@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import tokyoTemple from "@/assets/tokyo-temple.jpg";
 
 const tracks = [
   {
@@ -40,7 +41,21 @@ const ThemeSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen px-6 py-32" id="theme">
+    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="theme">
+      {/* Background Image */}
+      <motion.div
+        className="absolute inset-0 -z-10"
+        initial={{ opacity: 0 }}
+        animate={headerVisible ? { opacity: 1 } : {}}
+        transition={{ duration: 1.5 }}
+      >
+        <img
+          src={tokyoTemple}
+          alt=""
+          className="h-full w-full object-cover opacity-15"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
+      </motion.div>
       <div className="mx-auto max-w-5xl">
         {/* Section Header */}
         <motion.div
