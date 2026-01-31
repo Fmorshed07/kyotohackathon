@@ -1,13 +1,45 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import LoadingExperience from "@/components/LoadingExperience";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import HeroSection from "@/components/sections/HeroSection";
+import AboutSection from "@/components/sections/AboutSection";
+import ThemeSection from "@/components/sections/ThemeSection";
+import TimelineSection from "@/components/sections/TimelineSection";
+import ParticipantsSection from "@/components/sections/ParticipantsSection";
+import DeliverablesSection from "@/components/sections/DeliverablesSection";
+import JudgingSection from "@/components/sections/JudgingSection";
+import SponsorsSection from "@/components/sections/SponsorsSection";
+import CognisorSection from "@/components/sections/CognisorSection";
+import FinalCTASection from "@/components/sections/FinalCTASection";
 
 const Index = () => {
+  const [isLoading, setIsLoading] = useState(true);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <>
+      {isLoading && <LoadingExperience onComplete={() => setIsLoading(false)} />}
+      
+      <div
+        className={`transition-opacity duration-1000 ${
+          isLoading ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        <AnimatedBackground />
+        
+        <main className="relative">
+          <HeroSection />
+          <AboutSection />
+          <ThemeSection />
+          <TimelineSection />
+          <ParticipantsSection />
+          <DeliverablesSection />
+          <JudgingSection />
+          <SponsorsSection />
+          <CognisorSection />
+          <FinalCTASection />
+        </main>
       </div>
-    </div>
+    </>
   );
 };
 
