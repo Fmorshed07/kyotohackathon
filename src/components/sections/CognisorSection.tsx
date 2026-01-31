@@ -2,11 +2,11 @@ import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const CognisorSection = () => {
-  const { ref, isVisible } = useScrollReveal<HTMLElement>({ threshold: 0.2 });
+  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.2 });
 
   return (
-    <section ref={ref} className="relative min-h-screen px-6 py-32" id="cognisor">
-      <div className="mx-auto max-w-4xl text-center">
+    <section className="relative min-h-screen px-6 py-32" id="cognisor">
+      <div ref={ref} className="mx-auto max-w-4xl text-center">
         {/* Organized By */}
         <motion.span
           className="font-display text-sm tracking-[0.3em] text-muted-foreground"

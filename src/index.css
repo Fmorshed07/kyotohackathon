@@ -108,11 +108,44 @@
 
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: 2rem;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* Smooth scroll with custom easing */
+  @supports (scroll-behavior: smooth) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  /* Selection styling */
+  ::selection {
+    background: hsl(185 100% 50% / 0.3);
+    color: hsl(210 40% 98%);
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(222 47% 5%);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(222 30% 20%);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(185 100% 50% / 0.5);
   }
 }
 

@@ -3,10 +3,12 @@ import { useScrollReveal } from "@/hooks/useScrollReveal";
 import tokyoSkyline from "@/assets/tokyo-skyline.jpg";
 
 const AboutSection = () => {
-  const { ref: sectionRef, isVisible: sectionVisible } = useScrollReveal<HTMLElement>({ threshold: 0.1 });
+  const { ref: sectionRef, isVisible: sectionVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.1 });
 
   return (
-    <section ref={sectionRef} className="relative min-h-screen overflow-hidden px-6 py-32" id="about">
+    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="about">
+      {/* Scroll trigger */}
+      <div ref={sectionRef} className="absolute inset-0" />
       {/* Background Image */}
       <motion.div
         className="absolute inset-0 -z-10"

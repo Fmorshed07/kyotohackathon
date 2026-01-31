@@ -3,13 +3,14 @@ import { useScrollReveal } from "@/hooks/useScrollReveal";
 import tokyoHero from "@/assets/tokyo-hero.jpg";
 
 const HeroSection = () => {
-  const { ref, isVisible } = useScrollReveal<HTMLElement>({ threshold: 0.2 });
+  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.2 });
 
   return (
     <section
-      ref={ref}
       className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-20"
     >
+      {/* Scroll trigger */}
+      <div ref={ref} className="absolute inset-0" />
       {/* Background Image with Parallax */}
       <motion.div
         className="absolute inset-0 -z-10"

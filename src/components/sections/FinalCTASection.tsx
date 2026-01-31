@@ -3,14 +3,15 @@ import { useScrollReveal } from "@/hooks/useScrollReveal";
 import tokyoAbstract from "@/assets/tokyo-abstract.jpg";
 
 const FinalCTASection = () => {
-  const { ref, isVisible } = useScrollReveal<HTMLElement>({ threshold: 0.2 });
+  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.2 });
 
   return (
     <section
-      ref={ref}
       className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-32"
       id="cta"
     >
+      {/* Scroll trigger */}
+      <div ref={ref} className="absolute inset-0" />
       {/* Background */}
       <motion.div
         className="absolute inset-0 -z-10"
