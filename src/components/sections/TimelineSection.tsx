@@ -1,10 +1,11 @@
+import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const milestones = [
-  { phase: "Phase 1", title: "Registration Opens", time: "Early 2026" },
-  { phase: "Phase 2", title: "Team Formation", time: "January 2026" },
-  { phase: "Phase 3", title: "Build Week", time: "February 2026" },
-  { phase: "Phase 4", title: "Final Presentations", time: "February 2026" },
+  { phase: "Phase 1", title: "Registration Opens", time: "Early 2026", kanji: "登録開始" },
+  { phase: "Phase 2", title: "Team Formation", time: "January 2026", kanji: "チーム結成" },
+  { phase: "Phase 3", title: "Build Week", time: "February 2026", kanji: "開発週間" },
+  { phase: "Phase 4", title: "Final Presentations", time: "February 2026", kanji: "最終発表" },
 ];
 
 const TimelineSection = () => {
@@ -19,38 +20,60 @@ const TimelineSection = () => {
     <section className="relative min-h-screen px-6 py-32" id="timeline">
       <div className="mx-auto max-w-5xl">
         {/* Section Header */}
-        <div
+        <motion.div
           ref={headerRef}
-          className={`mb-20 transition-all duration-1000 ${
-            headerVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-          }`}
+          className="mb-20"
+          initial={{ opacity: 0, y: 50 }}
+          animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
-          <span className="font-display text-sm tracking-gta text-primary">EVENT FORMAT</span>
-          <h2 className="mt-4 font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+          <motion.span
+            className="font-display text-sm tracking-[0.3em] text-primary"
+            initial={{ opacity: 0, x: -20 }}
+            animate={headerVisible ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            EVENT FORMAT
+          </motion.span>
+          <motion.h2
+            className="mt-4 font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl"
+            initial={{ opacity: 0, y: 30 }}
+            animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.8, delay: 0.3 }}
+          >
             The Journey
-          </h2>
-          <div className="mt-6 flex flex-wrap items-center gap-4 text-muted-foreground">
-            <span className="rounded-full border border-primary/30 bg-primary/5 px-4 py-1 font-display text-sm text-primary">
+          </motion.h2>
+          <motion.div
+            className="mt-6 flex flex-wrap items-center gap-4"
+            initial={{ opacity: 0 }}
+            animate={headerVisible ? { opacity: 1 } : {}}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            <motion.span
+              className="rounded-full border border-primary/30 bg-primary/5 px-4 py-1 font-display text-sm text-primary"
+              whileHover={{ scale: 1.05, borderColor: "hsl(185 100% 50% / 0.6)" }}
+            >
               February 2026
-            </span>
-            <span className="rounded-full border border-border px-4 py-1 font-display text-sm">
+            </motion.span>
+            <span className="rounded-full border border-border px-4 py-1 font-display text-sm text-muted-foreground">
               Tokyo, Japan
             </span>
-            <span className="rounded-full border border-border px-4 py-1 font-display text-sm">
+            <span className="rounded-full border border-border px-4 py-1 font-display text-sm text-muted-foreground">
               In-Person
             </span>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* Timeline */}
         <div ref={lineRef} className="relative">
           {/* Vertical Line */}
           <div className="absolute left-4 top-0 h-full w-[2px] overflow-hidden md:left-1/2 md:-translate-x-1/2">
-            <div
-              className={`h-full w-full bg-gradient-to-b from-primary via-secondary to-primary/20 transition-all duration-1500 ease-out ${
-                lineVisible ? "translate-y-0" : "-translate-y-full"
-              }`}
-              style={{ transitionDuration: "1.5s" }}
+            <motion.div
+              className="h-full w-full bg-gradient-to-b from-primary via-secondary to-primary/20"
+              initial={{ scaleY: 0 }}
+              animate={lineVisible ? { scaleY: 1 } : {}}
+              transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1] }}
+              style={{ transformOrigin: "top" }}
             />
           </div>
 
@@ -63,26 +86,33 @@ const TimelineSection = () => {
               const isEven = index % 2 === 0;
 
               return (
-                <div
+                <motion.div
                   key={milestone.phase}
                   ref={ref}
-                  className={`relative flex items-center transition-all duration-700 ${
-                    isVisible ? "opacity-100" : "opacity-0"
-                  } ${isVisible ? (isEven ? "translate-x-0" : "translate-x-0") : isEven ? "-translate-x-8" : "translate-x-8"}`}
-                  style={{ transitionDelay: `${index * 150}ms` }}
+                  className="relative flex items-center"
+                  initial={{ opacity: 0, x: isEven ? -50 : 50 }}
+                  animate={isVisible ? { opacity: 1, x: 0 } : {}}
+                  transition={{ duration: 0.6, delay: index * 0.15, ease: [0.22, 1, 0.36, 1] }}
                 >
                   {/* Dot */}
-                  <div
-                    className={`absolute left-4 z-10 h-4 w-4 rounded-full border-2 border-primary bg-background md:left-1/2 md:-translate-x-1/2 ${
-                      isVisible ? "scale-100" : "scale-0"
-                    } transition-transform duration-500`}
-                    style={{
-                      boxShadow: isVisible
-                        ? "0 0 20px hsl(185 100% 50% / 0.5)"
-                        : "none",
-                      transitionDelay: `${index * 150 + 200}ms`,
-                    }}
-                  />
+                  <motion.div
+                    className="absolute left-4 z-10 md:left-1/2 md:-translate-x-1/2"
+                    initial={{ scale: 0 }}
+                    animate={isVisible ? { scale: 1 } : {}}
+                    transition={{ duration: 0.4, delay: index * 0.15 + 0.2 }}
+                  >
+                    <motion.div
+                      className="h-4 w-4 rounded-full border-2 border-primary bg-background"
+                      animate={isVisible ? {
+                        boxShadow: [
+                          "0 0 0px hsl(185 100% 50% / 0)",
+                          "0 0 20px hsl(185 100% 50% / 0.5)",
+                          "0 0 0px hsl(185 100% 50% / 0)",
+                        ],
+                      } : {}}
+                      transition={{ duration: 2, repeat: Infinity, delay: index * 0.3 }}
+                    />
+                  </motion.div>
 
                   {/* Content */}
                   <div
@@ -92,17 +122,22 @@ const TimelineSection = () => {
                         : "md:ml-auto md:pl-20 md:text-left md:w-1/2"
                     }`}
                   >
-                    <span className="font-display text-xs tracking-gta text-primary/60">
+                    <span className="font-display text-xs tracking-[0.2em] text-primary/60">
                       {milestone.phase}
                     </span>
                     <h3 className="mt-1 font-display text-xl tracking-wide text-foreground md:text-2xl">
                       {milestone.title}
                     </h3>
-                    <p className="mt-1 font-body text-sm text-muted-foreground">
-                      {milestone.time}
-                    </p>
+                    <div className="mt-1 flex items-center gap-3 md:justify-end">
+                      <p className="font-body text-sm text-muted-foreground">
+                        {milestone.time}
+                      </p>
+                      <span className="text-xs text-muted-foreground/40">
+                        {milestone.kanji}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>

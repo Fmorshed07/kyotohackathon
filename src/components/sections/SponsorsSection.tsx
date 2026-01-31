@@ -1,18 +1,22 @@
+import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const tiers = [
   {
     name: "Platinum",
+    kanji: "プラチナ",
     color: "primary",
     benefits: ["Premier logo placement", "Speaking opportunity", "VIP access", "Recruiting booth"],
   },
   {
     name: "Gold",
+    kanji: "ゴールド",
     color: "secondary",
     benefits: ["Logo on materials", "Booth space", "Attendee access", "Social mentions"],
   },
   {
     name: "Silver",
+    kanji: "シルバー",
     color: "muted",
     benefits: ["Logo on website", "Social mentions", "Event tickets", "Brand visibility"],
   },
@@ -27,21 +31,39 @@ const SponsorsSection = () => {
     <section className="relative min-h-screen px-6 py-32" id="sponsors">
       <div className="mx-auto max-w-5xl">
         {/* Section Header */}
-        <div
+        <motion.div
           ref={headerRef}
-          className={`mb-20 text-center transition-all duration-1000 ${
-            headerVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-          }`}
+          className="mb-20 text-center"
+          initial={{ opacity: 0, y: 50 }}
+          animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
-          <span className="font-display text-sm tracking-gta text-primary">PARTNERS</span>
-          <h2 className="mt-4 font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+          <motion.span
+            className="font-display text-sm tracking-[0.3em] text-primary"
+            initial={{ opacity: 0 }}
+            animate={headerVisible ? { opacity: 1 } : {}}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            PARTNERS
+          </motion.span>
+          <motion.h2
+            className="mt-4 font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl"
+            initial={{ opacity: 0, y: 30 }}
+            animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.8, delay: 0.3 }}
+          >
             Partner with Impact Tokyo
-          </h2>
-          <p className="mx-auto mt-6 max-w-2xl font-body text-lg text-muted-foreground">
+          </motion.h2>
+          <motion.p
+            className="mx-auto mt-6 max-w-2xl font-body text-lg text-muted-foreground"
+            initial={{ opacity: 0 }}
+            animate={headerVisible ? { opacity: 1 } : {}}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
             Join us in building the future of AI. Your support enables the next generation
             of impactful technology.
-          </p>
-        </div>
+          </motion.p>
+        </motion.div>
 
         {/* Sponsor Tiers */}
         <div className="grid gap-6 md:grid-cols-3">
@@ -52,10 +74,10 @@ const SponsorsSection = () => {
 
             const borderClass =
               tier.color === "primary"
-                ? "neon-border-cyan"
+                ? "border-primary/50 hover:border-primary"
                 : tier.color === "secondary"
-                ? "neon-border-violet"
-                : "border-border";
+                ? "border-secondary/50 hover:border-secondary"
+                : "border-border hover:border-muted-foreground";
 
             const textClass =
               tier.color === "primary"
@@ -64,50 +86,82 @@ const SponsorsSection = () => {
                 ? "text-secondary"
                 : "text-muted-foreground";
 
+            const glowClass =
+              tier.color === "primary"
+                ? "0 0 30px hsl(185 100% 50% / 0.3)"
+                : tier.color === "secondary"
+                ? "0 0 30px hsl(270 70% 60% / 0.3)"
+                : "none";
+
             return (
-              <div
+              <motion.div
                 key={tier.name}
                 ref={ref}
-                className={`group relative rounded-xl bg-card/50 p-8 transition-all duration-700 hover:bg-card ${borderClass} ${
-                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-                }`}
-                style={{ transitionDelay: `${index * 150}ms` }}
+                className={`group relative overflow-hidden rounded-xl border bg-card/30 p-8 backdrop-blur-sm transition-all duration-500 ${borderClass}`}
+                initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                animate={isVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
+                transition={{ duration: 0.6, delay: index * 0.15, ease: [0.22, 1, 0.36, 1] }}
+                whileHover={{ 
+                  scale: 1.02,
+                  boxShadow: glowClass,
+                }}
               >
-                <h3 className={`font-display text-2xl tracking-wide ${textClass}`}>
-                  {tier.name}
-                </h3>
-                <ul className="mt-6 space-y-3">
-                  {tier.benefits.map((benefit) => (
-                    <li
+                {/* Tier name */}
+                <div className="mb-6 flex items-center justify-between">
+                  <motion.h3
+                    className={`font-display text-2xl tracking-wide ${textClass}`}
+                    whileHover={{ x: 5 }}
+                  >
+                    {tier.name}
+                  </motion.h3>
+                  <span className="text-xs text-muted-foreground/40">{tier.kanji}</span>
+                </div>
+
+                {/* Benefits */}
+                <ul className="space-y-3">
+                  {tier.benefits.map((benefit, i) => (
+                    <motion.li
                       key={benefit}
                       className="flex items-center gap-3 font-body text-sm text-muted-foreground"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={isVisible ? { opacity: 1, x: 0 } : {}}
+                      transition={{ duration: 0.4, delay: index * 0.15 + i * 0.05 + 0.3 }}
                     >
-                      <span className={`h-1 w-1 rounded-full ${
+                      <span className={`h-1.5 w-1.5 rounded-full ${
                         tier.color === "primary" ? "bg-primary" : 
                         tier.color === "secondary" ? "bg-secondary" : "bg-muted-foreground"
                       }`} />
                       {benefit}
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
-              </div>
+
+                {/* Decorative corner */}
+                <div className={`absolute -right-8 -top-8 h-16 w-16 rounded-full opacity-10 blur-2xl ${
+                  tier.color === "primary" ? "bg-primary" : 
+                  tier.color === "secondary" ? "bg-secondary" : "bg-muted-foreground"
+                }`} />
+              </motion.div>
             );
           })}
         </div>
 
         {/* CTA */}
-        <div
-          className={`mt-16 text-center transition-all duration-1000 delay-500 ${
-            headerVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}
+        <motion.div
+          className="mt-16 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.8 }}
         >
-          <a
+          <motion.a
             href="#"
-            className="inline-flex items-center justify-center rounded-lg border border-primary/50 bg-primary/10 px-10 py-4 font-display text-sm tracking-wider text-primary transition-all duration-300 hover:bg-primary/20 btn-glow-cyan"
+            className="inline-flex items-center justify-center rounded-lg border border-primary/50 bg-primary/10 px-10 py-4 font-display text-sm tracking-wider text-primary backdrop-blur-sm transition-all duration-300 hover:bg-primary/20"
+            whileHover={{ scale: 1.02, boxShadow: "0 0 30px hsl(185 100% 50% / 0.4)" }}
+            whileTap={{ scale: 0.98 }}
           >
             BECOME A SPONSOR
-          </a>
-        </div>
+          </motion.a>
+        </motion.div>
       </div>
     </section>
   );

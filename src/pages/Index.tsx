@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import LoadingExperience from "@/components/LoadingExperience";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import HeroSection from "@/components/sections/HeroSection";
@@ -17,12 +18,16 @@ const Index = () => {
 
   return (
     <>
-      {isLoading && <LoadingExperience onComplete={() => setIsLoading(false)} />}
+      <AnimatePresence mode="wait">
+        {isLoading && (
+          <LoadingExperience onComplete={() => setIsLoading(false)} />
+        )}
+      </AnimatePresence>
       
-      <div
-        className={`transition-opacity duration-1000 ${
-          isLoading ? "opacity-0" : "opacity-100"
-        }`}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: isLoading ? 0 : 1 }}
+        transition={{ duration: 1, delay: 0.3 }}
       >
         <AnimatedBackground />
         
@@ -38,7 +43,7 @@ const Index = () => {
           <CognisorSection />
           <FinalCTASection />
         </main>
-      </div>
+      </motion.div>
     </>
   );
 };
