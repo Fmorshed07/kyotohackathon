@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import tokyoNeonAlley from "@/assets/tokyo-neon-alley.jpg";
 
 const participants = [
   {
@@ -34,7 +35,22 @@ const ParticipantsSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen px-6 py-32" id="participants">
+    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="participants">
+      {/* Background Image */}
+      <motion.div
+        className="absolute inset-0 -z-10"
+        initial={{ opacity: 0 }}
+        animate={headerVisible ? { opacity: 1 } : {}}
+        transition={{ duration: 1.5 }}
+      >
+        <img
+          src={tokyoNeonAlley}
+          alt=""
+          className="h-full w-full object-cover opacity-20"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/90 to-background" />
+      </motion.div>
+
       <div className="mx-auto max-w-5xl">
         {/* Section Header */}
         <motion.div
