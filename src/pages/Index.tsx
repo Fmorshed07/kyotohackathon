@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingExperience from "@/components/LoadingExperience";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import SiteHeader from "@/components/SiteHeader";
 import HeroSection from "@/components/sections/HeroSection";
 import AboutSection from "@/components/sections/AboutSection";
 import ThemeSection from "@/components/sections/ThemeSection";
@@ -30,8 +31,10 @@ const Index = () => {
         transition={{ duration: 1, delay: 0.3 }}
       >
         <AnimatedBackground />
-        
-        <main className="relative">
+
+        <SiteHeader />
+
+        <main className="relative pt-16">
           <HeroSection />
           <AboutSection />
           <ThemeSection />

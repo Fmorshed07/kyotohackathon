@@ -113,7 +113,7 @@
 
   html {
     scroll-behavior: smooth;
-    scroll-padding-top: 2rem;
+    scroll-padding-top: 5rem;
   }
 
   body {
@@ -254,6 +254,14 @@
     background-size: 200% 200%;
     animation: gradientShift 15s ease infinite;
   }
+
+  .animate-scroll-left {
+    animation: scrollLeft 24s linear infinite;
+  }
+
+  .animate-scroll-right {
+    animation: scrollRight 24s linear infinite;
+  }
 }
 
 @keyframes breathe {
@@ -319,5 +327,23 @@
   }
   100% {
     transform: translateY(-100%);
+  }
+}
+
+@keyframes scrollLeft {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes scrollRight {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
   }
 }

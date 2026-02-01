@@ -100,7 +100,15 @@ const HeroSection = () => {
           animate={isVisible ? { opacity: 1 } : {}}
           transition={{ duration: 0.8, delay: 0.7 }}
         >
-          Organized by Cognisor AI
+          Organized by{" "}
+          <a
+            href="https://cognisorai.com"
+            className="text-muted-foreground/80 transition-colors hover:text-primary"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Cognisor AI
+          </a>
         </motion.p>
 
         {/* Event Info Pills */}
@@ -121,21 +129,13 @@ const HeroSection = () => {
           </span>
         </motion.div>
 
-        {/* CTA Buttons */}
+        {/* CTA Button */}
         <motion.div
-          className="mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+          className="mt-12 flex justify-center"
           initial={{ opacity: 0, y: 30 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.8, delay: 0.9 }}
         >
-          <motion.a
-            href="#sponsors"
-            className="group relative inline-flex items-center justify-center overflow-hidden rounded-lg border border-primary/50 bg-primary/10 px-8 py-4 font-display text-sm tracking-wider text-primary backdrop-blur-sm transition-all duration-300 hover:bg-primary/20"
-            whileHover={{ scale: 1.02, boxShadow: "0 0 30px hsl(185 100% 50% / 0.4)" }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <span className="relative z-10">BECOME A SPONSOR</span>
-          </motion.a>
           <motion.a
             href="#"
             className="group relative inline-flex items-center justify-center overflow-hidden rounded-lg border border-secondary/50 bg-secondary/10 px-8 py-4 font-display text-sm tracking-wider text-secondary backdrop-blur-sm transition-all duration-300 hover:bg-secondary/20"

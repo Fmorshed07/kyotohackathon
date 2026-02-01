@@ -24,8 +24,11 @@ const CognisorSection = () => {
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
         >
-          <motion.span
-            className="text-gradient-cyan"
+          <motion.a
+            href="https://cognisorai.com"
+            target="_blank"
+            rel="noreferrer"
+            className="text-gradient-cyan transition-colors hover:text-primary"
             animate={isVisible ? {
               textShadow: [
                 "0 0 20px hsl(185 100% 50% / 0.3)",
@@ -36,7 +39,7 @@ const CognisorSection = () => {
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
           >
             Cognisor AI
-          </motion.span>
+          </motion.a>
         </motion.h2>
 
         {/* Description */}
