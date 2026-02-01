@@ -39,6 +39,11 @@
     --accent: 270 50% 40%;
     --accent-foreground: 210 40% 98%;
 
+    /* Community - Emerald */
+    --community: 160 70% 45%;
+    --community-foreground: 210 40% 98%;
+    --accent-foreground: 210 40% 98%;
+
     /* Destructive */
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;

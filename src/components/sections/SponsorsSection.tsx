@@ -22,6 +22,23 @@ const tiers = [
   },
 ];
 
+const additionalTiers = [
+  {
+    name: "Partners",
+    kanji: "パートナー",
+    color: "accent",
+    description: "Strategic collaborators who share our vision for AI-driven global impact.",
+    benefits: ["Co-branding opportunities", "Joint content creation", "Network access", "Mentorship roles"],
+  },
+  {
+    name: "Community Supporters",
+    kanji: "コミュニティ",
+    color: "community",
+    description: "Individuals and organizations championing the AI for Good movement.",
+    benefits: ["Recognition on website", "Community badge", "Early access updates", "Networking events"],
+  },
+];
+
 const SponsorsSection = () => {
   const { ref: headerRef, isVisible: headerVisible } = useScrollReveal<HTMLDivElement>({
     threshold: 0.2,
@@ -146,6 +163,79 @@ const SponsorsSection = () => {
           })}
         </div>
 
+        {/* Partners & Community Section */}
+        <motion.div
+          className="mt-16 grid gap-6 md:grid-cols-2"
+          initial={{ opacity: 0, y: 30 }}
+          animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.8, delay: 0.6 }}
+        >
+          {additionalTiers.map((tier, index) => {
+            const isPartner = tier.color === "accent";
+            
+            return (
+              <motion.div
+                key={tier.name}
+                className={`group relative overflow-hidden rounded-xl border p-8 backdrop-blur-sm transition-all duration-500 ${
+                  isPartner 
+                    ? "border-accent/50 hover:border-accent bg-accent/5" 
+                    : "border-community/50 hover:border-community bg-community/5"
+                }`}
+                initial={{ opacity: 0, x: index === 0 ? -30 : 30 }}
+                animate={headerVisible ? { opacity: 1, x: 0 } : {}}
+                transition={{ duration: 0.6, delay: 0.7 + index * 0.15 }}
+                whileHover={{ 
+                  scale: 1.02,
+                  boxShadow: isPartner 
+                    ? "0 0 30px hsl(270 50% 40% / 0.3)" 
+                    : "0 0 30px hsl(160 70% 45% / 0.3)",
+                }}
+              >
+                {/* Header */}
+                <div className="mb-4 flex items-center justify-between">
+                  <motion.h3
+                    className={`font-display text-2xl tracking-wide ${
+                      isPartner ? "text-accent" : "text-community"
+                    }`}
+                    whileHover={{ x: 5 }}
+                  >
+                    {tier.name}
+                  </motion.h3>
+                  <span className="text-xs text-muted-foreground/40">{tier.kanji}</span>
+                </div>
+                
+                {/* Description */}
+                <p className="mb-6 font-body text-sm text-muted-foreground">
+                  {tier.description}
+                </p>
+
+                {/* Benefits */}
+                <ul className="space-y-2">
+                  {tier.benefits.map((benefit, i) => (
+                    <motion.li
+                      key={benefit}
+                      className="flex items-center gap-3 font-body text-sm text-muted-foreground"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={headerVisible ? { opacity: 1, x: 0 } : {}}
+                      transition={{ duration: 0.4, delay: 0.8 + index * 0.15 + i * 0.05 }}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${
+                        isPartner ? "bg-accent" : "bg-community"
+                      }`} />
+                      {benefit}
+                    </motion.li>
+                  ))}
+                </ul>
+
+                {/* Decorative corner */}
+                <div className={`absolute -right-8 -top-8 h-16 w-16 rounded-full opacity-10 blur-2xl ${
+                  isPartner ? "bg-accent" : "bg-community"
+                }`} />
+              </motion.div>
+            );
+          })}
+        </motion.div>
+
         {/* CTA */}
         <motion.div
           className="mt-16 text-center"
@@ -153,14 +243,24 @@ const SponsorsSection = () => {
           animate={headerVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.8 }}
         >
-          <motion.a
-            href="#"
-            className="inline-flex items-center justify-center rounded-lg border border-primary/50 bg-primary/10 px-10 py-4 font-display text-sm tracking-wider text-primary backdrop-blur-sm transition-all duration-300 hover:bg-primary/20"
-            whileHover={{ scale: 1.02, boxShadow: "0 0 30px hsl(185 100% 50% / 0.4)" }}
-            whileTap={{ scale: 0.98 }}
-          >
-            BECOME A SPONSOR
-          </motion.a>
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <motion.a
+              href="#"
+              className="inline-flex items-center justify-center rounded-lg border border-primary/50 bg-primary/10 px-10 py-4 font-display text-sm tracking-wider text-primary backdrop-blur-sm transition-all duration-300 hover:bg-primary/20"
+              whileHover={{ scale: 1.02, boxShadow: "0 0 30px hsl(185 100% 50% / 0.4)" }}
+              whileTap={{ scale: 0.98 }}
+            >
+              BECOME A SPONSOR
+            </motion.a>
+            <motion.a
+              href="#"
+              className="inline-flex items-center justify-center rounded-lg border border-community/50 bg-community/10 px-10 py-4 font-display text-sm tracking-wider text-community backdrop-blur-sm transition-all duration-300 hover:bg-community/20"
+              whileHover={{ scale: 1.02, boxShadow: "0 0 30px hsl(160 70% 45% / 0.4)" }}
+              whileTap={{ scale: 0.98 }}
+            >
+              JOIN AS SUPPORTER
+            </motion.a>
+          </div>
         </motion.div>
       </div>
     </section>
