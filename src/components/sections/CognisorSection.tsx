@@ -6,14 +6,19 @@ const CognisorSection = () => {
 
   return (
     <section className="relative min-h-screen px-6 py-32" id="cognisor">
-      <div ref={ref} className="mx-auto max-w-4xl text-center">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute left-1/2 top-24 h-96 w-96 -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[120px]" />
+        <div className="absolute right-0 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-violet-500/10 blur-[120px]" />
+      </div>
+      <div ref={ref} className="mx-auto max-w-5xl text-center">
         {/* Organized By */}
         <motion.span
-          className="font-display text-sm tracking-[0.3em] text-muted-foreground"
+          className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/40 px-4 py-2 font-display text-xs tracking-[0.3em] text-muted-foreground shadow-sm backdrop-blur"
           initial={{ opacity: 0, y: 20 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
         >
+          <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_12px_hsl(185_100%_50%/0.8)]" />
           ORGANIZED BY
         </motion.span>
 
@@ -41,6 +46,21 @@ const CognisorSection = () => {
             Cognisor AI
           </motion.a>
         </motion.h2>
+        <motion.p
+          className="mt-3 font-body text-sm text-muted-foreground"
+          initial={{ opacity: 0, y: 20 }}
+          animate={isVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.3 }}
+        >
+          <a
+            href="https://www.cognisorai.com"
+            target="_blank"
+            rel="noreferrer"
+            className="transition-colors hover:text-primary"
+          >
+            www.cognisorai.com
+          </a>
+        </motion.p>
 
         {/* Description */}
         <motion.div
@@ -50,33 +70,74 @@ const CognisorSection = () => {
           transition={{ duration: 0.8, delay: 0.4 }}
         >
           <p className="font-body text-xl leading-relaxed text-muted-foreground md:text-2xl">
-            Cognisor AI is at the forefront of developing artificial intelligence
-            solutions that prioritize human impact over technological novelty.
+            Cognisor AI builds AI development and business automation solutions that
+            help teams build smarter and scale faster with AI at the core.
           </p>
           <p className="font-body text-lg text-muted-foreground/80">
-            Based in Tokyo, we believe in building AI that serves humanity's most
-            pressing needs—from healthcare accessibility to sustainable urban living.
-            Impact Tokyo is our flagship initiative to empower the next generation of
-            purpose-driven AI builders.
+            The company delivers intelligent systems, scalable digital products, and
+            automation workflows tailored to business needs, supported by consultations
+            and a growing catalog of AI tools.
           </p>
+          <div className="mt-8 grid gap-4 text-left md:grid-cols-2">
+            {[
+              {
+                title: "AI Systems",
+                description:
+                  "Intelligent systems for complex business problems with speed and accuracy.",
+              },
+              {
+                title: "Web & App Development",
+                description:
+                  "Scalable digital products built for performance, reliability, and growth.",
+              },
+              {
+                title: "Business Automation",
+                description:
+                  "Replace repetitive tasks with intelligent, measurable workflows.",
+              },
+              {
+                title: "AI Tools Catalog",
+                description:
+                  "Tools across productivity, marketing, content, and operations.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="group rounded-2xl border border-border/70 bg-card/40 p-5 shadow-sm backdrop-blur transition hover:border-cyan-400/40 hover:bg-card/60"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display text-lg tracking-wide text-foreground">
+                    {item.title}
+                  </h3>
+                  <span className="h-2.5 w-2.5 rounded-full bg-cyan-400/80 opacity-60 transition group-hover:opacity-100" />
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground/80">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
         </motion.div>
 
         {/* Mission Statement */}
         <motion.div
-          className="mt-16 overflow-hidden rounded-xl border border-border bg-card/30 p-8 backdrop-blur-sm md:p-12"
+          className="mt-16 overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-card/40 via-card/20 to-transparent p-8 text-left shadow-lg backdrop-blur md:p-12"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={isVisible ? { opacity: 1, scale: 1 } : {}}
           transition={{ duration: 0.8, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
           whileHover={{ borderColor: "hsl(185 100% 50% / 0.3)" }}
         >
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            Cognisor AI Philosophy
+          </p>
           <motion.blockquote
-            className="font-display text-xl italic tracking-wide text-foreground md:text-2xl"
+            className="mt-4 font-display text-xl italic tracking-wide text-foreground md:text-2xl"
             initial={{ opacity: 0 }}
             animate={isVisible ? { opacity: 1 } : {}}
             transition={{ duration: 0.6, delay: 0.8 }}
           >
-            "Technology should solve problems that matter, not create problems to
-            solve."
+            "Build and deploy intelligent systems that solve complex business problems
+            with speed and accuracy."
           </motion.blockquote>
           <motion.p
             className="mt-4 font-body text-sm text-muted-foreground"
@@ -84,7 +145,7 @@ const CognisorSection = () => {
             animate={isVisible ? { opacity: 1 } : {}}
             transition={{ duration: 0.6, delay: 1 }}
           >
-            — The Cognisor AI Philosophy
+            — Cognisor AI
           </motion.p>
         </motion.div>
       </div>
