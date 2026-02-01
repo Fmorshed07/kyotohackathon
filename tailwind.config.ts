@@ -100,6 +100,10 @@ export default {
           800: "hsl(222 47% 8%)",
           900: "hsl(222 47% 5%)",
         },
+        community: {
+          DEFAULT: "hsl(var(--community))",
+          foreground: "hsl(var(--community-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
