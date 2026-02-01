@@ -1,4 +1,5 @@
 import { Menu } from "lucide-react";
+import { useCallback, useState, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,28 @@ const navLinks = [
 ];
 
 const SiteHeader = () => {
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  const handleMobileNavClick = useCallback((event: MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (!href.startsWith("#")) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsMobileNavOpen(false);
+
+    const target = document.querySelector(href);
+    if (!target) {
+      return;
+    }
+
+    window.history.pushState(null, "", href);
+
+    window.setTimeout(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+  }, []);
+
   return (
     <header className="fixed top-0 z-40 w-full border-b border-border/40 bg-background/70 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
@@ -52,7 +75,7 @@ const SiteHeader = () => {
         </div>
 
         <div className="md:hidden">
-          <Sheet>
+          <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Open navigation menu">
                 <Menu className="h-5 w-5" />
@@ -77,6 +100,7 @@ const SiteHeader = () => {
                     <SheetClose key={link.href} asChild>
                       <a
                         href={link.href}
+                        onClick={(event) => handleMobileNavClick(event, link.href)}
                         className="text-sm uppercase tracking-[0.35em] text-foreground/80 transition-colors hover:text-primary"
                       >
                         {link.label}
