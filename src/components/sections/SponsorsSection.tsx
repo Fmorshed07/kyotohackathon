@@ -39,6 +39,22 @@ const additionalTiers = [
   },
 ];
 
+const partnerLogos = [
+  { name: "Partner 1", placeholder: true },
+  { name: "Partner 2", placeholder: true },
+  { name: "Partner 3", placeholder: true },
+  { name: "Partner 4", placeholder: true },
+];
+
+const supporterLogos = [
+  { name: "Supporter 1", placeholder: true },
+  { name: "Supporter 2", placeholder: true },
+  { name: "Supporter 3", placeholder: true },
+  { name: "Supporter 4", placeholder: true },
+  { name: "Supporter 5", placeholder: true },
+  { name: "Supporter 6", placeholder: true },
+];
+
 const SponsorsSection = () => {
   const { ref: headerRef, isVisible: headerVisible } = useScrollReveal<HTMLDivElement>({
     threshold: 0.2,
@@ -235,6 +251,65 @@ const SponsorsSection = () => {
             );
           })}
         </motion.div>
+
+        {/* Logo Grids */}
+        <div className="mt-12 grid gap-8 md:grid-cols-2">
+          {/* Partners Logos */}
+          <motion.div
+            className="rounded-xl border border-accent/30 bg-accent/5 p-6 backdrop-blur-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.9 }}
+          >
+            <h4 className="mb-4 font-display text-sm tracking-wider text-accent">
+              OUR PARTNERS
+            </h4>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {partnerLogos.map((logo, i) => (
+                <motion.div
+                  key={logo.name}
+                  className="group flex h-16 items-center justify-center rounded-lg border border-accent/20 bg-accent/5 transition-all duration-300 hover:border-accent/50 hover:bg-accent/10"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={headerVisible ? { opacity: 1, scale: 1 } : {}}
+                  transition={{ duration: 0.4, delay: 1 + i * 0.1 }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <span className="font-display text-xs text-accent/40 transition-colors group-hover:text-accent/70">
+                    LOGO
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Community Supporters Logos */}
+          <motion.div
+            className="rounded-xl border border-community/30 bg-community/5 p-6 backdrop-blur-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 1 }}
+          >
+            <h4 className="mb-4 font-display text-sm tracking-wider text-community">
+              COMMUNITY SUPPORTERS
+            </h4>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+              {supporterLogos.map((logo, i) => (
+                <motion.div
+                  key={logo.name}
+                  className="group flex h-12 items-center justify-center rounded-lg border border-community/20 bg-community/5 transition-all duration-300 hover:border-community/50 hover:bg-community/10"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={headerVisible ? { opacity: 1, scale: 1 } : {}}
+                  transition={{ duration: 0.4, delay: 1.1 + i * 0.08 }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <span className="font-display text-[10px] text-community/40 transition-colors group-hover:text-community/70">
+                    LOGO
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
 
         {/* CTA */}
         <motion.div
