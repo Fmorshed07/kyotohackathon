@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence, type Transition } from "framer-motion";
 import tokyoAbstract from "@/assets/tokyo-abstract.jpg";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LoadingExperienceProps {
   onComplete: () => void;
@@ -8,21 +9,30 @@ interface LoadingExperienceProps {
 
 const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
   const [stage, setStage] = useState(0);
+  const isMobile = useIsMobile();
 
   // Memoize particle positions to avoid recalculation
+  const particleCount = isMobile ? 14 : 40;
   const particles = useMemo(() => 
-    Array.from({ length: 40 }).map((_, i) => ({
+    Array.from({ length: particleCount }).map((_, i) => ({
       id: i,
       x: Math.random() * 100,
-      delay: Math.random() * 2,
-      duration: 5 + Math.random() * 4,
-      blur: Math.random() * 2,
-      size: 1 + Math.random() * 2,
-    })), []
+      delay: Math.random() * (isMobile ? 1.2 : 2),
+      duration: (isMobile ? 3.5 : 5) + Math.random() * (isMobile ? 2 : 4),
+      blur: Math.random() * (isMobile ? 1.2 : 2),
+      size: (isMobile ? 1 : 1) + Math.random() * (isMobile ? 1 : 2),
+    })), [particleCount, isMobile]
   );
 
   useEffect(() => {
-    const stages = [
+    const stages = isMobile ? [
+      { delay: 200, stage: 1 },   // Particles appear
+      { delay: 500, stage: 2 },   // Line draws
+      { delay: 900, stage: 3 },   // Title appears
+      { delay: 1200, stage: 4 },  // Subtitle appears
+      { delay: 1500, stage: 5 },  // Start reveal
+      { delay: 1700, stage: 6 },  // Complete
+    ] : [
       { delay: 400, stage: 1 },   // Particles appear
       { delay: 1000, stage: 2 },  // Line draws
       { delay: 1800, stage: 3 },  // Title appears
@@ -35,13 +45,13 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
       setTimeout(() => setStage(stage), delay)
     );
 
-    const completeTimer = setTimeout(onComplete, 4200);
+    const completeTimer = setTimeout(onComplete, isMobile ? 1900 : 4200);
 
     return () => {
       timers.forEach(clearTimeout);
       clearTimeout(completeTimer);
     };
-  }, [onComplete]);
+  }, [onComplete, isMobile]);
 
   // Smooth spring transition
   const springTransition: Transition = {
@@ -112,49 +122,50 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
             ))}
           </div>
 
-          {/* Animated Lines */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            {/* Main Horizontal Line */}
-            <motion.div
-              className="absolute h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent"
-              initial={{ width: 0, opacity: 0 }}
-              animate={stage >= 2 ? { width: "85%", opacity: 1 } : {}}
-              transition={{ duration: 1.5, ease: "easeOut" }}
-              style={{
-                boxShadow: "0 0 40px hsl(185 100% 50% / 0.8), 0 0 80px hsl(185 100% 50% / 0.4)",
-              }}
-            />
+          {!isMobile && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {/* Main Horizontal Line */}
+              <motion.div
+                className="absolute h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent"
+                initial={{ width: 0, opacity: 0 }}
+                animate={stage >= 2 ? { width: "85%", opacity: 1 } : {}}
+                transition={{ duration: 1.5, ease: "easeOut" }}
+                style={{
+                  boxShadow: "0 0 40px hsl(185 100% 50% / 0.8), 0 0 80px hsl(185 100% 50% / 0.4)",
+                }}
+              />
 
-            {/* Secondary horizontal lines */}
-            <motion.div
-              className="absolute h-[1px] w-[60%] bg-gradient-to-r from-transparent via-secondary/30 to-transparent"
-              initial={{ opacity: 0, y: -40 }}
-              animate={stage >= 2 ? { opacity: 1, y: -60 } : {}}
-              transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
-            />
-            <motion.div
-              className="absolute h-[1px] w-[60%] bg-gradient-to-r from-transparent via-secondary/30 to-transparent"
-              initial={{ opacity: 0, y: 40 }}
-              animate={stage >= 2 ? { opacity: 1, y: 60 } : {}}
-              transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
-            />
+              {/* Secondary horizontal lines */}
+              <motion.div
+                className="absolute h-[1px] w-[60%] bg-gradient-to-r from-transparent via-secondary/30 to-transparent"
+                initial={{ opacity: 0, y: -40 }}
+                animate={stage >= 2 ? { opacity: 1, y: -60 } : {}}
+                transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+              />
+              <motion.div
+                className="absolute h-[1px] w-[60%] bg-gradient-to-r from-transparent via-secondary/30 to-transparent"
+                initial={{ opacity: 0, y: 40 }}
+                animate={stage >= 2 ? { opacity: 1, y: 60 } : {}}
+                transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
+              />
 
-            {/* Vertical accent lines */}
-            <motion.div
-              className="absolute h-40 w-[1px] bg-gradient-to-b from-transparent via-primary/40 to-transparent"
-              initial={{ scaleY: 0, opacity: 0 }}
-              animate={stage >= 2 ? { scaleY: 1, opacity: 1 } : {}}
-              transition={{ duration: 1, delay: 0.4, ease: "easeOut" }}
-              style={{ left: "8%" }}
-            />
-            <motion.div
-              className="absolute h-40 w-[1px] bg-gradient-to-b from-transparent via-primary/40 to-transparent"
-              initial={{ scaleY: 0, opacity: 0 }}
-              animate={stage >= 2 ? { scaleY: 1, opacity: 1 } : {}}
-              transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
-              style={{ right: "8%" }}
-            />
-          </div>
+              {/* Vertical accent lines */}
+              <motion.div
+                className="absolute h-40 w-[1px] bg-gradient-to-b from-transparent via-primary/40 to-transparent"
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={stage >= 2 ? { scaleY: 1, opacity: 1 } : {}}
+                transition={{ duration: 1, delay: 0.4, ease: "easeOut" }}
+                style={{ left: "8%" }}
+              />
+              <motion.div
+                className="absolute h-40 w-[1px] bg-gradient-to-b from-transparent via-primary/40 to-transparent"
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={stage >= 2 ? { scaleY: 1, opacity: 1 } : {}}
+                transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
+                style={{ right: "8%" }}
+              />
+            </div>
+          )}
 
           {/* Main Content */}
           <div className="relative z-10 flex flex-col items-center">
@@ -171,7 +182,7 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
             {/* Title with smooth mask reveal */}
             <div className="overflow-hidden">
               <motion.h1
-                className="font-display text-5xl font-bold tracking-[0.15em] md:text-7xl lg:text-8xl"
+                className="font-display text-4xl font-bold tracking-[0.15em] sm:text-5xl md:text-7xl lg:text-8xl"
                 initial={{ y: 120, opacity: 0 }}
                 animate={stage >= 3 ? { y: 0, opacity: 1 } : {}}
                 transition={{ 
@@ -252,33 +263,37 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
             </motion.div>
           </div>
 
-          {/* Corner decorations with smoother animation */}
-          <motion.div
-            className="absolute left-6 top-6 h-20 w-20 border-l-2 border-t-2 border-primary/40"
-            initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
-            animate={stage >= 2 ? { opacity: 1, scale: 1, rotate: 0 } : {}}
-            transition={{ ...springTransition, delay: 0.5 }}
-          />
-          <motion.div
-            className="absolute bottom-6 right-6 h-20 w-20 border-b-2 border-r-2 border-primary/40"
-            initial={{ opacity: 0, scale: 0.5, rotate: 10 }}
-            animate={stage >= 2 ? { opacity: 1, scale: 1, rotate: 0 } : {}}
-            transition={{ ...springTransition, delay: 0.6 }}
-          />
+          {!isMobile && (
+            <>
+              {/* Corner decorations with smoother animation */}
+              <motion.div
+                className="absolute left-6 top-6 h-20 w-20 border-l-2 border-t-2 border-primary/40"
+                initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
+                animate={stage >= 2 ? { opacity: 1, scale: 1, rotate: 0 } : {}}
+                transition={{ ...springTransition, delay: 0.5 }}
+              />
+              <motion.div
+                className="absolute bottom-6 right-6 h-20 w-20 border-b-2 border-r-2 border-primary/40"
+                initial={{ opacity: 0, scale: 0.5, rotate: 10 }}
+                animate={stage >= 2 ? { opacity: 1, scale: 1, rotate: 0 } : {}}
+                transition={{ ...springTransition, delay: 0.6 }}
+              />
 
-          {/* Additional corner accents */}
-          <motion.div
-            className="absolute right-6 top-6 h-20 w-20 border-r-2 border-t-2 border-secondary/30"
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={stage >= 2 ? { opacity: 1, scale: 1 } : {}}
-            transition={{ ...springTransition, delay: 0.7 }}
-          />
-          <motion.div
-            className="absolute bottom-6 left-6 h-20 w-20 border-b-2 border-l-2 border-secondary/30"
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={stage >= 2 ? { opacity: 1, scale: 1 } : {}}
-            transition={{ ...springTransition, delay: 0.8 }}
-          />
+              {/* Additional corner accents */}
+              <motion.div
+                className="absolute right-6 top-6 h-20 w-20 border-r-2 border-t-2 border-secondary/30"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={stage >= 2 ? { opacity: 1, scale: 1 } : {}}
+                transition={{ ...springTransition, delay: 0.7 }}
+              />
+              <motion.div
+                className="absolute bottom-6 left-6 h-20 w-20 border-b-2 border-l-2 border-secondary/30"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={stage >= 2 ? { opacity: 1, scale: 1 } : {}}
+                transition={{ ...springTransition, delay: 0.8 }}
+              />
+            </>
+          )}
         </motion.div>
       )}
     </AnimatePresence>
