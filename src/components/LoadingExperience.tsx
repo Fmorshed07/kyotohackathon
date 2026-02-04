@@ -26,12 +26,12 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
 
   useEffect(() => {
     const stages = isMobile ? [
-      { delay: 200, stage: 1 },   // Particles appear
-      { delay: 500, stage: 2 },   // Line draws
-      { delay: 900, stage: 3 },   // Title appears
-      { delay: 1200, stage: 4 },  // Subtitle appears
-      { delay: 1500, stage: 5 },  // Start reveal
-      { delay: 1700, stage: 6 },  // Complete
+      { delay: 250, stage: 1 },   // Particles appear
+      { delay: 700, stage: 2 },   // Line draws
+      { delay: 1200, stage: 3 },  // Title appears
+      { delay: 1700, stage: 4 },  // Subtitle appears
+      { delay: 2100, stage: 5 },  // Start reveal
+      { delay: 2400, stage: 6 },  // Complete
     ] : [
       { delay: 400, stage: 1 },   // Particles appear
       { delay: 1000, stage: 2 },  // Line draws
@@ -45,7 +45,7 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
       setTimeout(() => setStage(stage), delay)
     );
 
-    const completeTimer = setTimeout(onComplete, isMobile ? 1900 : 4200);
+    const completeTimer = setTimeout(onComplete, isMobile ? 2600 : 4200);
 
     return () => {
       timers.forEach(clearTimeout);
@@ -68,10 +68,10 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
           initial={{ opacity: 1 }}
           exit={{ 
             opacity: 0,
-            scale: 1.05,
-            filter: "blur(10px)",
+            scale: 1.02,
+            filter: "blur(6px)",
           }}
-          transition={{ duration: 1, ease: "easeInOut" }}
+          transition={{ duration: 1.2, ease: "easeInOut" }}
         >
           {/* Background Image with smooth reveal */}
           <motion.div
@@ -81,7 +81,7 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
               scale: stage >= 1 ? 1.1 : 1.3, 
               opacity: stage >= 1 ? 0.25 : 0 
             }}
-            transition={{ duration: 2.5, ease: "easeOut" }}
+            transition={{ duration: 2.8, ease: "easeInOut" }}
           >
             <img
               src={tokyoAbstract}
@@ -186,8 +186,8 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
                 initial={{ y: 120, opacity: 0 }}
                 animate={stage >= 3 ? { y: 0, opacity: 1 } : {}}
                 transition={{ 
-                  duration: 1.2, 
-                  ease: "easeOut",
+                  duration: 1.4, 
+                  ease: "easeInOut",
                 }}
               >
                 <motion.span 
@@ -212,13 +212,13 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
               className="mt-3 overflow-hidden"
               initial={{ opacity: 0 }}
               animate={stage >= 3 ? { opacity: 1 } : {}}
-              transition={{ duration: 0.8, delay: 0.4 }}
+              transition={{ duration: 0.9, delay: 0.45, ease: "easeInOut" }}
             >
               <motion.span
                 className="font-display text-3xl font-light tracking-[0.4em] text-foreground/70 md:text-4xl"
                 initial={{ y: 60, opacity: 0 }}
                 animate={stage >= 3 ? { y: 0, opacity: 1 } : {}}
-                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+                transition={{ duration: 0.9, delay: 0.25, ease: "easeInOut" }}
               >
                 2026
               </motion.span>
@@ -229,7 +229,7 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
               className="mt-8 font-display text-lg tracking-[0.25em] text-secondary md:text-xl"
               initial={{ opacity: 0, y: 30, filter: "blur(5px)" }}
               animate={stage >= 4 ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
-              transition={{ duration: 0.8, ease: "easeOut" }}
+              transition={{ duration: 1.0, ease: "easeInOut" }}
               style={{
                 textShadow: stage >= 4 ? "0 0 40px hsl(270 70% 60% / 0.6)" : "none",
               }}
@@ -253,7 +253,7 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
                     opacity: [0.4, 1, 0.4],
                   }}
                   transition={{ 
-                    duration: 1.2, 
+                    duration: 1.6, 
                     repeat: Infinity, 
                     delay: i * 0.15,
                     ease: "easeInOut",
