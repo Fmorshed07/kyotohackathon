@@ -26,9 +26,9 @@ const Index = () => {
       </AnimatePresence>
       
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={false}
         animate={{ opacity: isLoading ? 0 : 1 }}
-        transition={{ duration: 1, delay: 0.3 }}
+        transition={{ duration: 0.6, delay: 0 }}
       >
         <AnimatedBackground />
 
