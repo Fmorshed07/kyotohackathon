@@ -27,6 +27,12 @@ const partners = [
     logoClassName: "max-h-16 md:max-h-20",
   },
   {
+    name: "CreatorLabo",
+    src: "/partners/creatorlabo-log.png",
+    alt: "CreatorLabo logo",
+    logoClassName: "max-h-16 md:max-h-20",
+  },
+  {
     name: "Orange Partner",
     src: "/partners/orange-partner.png",
     alt: "Orange partner logo",

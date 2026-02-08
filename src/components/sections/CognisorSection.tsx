@@ -8,7 +8,7 @@ const CognisorSection = () => {
     <section className="relative min-h-screen px-6 py-32" id="cognisor">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute left-1/2 top-24 h-96 w-96 -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[120px]" />
-        <div className="absolute right-0 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-violet-500/10 blur-[120px]" />
+        <div className="absolute right-0 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-navy-500/10 blur-[120px]" />
       </div>
       <div ref={ref} className="mx-auto max-w-5xl text-center">
         {/* Organized By */}
@@ -78,6 +78,36 @@ const CognisorSection = () => {
             automation workflows tailored to business needs, supported by consultations
             and a growing catalog of AI tools.
           </p>
+          <div className="relative overflow-hidden rounded-3xl border border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 via-navy-500/10 to-transparent p-8 text-left shadow-[0_25px_80px_-50px_hsl(185_100%_50%/0.6)] backdrop-blur">
+            <div className="pointer-events-none absolute -top-20 right-0 h-40 w-40 rounded-full bg-cyan-400/20 blur-[60px]" />
+            <div className="pointer-events-none absolute -bottom-16 left-0 h-40 w-40 rounded-full bg-navy-400/20 blur-[60px]" />
+            <div className="relative">
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-cyan-100">
+                <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_hsl(185_100%_50%/0.9)]" />
+                Sushi Tech Tokyo 2026
+              </div>
+              <h3 className="mt-5 font-display text-2xl font-semibold tracking-wide text-foreground md:text-3xl">
+                TIU Impact Next & Cognisor AI are the event ambassadors
+              </h3>
+              <p className="mt-4 font-body text-lg text-muted-foreground/90">
+                As we connect with Sushi Tech Tokyo 2026, we are offering{" "}
+                <span className="text-foreground">discounted tickets</span> to our
+                community through this partnership.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                {["TIU Impact Next", "Cognisor AI", "Sushi Tech Tokyo 2026"].map(
+                  (label) => (
+                    <span
+                      key={label}
+                      className="rounded-full border border-border/60 bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground"
+                    >
+                      {label}
+                    </span>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
           <div className="mt-8 grid gap-4 text-left md:grid-cols-2">
             {[
               {

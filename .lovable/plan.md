@@ -21,7 +21,7 @@ When the site first opens:
 ## 2. Visual Design System
 **Color Palette:**
 - Deep navy & charcoal base
-- Subtle cyan and violet accent highlights
+- Subtle cyan and navy accent highlights
 - No photos, no illustrations – only gradients, light, typography, and motion
 
 **Typography:**
@@ -34,7 +34,7 @@ When the site first opens:
 ## 3. Hero Section (Full Viewport)
 - Centered, breathing text:
   - **"IMPACT TOKYO"** (large, gradient cyan-to-white)
-  - **"AI FOR GLOBAL GOOD"** (below, violet accent)
+- **"AI FOR GLOBAL GOOD"** (below, navy accent)
   - *"Build With Purpose. Code With Vision. Impact the World."*
   - "Organized by Cognisor AI"
 - Two glowing CTA buttons:
