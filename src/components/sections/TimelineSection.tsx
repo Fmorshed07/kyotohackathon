@@ -3,10 +3,11 @@ import { useScrollReveal } from "@/hooks/useScrollReveal";
 import tokyoStation from "@/assets/tokyo-station.jpg";
 
 const milestones = [
-  { phase: "Phase 1", title: "Registration Opens", time: "Early 2026", kanji: "登録開始" },
-  { phase: "Phase 2", title: "Team Formation", time: "January 2026", kanji: "チーム結成" },
-  { phase: "Phase 3", title: "Build Week", time: "February 2026", kanji: "開発週間" },
-  { phase: "Phase 4", title: "Final Presentations", time: "February 2026", kanji: "最終発表" },
+  { title: "Gate Opens", time: "2:00 PM", kanji: "開場" },
+  { title: "Team Formation", time: "3:00 PM", kanji: "チーム結成" },
+  { title: "Build Session", time: "4:30 PM", kanji: "開発セッション" },
+  { title: "Pitch Session", time: "5:00 - 6:30 PM", kanji: "ピッチセッション" },
+  { title: "Networking & Closing", time: "8:00 PM", kanji: "交流・閉会" },
 ];
 
 const TimelineSection = () => {
@@ -69,7 +70,7 @@ const TimelineSection = () => {
               className="rounded-full border border-primary/30 bg-primary/5 px-4 py-1 font-display text-sm text-primary"
               whileHover={{ scale: 1.05, borderColor: "hsl(185 100% 50% / 0.6)" }}
             >
-              February 2026
+              Event Day Schedule
             </motion.span>
             <span className="rounded-full border border-border px-4 py-1 font-display text-sm text-muted-foreground">
               Tokyo, Japan
@@ -103,7 +104,7 @@ const TimelineSection = () => {
 
               return (
                 <motion.div
-                  key={milestone.phase}
+                  key={`${milestone.title}-${milestone.time}`}
                   ref={ref}
                   className="relative flex items-center"
                   initial={{ opacity: 0, x: isEven ? -50 : 50 }}
@@ -138,17 +139,14 @@ const TimelineSection = () => {
                         : "md:ml-auto md:pl-20 md:text-left md:w-1/2"
                     }`}
                   >
-                    <span className="font-display text-xs tracking-[0.2em] text-primary/60">
-                      {milestone.phase}
+                    <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-display text-xs tracking-[0.2em] text-primary">
+                      {milestone.time}
                     </span>
-                    <h3 className="mt-1 font-display text-xl tracking-wide text-foreground md:text-2xl">
+                    <h3 className="mt-3 font-display text-xl tracking-wide text-foreground md:text-2xl">
                       {milestone.title}
                     </h3>
-                    <div className="mt-1 flex items-center gap-3 md:justify-end">
-                      <p className="font-body text-sm text-muted-foreground">
-                        {milestone.time}
-                      </p>
-                      <span className="text-xs text-muted-foreground/40">
+                    <div className="mt-2 flex items-center gap-3 md:justify-end">
+                      <span className="text-xs text-muted-foreground/60">
                         {milestone.kanji}
                       </span>
                     </div>
