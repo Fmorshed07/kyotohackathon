@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import tokyoStation from "@/assets/tokyo-station.jpg";
+import tokyoHero from "@/assets/tokyo-hero.jpg";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const milestones = [
   { title: "Gate Opens", time: "2:00 PM", kanji: "開場" },
@@ -36,6 +38,51 @@ const TimelineSection = () => {
       </motion.div>
 
       <div className="mx-auto max-w-5xl">
+        {/* Luma preview */}
+        <motion.div
+          className="mb-16 flex justify-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.15 }}
+        >
+          <Card className="w-full max-w-5xl border border-primary/50 bg-background/80 shadow-[0_0_40px_hsl(185_100%_50%_/_0.2)] backdrop-blur-md">
+            <CardContent className="grid gap-6 p-6 md:grid-cols-[1.1fr_1fr] md:items-stretch">
+              <div className="relative overflow-hidden rounded-md border border-border/60 bg-black/20">
+                <img
+                  src={tokyoHero}
+                  alt="Impact Tokyo Hackathon 2026"
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/30 to-transparent" />
+                <div className="absolute left-4 top-4 inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs tracking-[0.2em] text-primary">
+                  LIVE ON LUMA
+                </div>
+              </div>
+              <div className="flex flex-col justify-between gap-6">
+                <div className="space-y-3">
+                  <CardTitle className="text-2xl tracking-wide text-foreground">
+                    Impact Tokyo Hackathon 2026: AI for Global Good
+                  </CardTitle>
+                  <p className="text-sm text-foreground/90">
+                    Hosted by Cognisor AI • Antler in Japan, Tokyo
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Approval required • Request to join on Luma
+                  </p>
+                </div>
+                <a
+                  href="https://luma.com/2f3omvqa"
+                  className="inline-flex items-center justify-center rounded-md border border-secondary/70 bg-secondary/20 px-5 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-secondary transition-colors hover:bg-secondary/30"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Request to join
+                </a>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Section Header */}
         <motion.div
           ref={headerRef}

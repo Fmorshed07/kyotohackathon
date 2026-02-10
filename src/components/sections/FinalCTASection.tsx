@@ -102,14 +102,17 @@ const FinalCTASection = () => {
             <span className="relative z-10">SPONSOR IMPACT TOKYO</span>
           </motion.a>
           <motion.a
-            href="#"
+            href="https://luma.com/2f3omvqa"
             className="group relative inline-flex items-center justify-center overflow-hidden rounded-lg border border-secondary/50 bg-secondary/10 px-10 py-5 font-display text-base tracking-wider text-secondary backdrop-blur-sm transition-all duration-300 hover:bg-secondary/20"
             whileHover={{ scale: 1.02, boxShadow: "0 0 40px hsl(270 70% 60% / 0.4)" }}
             whileTap={{ scale: 0.98 }}
+            target="_blank"
+            rel="noreferrer"
           >
             <span className="relative z-10">GET INVOLVED</span>
           </motion.a>
         </motion.div>
+
 
         {/* Footer Note */}
         <motion.p
