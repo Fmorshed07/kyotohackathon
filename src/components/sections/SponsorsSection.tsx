@@ -21,21 +21,21 @@ const partners = [
     logoClassName: "h-[140%] w-[170%] max-w-none max-h-none",
   },
   {
-    name: "Cognisor",
-    src: "/partners/cognisor.png",
-    alt: "Cognisor logo",
-    logoClassName: "max-h-16 md:max-h-20",
-  },
-  {
-    name: "CreatorLabo",
+    name: "Creator Labo",
     src: "/partners/creatorlabo-log.png",
-    alt: "CreatorLabo logo",
+    alt: "Creator Labo logo",
     logoClassName: "max-h-16 md:max-h-20",
   },
   {
     name: "Orange Partner",
     src: "/partners/orange-partner.png",
     alt: "Orange partner logo",
+    logoClassName: "max-h-14 md:max-h-16",
+  },
+  {
+    name: "Tokyo Design",
+    src: "/partners/Tokyo%20Design.png",
+    alt: "Tokyo Design logo",
     logoClassName: "max-h-14 md:max-h-16",
   },
 ];
@@ -48,7 +48,7 @@ const SponsorsSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="sponsors">
+    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="partners">
       <div className="pointer-events-none absolute inset-0 -z-10">
         <motion.div
           className="absolute left-1/2 top-8 h-64 w-64 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"

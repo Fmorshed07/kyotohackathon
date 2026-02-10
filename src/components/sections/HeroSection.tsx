@@ -110,6 +110,14 @@ const HeroSection = () => {
             Cognisor AI
           </a>
         </motion.p>
+        <motion.p
+          className="mt-2 font-body text-sm tracking-wide text-muted-foreground/70"
+          initial={{ opacity: 0 }}
+          animate={isVisible ? { opacity: 1 } : {}}
+          transition={{ duration: 0.8, delay: 0.75 }}
+        >
+          Co-host: Creator Labo and TIU Impact Next
+        </motion.p>
 
         {/* Event Info Pills */}
         <motion.div

@@ -10,6 +10,7 @@ import TimelineSection from "@/components/sections/TimelineSection";
 import ParticipantsSection from "@/components/sections/ParticipantsSection";
 import DeliverablesSection from "@/components/sections/DeliverablesSection";
 import JudgingSection from "@/components/sections/JudgingSection";
+import SponsorLogosSection from "@/components/sections/SponsorLogosSection";
 import SponsorsSection from "@/components/sections/SponsorsSection";
 import CognisorSection from "@/components/sections/CognisorSection";
 import FinalCTASection from "@/components/sections/FinalCTASection";
@@ -42,6 +43,7 @@ const Index = () => {
           <ParticipantsSection />
           <DeliverablesSection />
           <JudgingSection />
+          <SponsorLogosSection />
           <SponsorsSection />
           <CognisorSection />
           <FinalCTASection />
