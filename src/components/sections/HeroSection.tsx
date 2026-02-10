@@ -35,7 +35,7 @@ const HeroSection = () => {
         }}
       />
 
-      <div className="max-w-5xl text-center">
+      <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
         {/* Japanese subtitle */}
         <motion.span
           className="mb-4 inline-block font-display text-sm tracking-[0.4em] text-primary/70"

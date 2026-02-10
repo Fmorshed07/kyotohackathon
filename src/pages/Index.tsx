@@ -14,6 +14,7 @@ import SponsorLogosSection from "@/components/sections/SponsorLogosSection";
 import HostSection from "@/components/sections/HostSection";
 import CoHostsSection from "@/components/sections/CoHostsSection";
 import SponsorsSection from "@/components/sections/SponsorsSection";
+import PartnerWithSection from "@/components/sections/PartnerWithSection";
 import CognisorSection from "@/components/sections/CognisorSection";
 import FinalCTASection from "@/components/sections/FinalCTASection";
 
@@ -45,10 +46,11 @@ const Index = () => {
           <ParticipantsSection />
           <DeliverablesSection />
           <JudgingSection />
-          <SponsorLogosSection />
           <HostSection />
           <CoHostsSection />
+          <SponsorLogosSection />
           <SponsorsSection />
+          <PartnerWithSection />
           <CognisorSection />
           <FinalCTASection />
         </main>
