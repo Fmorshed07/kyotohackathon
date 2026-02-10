@@ -11,6 +11,8 @@ import ParticipantsSection from "@/components/sections/ParticipantsSection";
 import DeliverablesSection from "@/components/sections/DeliverablesSection";
 import JudgingSection from "@/components/sections/JudgingSection";
 import SponsorLogosSection from "@/components/sections/SponsorLogosSection";
+import HostSection from "@/components/sections/HostSection";
+import CoHostsSection from "@/components/sections/CoHostsSection";
 import SponsorsSection from "@/components/sections/SponsorsSection";
 import CognisorSection from "@/components/sections/CognisorSection";
 import FinalCTASection from "@/components/sections/FinalCTASection";
@@ -44,6 +46,8 @@ const Index = () => {
           <DeliverablesSection />
           <JudgingSection />
           <SponsorLogosSection />
+          <HostSection />
+          <CoHostsSection />
           <SponsorsSection />
           <CognisorSection />
           <FinalCTASection />
