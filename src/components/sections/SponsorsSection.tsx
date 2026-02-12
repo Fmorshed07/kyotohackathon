@@ -38,6 +38,12 @@ const partners = [
     alt: "Tokyo Design logo",
     logoClassName: "max-h-14 md:max-h-16",
   },
+  {
+    name: "Poland-Japan Foundation",
+    src: "/partners/Japan%20-%20Poland%20Foundation.png",
+    alt: "Poland-Japan Foundation logo",
+    logoClassName: "max-h-14 md:max-h-16",
+  },
 ];
 
 const marqueePartners = partners.concat(partners);
