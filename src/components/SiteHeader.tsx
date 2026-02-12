@@ -2,6 +2,7 @@ import { Menu } from "lucide-react";
 import { useCallback, useState, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import GoogleTranslate from "@/components/GoogleTranslate";
 import { cn } from "@/lib/utils";
 import tokyoNeonAlley from "@/assets/tokyo-neon-alley.jpg";
 
@@ -36,8 +37,13 @@ const SiteHeader = () => {
     window.history.pushState(null, "", href);
 
     window.setTimeout(() => {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 150);
+      const header = document.querySelector("header");
+      const headerHeight = header?.getBoundingClientRect().height ?? 64;
+      const targetTop = target.getBoundingClientRect().top + window.scrollY;
+      const scrollTop = Math.max(targetTop - headerHeight - 8, 0);
+
+      window.scrollTo({ top: scrollTop, behavior: "smooth" });
+    }, 200);
   }, []);
 
   return (
@@ -62,55 +68,60 @@ const SiteHeader = () => {
           ))}
         </nav>
 
-        <div className="hidden items-center md:flex">
-          <a
-            href="#cta"
-            className={cn(
-              "rounded-md border border-primary/40 px-4 py-2 text-xs uppercase tracking-[0.3em]",
-              "text-primary transition-colors hover:border-primary hover:text-primary/90",
-            )}
-          >
-            Join
-          </a>
-        </div>
+        <div className="flex items-center gap-3">
+          <GoogleTranslate />
+          <div className="hidden items-center md:flex">
+            <a
+              href="#cta"
+              className={cn(
+                "rounded-md border border-primary/40 px-4 py-2 text-xs uppercase tracking-[0.3em]",
+                "text-primary transition-colors hover:border-primary hover:text-primary/90",
+              )}
+            >
+              Join
+            </a>
+          </div>
+          <div className="md:hidden">
+            <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Open navigation menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="right"
+                className="relative overflow-hidden border-border/40 bg-background"
+              >
+                <div className="absolute inset-0">
+                  <img
+                    src={tokyoNeonAlley}
+                    alt=""
+                    className="h-full w-full object-cover opacity-35"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/70 to-background/90" />
+                </div>
 
-        <div className="md:hidden">
-          <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open navigation menu">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="relative overflow-hidden border-border/40 bg-background">
-              <div className="absolute inset-0">
-                <img
-                  src={tokyoNeonAlley}
-                  alt=""
-                  className="h-full w-full object-cover opacity-35"
-                />
-                <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/70 to-background/90" />
-              </div>
-
-              <div className="relative flex flex-col gap-6 pt-8">
-                <span className="text-xs uppercase tracking-[0.4em] text-muted-foreground">
-                  Navigation
-                </span>
-                <nav className="flex flex-col gap-4" aria-label="Mobile">
-                  {navLinks.map((link) => (
-                    <SheetClose key={link.href} asChild>
-                      <a
-                        href={link.href}
-                        onClick={(event) => handleMobileNavClick(event, link.href)}
-                        className="text-sm uppercase tracking-[0.35em] text-foreground/80 transition-colors hover:text-primary"
-                      >
-                        {link.label}
-                      </a>
-                    </SheetClose>
-                  ))}
-                </nav>
-              </div>
-            </SheetContent>
-          </Sheet>
+                <div className="relative flex flex-col gap-6 pt-8">
+                  <span className="text-xs uppercase tracking-[0.4em] text-muted-foreground">
+                    Navigation
+                  </span>
+                  <nav className="flex flex-col gap-4" aria-label="Mobile">
+                    {navLinks.map((link) => (
+                      <SheetClose key={link.href} asChild>
+                        <a
+                          href={link.href}
+                          onClick={(event) => handleMobileNavClick(event, link.href)}
+                          className="text-sm uppercase tracking-[0.35em] text-foreground/80 transition-colors hover:text-primary"
+                        >
+                          {link.label}
+                        </a>
+                      </SheetClose>
+                    ))}
+                  </nav>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
     </header>

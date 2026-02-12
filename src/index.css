@@ -122,6 +122,30 @@
     overflow-x: hidden;
   }
 
+  /* Google Translate: hide banner and tooltip */
+  .goog-te-banner-frame,
+  .goog-te-banner-frame.skiptranslate {
+    display: none !important;
+  }
+
+  .skiptranslate {
+    display: none !important;
+  }
+
+  html {
+    margin-top: 0 !important;
+  }
+
+  body {
+    top: 0 !important;
+  }
+
+  #goog-gt-tt,
+  .goog-te-balloon-frame,
+  .goog-te-gadget-icon {
+    display: none !important;
+  }
+
   /* Smooth scroll with custom easing */
   @supports (scroll-behavior: smooth) {
     html {

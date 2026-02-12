@@ -55,19 +55,45 @@ const HeroSection = () => {
         >
           <motion.span
             className="text-gradient-cyan inline-block"
-            animate={{ 
+            animate={{
               textShadow: [
                 "0 0 20px hsl(185 100% 50% / 0.3)",
                 "0 0 40px hsl(185 100% 50% / 0.5)",
                 "0 0 20px hsl(185 100% 50% / 0.3)",
-              ]
+              ],
             }}
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
           >
             IMPACT
           </motion.span>{" "}
-          <span className="text-foreground">TOKYO</span>{" "}
-          <span className="text-foreground/80">2026</span>
+          <motion.span
+            className="inline-block text-foreground"
+            animate={{
+              y: [0, -2, 0],
+              textShadow: [
+                "0 0 10px hsl(0 0% 100% / 0.1)",
+                "0 0 22px hsl(0 0% 100% / 0.25)",
+                "0 0 10px hsl(0 0% 100% / 0.1)",
+              ],
+            }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          >
+            TOKYO
+          </motion.span>{" "}
+          <motion.span
+            className="inline-block text-foreground/80"
+            animate={{
+              y: [0, 2, 0],
+              textShadow: [
+                "0 0 8px hsl(0 0% 100% / 0.08)",
+                "0 0 18px hsl(0 0% 100% / 0.2)",
+                "0 0 8px hsl(0 0% 100% / 0.08)",
+              ],
+            }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+          >
+            2026
+          </motion.span>
         </motion.h1>
 
         {/* Subtitle */}
