@@ -1,0 +1,56 @@
+query ListAllHackathons @auth(level: PUBLIC, insecureReason: "This operation lists public hackathon information and is safe to expose to the public.") {
+  hackathons {
+    id
+    name
+    description
+    startDate
+    endDate
+    status
+    organizer {
+      displayName
+      username
+    }
+  }
+}
+
+query GetMyTeams @auth(level: USER, insecureReason: "This operation fetches teams associated with the currently logged-in user.") {
+  teams(where: {teamMembers_on_team: {exist: {userId_expr: "auth.uid"}}}) {
+    id
+    name
+    description
+    hackathon {
+      name
+    }
+    leadUser {
+      displayName
+    }
+    teamMembers_on_team {
+      user {
+        displayName
+      }
+      role
+    }
+  }
+}
+
+mutation CreateHackathon($name: String!, $startDate: Timestamp!, $endDate: Timestamp!, $status: String!, $description: String, $website: String, $location: String) @auth(level: USER, insecureReason: "This operation creates a new hackathon, associating it with the currently logged-in user as the organizer.") {
+  hackathon_insert(data: {
+    name: $name,
+    startDate: $startDate,
+    endDate: $endDate,
+    status: $status,
+    description: $description,
+    website: $website,
+    location: $location,
+    organizerId_expr: "auth.uid"
+  })
+}
+
+mutation JoinTeam($teamId: UUID!) @auth(level: USER, insecureReason: "This operation allows a logged-in user to join a specified team.") {
+  teamMember_insert(data: {
+    teamId: $teamId,
+    userId_expr: "auth.uid",
+    role: "Member",
+    joinedAt_expr: "request.time"
+  })
+}

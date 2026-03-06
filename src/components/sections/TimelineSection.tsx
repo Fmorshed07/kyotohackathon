@@ -5,11 +5,24 @@ import tokyoHero from "@/assets/tokyo-hero.jpg";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const milestones = [
-  { title: "Gate Opens", time: "2:00 PM", kanji: "開場" },
-  { title: "Team Formation", time: "3:00 PM", kanji: "チーム結成" },
-  { title: "Build Session", time: "4:30 PM", kanji: "開発セッション" },
-  { title: "Pitch Session", time: "5:00 - 6:30 PM", kanji: "ピッチセッション" },
-  { title: "Networking & Closing", time: "8:00 PM", kanji: "交流・閉会" },
+  { title: "Registration & Check-in", time: "11:30 - 12:00", kanji: "受付" },
+  { title: "Team Formation", time: "12:00 - 12:30", kanji: "チーム結成" },
+  { title: "Opening Remarks", time: "12:30 - 13:00", kanji: "開会挨拶" },
+  {
+    title: "Development Session & Video Pitch Submission",
+    time: "13:00 - 17:00",
+    kanji: "開発・提出",
+  },
+  {
+    title: "First Judging Session & Food",
+    time: "17:00 - 17:30",
+    kanji: "一次審査",
+    note: "Top 20 teams will be selected",
+  },
+  { title: "Top 20 Team Pitch", time: "17:30 - 19:30", kanji: "上位20チーム発表" },
+  { title: "Final Judging", time: "19:30 - 20:00", kanji: "最終審査" },
+  { title: "Award Ceremony", time: "20:00 - 20:30", kanji: "表彰式" },
+  { title: "Networking & Closing", time: "20:30 - 21:00", kanji: "交流・閉会" },
 ];
 
 const TimelineSection = () => {
@@ -97,7 +110,7 @@ const TimelineSection = () => {
             animate={headerVisible ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            EVENT FORMAT
+            HACKATHON SCHEDULE
           </motion.span>
           <motion.h2
             className="mt-4 font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl"
@@ -105,7 +118,7 @@ const TimelineSection = () => {
             animate={headerVisible ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.3 }}
           >
-            The Journey
+            Event Timeline
           </motion.h2>
           <motion.div
             className="mt-6 flex flex-wrap items-center gap-4"
@@ -192,6 +205,9 @@ const TimelineSection = () => {
                     <h3 className="mt-3 font-display text-xl tracking-wide text-foreground md:text-2xl">
                       {milestone.title}
                     </h3>
+                    {"note" in milestone && milestone.note ? (
+                      <p className="mt-2 text-sm text-secondary">{milestone.note}</p>
+                    ) : null}
                     <div className="mt-2 flex items-center gap-3 md:justify-end">
                       <span className="text-xs text-muted-foreground/60">
                         {milestone.kanji}

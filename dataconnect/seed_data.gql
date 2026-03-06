@@ -1,0 +1,121 @@
+mutation SeedData @transaction @auth(level: USER, insecureReason: "Seed data operations are typically restricted to authenticated users for initial setup and testing.") {
+  user_insertMany(data: [
+    {
+      id: "b21a8a20-8b01-4c12-8d76-5a9e0f6b3e70",
+      username: "hackathon_organizer",
+      email: "organizer@example.com",
+      createdAt: "2024-01-01T00:00:00Z",
+      displayName: "Hackathon Organizer",
+      bio: "Organizes awesome hackathons.",
+      skills: ["Event Management", "Community Building"]
+    },
+    {
+      id: "a1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+      username: "team_lead_alpha",
+      email: "alpha_lead@example.com",
+      createdAt: "2024-01-02T00:00:00Z",
+      displayName: "Alpha Team Lead",
+      bio: "Leading Team Alpha to victory!",
+      skills: ["Frontend", "Backend", "Leadership"]
+    },
+    {
+      id: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
+      username: "team_member_beta",
+      email: "beta_member@example.com",
+      createdAt: "2024-01-03T00:00:00Z",
+      displayName: "Beta Team Member",
+      bio: "Enjoys coding and collaborating.",
+      skills: ["Mobile Development", "UI/UX"]
+    }
+  ])
+  hackathon_insertMany(data: [
+    {
+      id: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
+      name: "Tokyo Hackathon 2024",
+      startDate: "2024-03-15T09:00:00Z",
+      endDate: "2024-03-17T17:00:00Z",
+      status: "Upcoming",
+      organizerId: "b21a8a20-8b01-4c12-8d76-5a9e0f6b3e70",
+      description: "Annual hackathon in Tokyo focusing on AI and Sustainability.",
+      website: "https://tokyohackathon.example.com",
+      location: "Tokyo Big Sight"
+    },
+    {
+      id: "d4d5e6f7-a8b9-0c1d-2e3f-4a5b6c7d8e9f",
+      name: "Firebase DevDays",
+      startDate: "2023-10-20T09:00:00Z",
+      endDate: "2023-10-21T17:00:00Z",
+      status: "Completed",
+      organizerId: "b21a8a20-8b01-4c12-8d76-5a9e0f6b3e70",
+      description: "A global event for Firebase developers.",
+      website: "https://firebasedevdays.example.com",
+      location: "Online"
+    }
+  ])
+  team_insertMany(data: [
+    {
+      id: "e0f1a2b3-c4d5-e6f7-a8b9-c0d1e2f3a4b5",
+      name: "Team Alpha",
+      hackathonId: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
+      leadUserId: "a1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+      description: "Developing a smart waste management solution for Tokyo Hackathon."
+    },
+    {
+      id: "f6a7b8c9-d0e1-f2a3-b4c5-d6e7f8a9b0c1",
+      name: "Team Beta",
+      hackathonId: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
+      leadUserId: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
+      description: "Building an AI-powered language learning app."
+    }
+  ])
+  teamMember_insertMany(data: [
+    {
+      teamId: "e0f1a2b3-c4d5-e6f7-a8b9-c0d1e2f3a4b5",
+      userId: "a1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+      role: "Lead Developer",
+      joinedAt: "2024-02-01T10:00:00Z"
+    },
+    {
+      teamId: "f6a7b8c9-d0e1-f2a3-b4c5-d6e7f8a9b0c1",
+      userId: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
+      role: "UI/UX Designer",
+      joinedAt: "2024-02-05T11:00:00Z"
+    }
+  ])
+  challenge_insertMany(data: [
+    {
+      id: "c0d1e2f3-a4b5-c6d7-e8f9-a0b1c2d3e4f5",
+      title: "Sustainable City Challenge",
+      description: "Develop solutions for a greener and more sustainable urban environment.",
+      hackathonId: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e"
+    },
+    {
+      id: "e0f1a2b3-c4d5-e6f7-a8b9-c0d1e2f3a4b6",
+      title: "AI in Education",
+      description: "Create innovative AI tools to enhance learning experiences.",
+      hackathonId: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e"
+    }
+  ])
+  project_insertMany(data: [
+    {
+      id: "d1e2f3a4-b5c6-d7e8-f9a0-b1c2d3e4f5a6",
+      name: "EcoRoute - Smart Waste Management",
+      teamId: "e0f1a2b3-c4d5-e6f7-a8b9-c0d1e2f3a4b5",
+      hackathonId: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
+      submittedAt: "2024-03-17T15:30:00Z",
+      description: "An application to optimize waste collection routes and reduce carbon footprint.",
+      repositoryLink: "https://github.com/teamalpha/ecoroute",
+      demoLink: "https://ecoroute.example.com"
+    },
+    {
+      id: "f7a8b9c0-d1e2-f3a4-b5c6-d7e8f9a0b1c2",
+      name: "LinguaLearn - AI Language Tutor",
+      teamId: "f6a7b8c9-d0e1-f2a3-b4c5-d6e7f8a9b0c1",
+      hackathonId: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
+      submittedAt: "2024-03-17T16:00:00Z",
+      description: "An AI-powered app offering personalized language lessons and real-time feedback.",
+      repositoryLink: "https://github.com/teambeta/lingualearn",
+      demoLink: "https://lingualearn.example.com"
+    }
+  ])
+}

@@ -1,0 +1,49 @@
+type User @table {
+  username: String!
+  email: String!
+  createdAt: Timestamp!
+  displayName: String
+  bio: String
+  skills: [String]
+}
+
+type Hackathon @table {
+  name: String!
+  startDate: Timestamp!
+  endDate: Timestamp!
+  status: String!
+  organizer: User!
+  description: String
+  website: String
+  location: String
+}
+
+type Challenge @table {
+  title: String!
+  description: String!
+  hackathon: Hackathon!
+}
+
+type Team @table {
+  name: String!
+  hackathon: Hackathon!
+  leadUser: User!
+  description: String
+}
+
+type TeamMember @table(key: ["team", "user"]) {
+  team: Team!
+  user: User!
+  role: String!
+  joinedAt: Timestamp!
+}
+
+type Project @table {
+  name: String!
+  team: Team!
+  hackathon: Hackathon!
+  submittedAt: Timestamp!
+  description: String
+  repositoryLink: String
+  demoLink: String
+}

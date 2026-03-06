@@ -36,6 +36,21 @@ const HeroSection = () => {
       />
 
       <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
+        <motion.div
+          className="mb-3 flex flex-col items-center font-display text-xs tracking-[0.3em] text-muted-foreground/85 md:text-sm"
+          initial={{ opacity: 0, y: 16 }}
+          animate={isVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.8, delay: 0.15 }}
+        >
+          <img
+            src="/partners/cognisor.png"
+            alt="Cognisor AI logo"
+            className="h-16 w-auto object-contain md:h-20"
+            loading="lazy"
+          />
+          <span className="mt-1">PRESENTS</span>
+        </motion.div>
+
         {/* Japanese subtitle */}
         <motion.span
           className="mb-4 inline-block font-display text-sm tracking-[0.4em] text-primary/70"

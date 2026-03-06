@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 /* IMPACT TOKYO 2026 Design System
    Apple × GTA-6 × Tokyo Futurism
@@ -113,7 +113,7 @@
 
   html {
     scroll-behavior: smooth;
-    scroll-padding-top: 5rem;
+    scroll-padding-top: 4rem;
   }
 
   body {
@@ -186,6 +186,11 @@
 
   .font-body {
     font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Classic minimal font for navigation */
+  .font-nav {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
   }
 
   /* GTA-style letter spacing */

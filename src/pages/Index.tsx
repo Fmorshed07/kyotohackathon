@@ -4,17 +4,13 @@ import LoadingExperience from "@/components/LoadingExperience";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import SiteHeader from "@/components/SiteHeader";
 import HeroSection from "@/components/sections/HeroSection";
+import UpdatedBannerSection from "@/components/sections/UpdatedBannerSection";
 import AboutSection from "@/components/sections/AboutSection";
 import ThemeSection from "@/components/sections/ThemeSection";
 import TimelineSection from "@/components/sections/TimelineSection";
-import ParticipantsSection from "@/components/sections/ParticipantsSection";
 import DeliverablesSection from "@/components/sections/DeliverablesSection";
 import JudgingSection from "@/components/sections/JudgingSection";
-import SponsorLogosSection from "@/components/sections/SponsorLogosSection";
 import HostSection from "@/components/sections/HostSection";
-import CoHostsSection from "@/components/sections/CoHostsSection";
-import SponsorsSection from "@/components/sections/SponsorsSection";
-import PartnerWithSection from "@/components/sections/PartnerWithSection";
 import CognisorSection from "@/components/sections/CognisorSection";
 import FinalCTASection from "@/components/sections/FinalCTASection";
 
@@ -40,17 +36,13 @@ const Index = () => {
 
         <main className="relative pt-16">
           <HeroSection />
+          <UpdatedBannerSection />
           <AboutSection />
           <ThemeSection />
           <TimelineSection />
-          <ParticipantsSection />
           <DeliverablesSection />
           <JudgingSection />
           <HostSection />
-          <CoHostsSection />
-          <SponsorLogosSection />
-          <SponsorsSection />
-          <PartnerWithSection />
           <CognisorSection />
           <FinalCTASection />
         </main>
