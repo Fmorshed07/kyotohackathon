@@ -31,6 +31,13 @@ const parseMemberNames = (rawMemberNames: string | null | undefined) =>
     .map((name) => name.trim())
     .filter(Boolean);
 
+const formatSubmittedAt = (createdAt: string | null | undefined) => {
+  if (!createdAt) return null;
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return createdAt;
+  return date.toLocaleString();
+};
+
 export type JudgeDashboardProps = {
   submissions: Submission[];
   isLoadingSubmissions: boolean;
@@ -169,7 +176,12 @@ export function JudgeDashboard({
                         : "border-border/50 bg-muted/20 hover:border-primary/30 hover:bg-primary/5"
                     }`}
                   >
-                    <p className="text-sm font-semibold text-foreground">{team.name}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-semibold text-foreground">{team.name}</p>
+                      <span className="rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                        View details
+                      </span>
+                    </div>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {team.submissions.length}{" "}
                       {team.submissions.length === 1 ? "submission" : "submissions"}{" "}
@@ -218,14 +230,82 @@ export function JudgeDashboard({
                       {activeTeam.submissions.map((submission) => (
                         <div
                           key={`${activeTeam.name}-${submission.id}`}
-                          className="rounded-lg border border-border/60 bg-background/80 px-3 py-2"
+                          className="space-y-3 rounded-lg border border-border/60 bg-background/80 px-3 py-3"
                         >
                           <p className="text-sm font-medium text-foreground">
                             {submission.title || "Untitled Project"}
                           </p>
-                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             {submission.short_description || "No description provided."}
                           </p>
+                          <div className="space-y-1 text-xs">
+                            {submission.project_url && (
+                              <a
+                                href={submission.project_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block text-primary underline underline-offset-4 hover:no-underline"
+                              >
+                                Project URL
+                              </a>
+                            )}
+                            {submission.submission_pdf_url && (
+                              <a
+                                href={submission.submission_pdf_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block text-primary underline underline-offset-4 hover:no-underline"
+                              >
+                                PDF
+                              </a>
+                            )}
+                            {submission.demo_video_url && (
+                              <a
+                                href={submission.demo_video_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block text-primary underline underline-offset-4 hover:no-underline"
+                              >
+                                Demo Video
+                              </a>
+                            )}
+                            {!submission.project_url &&
+                            !submission.submission_pdf_url &&
+                            !submission.demo_video_url ? (
+                              <p className="text-muted-foreground">No project links provided.</p>
+                            ) : null}
+                          </div>
+                          <div className="grid gap-2 text-xs sm:grid-cols-2">
+                            <div className="rounded-md border border-border/60 bg-muted/30 px-2.5 py-2">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                                Submitted
+                              </p>
+                              <p className="mt-1 text-foreground">
+                                {formatSubmittedAt(submission.created_at) ?? "Unknown"}
+                              </p>
+                            </div>
+                            <div className="rounded-md border border-border/60 bg-muted/30 px-2.5 py-2">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                                Current Score
+                              </p>
+                              <p className="mt-1 font-medium text-foreground">
+                                {submission.judge_criteria_scores &&
+                                typeof submission.judge_criteria_scores === "object"
+                                  ? `${calculateTotalFromCriteria(submission.judge_criteria_scores)}/100`
+                                  : submission.judge_score != null
+                                    ? `${submission.judge_score}/100`
+                                    : "Not scored yet"}
+                              </p>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                              Latest Notes
+                            </p>
+                            <p className="mt-1 text-xs text-foreground">
+                              {submission.judge_notes?.trim() || "No notes added yet."}
+                            </p>
+                          </div>
                         </div>
                       ))}
                     </div>
