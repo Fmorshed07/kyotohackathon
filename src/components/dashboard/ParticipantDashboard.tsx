@@ -1,6 +1,13 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import type { Submission } from "@/types/portal";
 
@@ -59,6 +66,9 @@ export type ParticipantDashboardProps = {
       memberNames: string;
     }>
   >;
+  participantSubmissions: Submission[];
+  activeSubmissionId: string | null;
+  onSelectSubmission: (submissionId: string) => void;
   participantSubmission: Submission | null;
   submissionMessage: string | null;
   isSubmittingProject: boolean;
@@ -68,6 +78,9 @@ export type ParticipantDashboardProps = {
 export function ParticipantDashboard({
   participantForm,
   setParticipantForm,
+  participantSubmissions,
+  activeSubmissionId,
+  onSelectSubmission,
   submissionMessage,
   isSubmittingProject,
   onSave,
@@ -108,6 +121,25 @@ export function ParticipantDashboard({
             </div>
           </div>
         </div>
+        {participantSubmissions.length > 1 && activeSubmissionId ? (
+          <div className="mt-5 border-t border-border/40 pt-4">
+            <p className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Edit your submission
+            </p>
+            <Select value={activeSubmissionId} onValueChange={onSelectSubmission}>
+              <SelectTrigger className="max-w-lg">
+                <SelectValue placeholder="Select submission" />
+              </SelectTrigger>
+              <SelectContent>
+                {participantSubmissions.map((submission) => (
+                  <SelectItem key={submission.id} value={submission.id}>
+                    {submission.title?.trim() || `Untitled submission (${submission.id.slice(0, 8)})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
       </section>
 
       {/* Overview / Project details */}
