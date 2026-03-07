@@ -25,11 +25,112 @@ type TeamSummary = {
   members: string[];
 };
 
+type CriterionAccentStyle = {
+  card: string;
+  pill: string;
+  activeButton: string;
+  inactiveButton: string;
+  input: string;
+};
+
+const TEAM_ACCENT_STYLES = [
+  {
+    active: "border-sky-400/60 bg-sky-500/15 shadow-[0_0_0_1px_rgba(14,165,233,0.18)]",
+    inactive: "border-sky-500/30 bg-sky-500/5 hover:border-sky-400/50 hover:bg-sky-500/10",
+    pill: "border-sky-400/40 bg-sky-500/10 text-sky-200",
+    panel: "border-sky-500/35 bg-sky-500/5",
+    teamName: "text-sky-300",
+  },
+  {
+    active: "border-violet-400/60 bg-violet-500/15 shadow-[0_0_0_1px_rgba(139,92,246,0.2)]",
+    inactive: "border-violet-500/30 bg-violet-500/5 hover:border-violet-400/50 hover:bg-violet-500/10",
+    pill: "border-violet-400/40 bg-violet-500/10 text-violet-200",
+    panel: "border-violet-500/35 bg-violet-500/5",
+    teamName: "text-violet-300",
+  },
+  {
+    active: "border-emerald-400/60 bg-emerald-500/15 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]",
+    inactive: "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-400/50 hover:bg-emerald-500/10",
+    pill: "border-emerald-400/40 bg-emerald-500/10 text-emerald-200",
+    panel: "border-emerald-500/35 bg-emerald-500/5",
+    teamName: "text-emerald-300",
+  },
+  {
+    active: "border-amber-400/60 bg-amber-500/15 shadow-[0_0_0_1px_rgba(245,158,11,0.2)]",
+    inactive: "border-amber-500/30 bg-amber-500/5 hover:border-amber-400/50 hover:bg-amber-500/10",
+    pill: "border-amber-400/40 bg-amber-500/10 text-amber-200",
+    panel: "border-amber-500/35 bg-amber-500/5",
+    teamName: "text-amber-300",
+  },
+  {
+    active: "border-rose-400/60 bg-rose-500/15 shadow-[0_0_0_1px_rgba(244,63,94,0.2)]",
+    inactive: "border-rose-500/30 bg-rose-500/5 hover:border-rose-400/50 hover:bg-rose-500/10",
+    pill: "border-rose-400/40 bg-rose-500/10 text-rose-200",
+    panel: "border-rose-500/35 bg-rose-500/5",
+    teamName: "text-rose-300",
+  },
+  {
+    active: "border-cyan-400/60 bg-cyan-500/15 shadow-[0_0_0_1px_rgba(6,182,212,0.2)]",
+    inactive: "border-cyan-500/30 bg-cyan-500/5 hover:border-cyan-400/50 hover:bg-cyan-500/10",
+    pill: "border-cyan-400/40 bg-cyan-500/10 text-cyan-200",
+    panel: "border-cyan-500/35 bg-cyan-500/5",
+    teamName: "text-cyan-300",
+  },
+];
+
+const CRITERION_ACCENT_STYLES: Record<JudgingCriterionId, CriterionAccentStyle> = {
+  social_impact: {
+    card: "border-sky-500/35 bg-sky-500/5",
+    pill: "border-sky-400/40 bg-sky-500/15 text-sky-200",
+    activeButton: "border-sky-400 bg-sky-500 text-sky-950",
+    inactiveButton: "border-sky-500/35 bg-background hover:border-sky-400/55 hover:bg-sky-500/10",
+    input: "border-sky-500/35 focus-visible:ring-sky-500/40",
+  },
+  innovation: {
+    card: "border-violet-500/35 bg-violet-500/5",
+    pill: "border-violet-400/40 bg-violet-500/15 text-violet-200",
+    activeButton: "border-violet-400 bg-violet-500 text-violet-50",
+    inactiveButton: "border-violet-500/35 bg-background hover:border-violet-400/55 hover:bg-violet-500/10",
+    input: "border-violet-500/35 focus-visible:ring-violet-500/40",
+  },
+  implementation: {
+    card: "border-emerald-500/35 bg-emerald-500/5",
+    pill: "border-emerald-400/40 bg-emerald-500/15 text-emerald-200",
+    activeButton: "border-emerald-400 bg-emerald-500 text-emerald-50",
+    inactiveButton: "border-emerald-500/35 bg-background hover:border-emerald-400/55 hover:bg-emerald-500/10",
+    input: "border-emerald-500/35 focus-visible:ring-emerald-500/40",
+  },
+  ai_usage: {
+    card: "border-amber-500/35 bg-amber-500/5",
+    pill: "border-amber-400/40 bg-amber-500/15 text-amber-200",
+    activeButton: "border-amber-400 bg-amber-500 text-amber-950",
+    inactiveButton: "border-amber-500/35 bg-background hover:border-amber-400/55 hover:bg-amber-500/10",
+    input: "border-amber-500/35 focus-visible:ring-amber-500/40",
+  },
+  demo: {
+    card: "border-rose-500/35 bg-rose-500/5",
+    pill: "border-rose-400/40 bg-rose-500/15 text-rose-200",
+    activeButton: "border-rose-400 bg-rose-500 text-rose-50",
+    inactiveButton: "border-rose-500/35 bg-background hover:border-rose-400/55 hover:bg-rose-500/10",
+    input: "border-rose-500/35 focus-visible:ring-rose-500/40",
+  },
+};
+
 const parseMemberNames = (rawMemberNames: string | null | undefined) =>
   (rawMemberNames ?? "")
     .split(/[\n,;]+/)
     .map((name) => name.trim())
     .filter(Boolean);
+
+const getTeamAccentStyle = (teamName: string) => {
+  const seed = teamName
+    .split("")
+    .reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % TEAM_ACCENT_STYLES.length, 0);
+  return TEAM_ACCENT_STYLES[Math.abs(seed) % TEAM_ACCENT_STYLES.length];
+};
+
+const getCriterionAccentStyle = (criterionId: JudgingCriterionId) =>
+  CRITERION_ACCENT_STYLES[criterionId];
 
 const formatSubmittedAt = (createdAt: string | null | undefined) => {
   if (!createdAt) return null;
@@ -95,6 +196,7 @@ export function JudgeDashboard({
     .values()
   ).sort((left, right) => left.name.localeCompare(right.name));
   const activeTeam = teams.find((team) => team.name === selectedTeamName) ?? teams[0] ?? null;
+  const activeTeamAccent = activeTeam ? getTeamAccentStyle(activeTeam.name) : null;
 
   return (
     <div className="space-y-8" id="overview">
@@ -165,6 +267,7 @@ export function JudgeDashboard({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
               {teams.map((team) => {
                 const isActive = activeTeam?.name === team.name;
+                const accentStyle = getTeamAccentStyle(team.name);
                 return (
                   <button
                     key={team.name}
@@ -172,13 +275,15 @@ export function JudgeDashboard({
                     onClick={() => setSelectedTeamName(team.name)}
                     className={`rounded-xl border px-4 py-3 text-left transition ${
                       isActive
-                        ? "border-primary/50 bg-primary/10"
-                        : "border-border/50 bg-muted/20 hover:border-primary/30 hover:bg-primary/5"
+                        ? accentStyle.active
+                        : accentStyle.inactive
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold text-foreground">{team.name}</p>
-                      <span className="rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      <p className={`text-base font-semibold ${accentStyle.teamName}`}>{team.name}</p>
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${accentStyle.pill}`}
+                      >
                         View details
                       </span>
                     </div>
@@ -192,14 +297,20 @@ export function JudgeDashboard({
               })}
             </div>
 
-            <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+            <div
+              className={`rounded-xl border p-4 ${
+                activeTeamAccent ? activeTeamAccent.panel : "border-border/50 bg-muted/20"
+              }`}
+            >
               {activeTeam ? (
                 <div className="space-y-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                       Team Details
                     </p>
-                    <h3 className="mt-1 text-base font-semibold text-foreground">{activeTeam.name}</h3>
+                    <h3 className={`mt-1 text-xl font-semibold ${activeTeamAccent?.teamName ?? "text-foreground"}`}>
+                      {activeTeam.name}
+                    </h3>
                   </div>
 
                   <div>
@@ -319,22 +430,29 @@ export function JudgeDashboard({
 
       {/* Submissions & scoring */}
       <section
-        className={`${sectionClass} overflow-hidden p-0`}
+        className={`${sectionClass} overflow-hidden border-primary/20 bg-gradient-to-b from-primary/5 via-card/95 to-card/95 p-0`}
         id="submissions"
         aria-labelledby="scoring-heading"
       >
-        <div className="border-b border-border/40 px-6 py-5">
-          <h2
-            id="scoring-heading"
-            className="text-lg font-semibold text-foreground"
-          >
-            Submissions & live scoring
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Score projects by weighted criteria, then save total points and notes.
-          </p>
+        <div className="border-b border-border/40 px-6 py-6 sm:px-8 sm:py-7">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2
+                id="scoring-heading"
+                className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+              >
+                Submissions & live scoring
+              </h2>
+              <p className="mt-2 text-base text-muted-foreground">
+                Score projects by weighted criteria, then save total points and notes.
+              </p>
+            </div>
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+              Judge panel
+            </span>
+          </div>
         </div>
-        <div className="p-4 sm:p-6">
+        <div className="p-5 sm:p-8">
           {isLoadingSubmissions ? (
             <p className="text-sm text-muted-foreground">
               Loading submissions…
@@ -351,21 +469,28 @@ export function JudgeDashboard({
                     submission.judge_criteria_scores && typeof submission.judge_criteria_scores === "object"
                       ? calculateTotalFromCriteria(submission.judge_criteria_scores)
                       : submission.judge_score ?? 0;
+                  const teamName = submission.team_name?.trim() || "Unnamed team";
+                  const teamAccent = getTeamAccentStyle(teamName);
                   return (
                     <article
                       key={submission.id}
-                      className="space-y-4 rounded-xl border border-border/50 bg-muted/20 p-4"
+                      className="space-y-5 rounded-2xl border border-border/50 bg-muted/20 p-5"
                     >
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-foreground">
+                      <div className="space-y-2">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${teamAccent.pill}`}
+                        >
+                          {teamName}
+                        </span>
+                        <p className="text-base font-semibold text-foreground">
                           {submission.title || "Untitled Project"}
                         </p>
-                        <p className="line-clamp-3 text-xs text-muted-foreground">
+                        <p className="line-clamp-3 text-sm text-muted-foreground">
                           {submission.short_description || "No description provided."}
                         </p>
                       </div>
 
-                      <div className="space-y-1 text-xs">
+                      <div className="space-y-1 text-sm">
                         {submission.project_url && (
                           <a
                             href={submission.project_url}
@@ -403,31 +528,34 @@ export function JudgeDashboard({
                           const scoreStops =
                             scoreButtonStopsByWeight[criterion.weight] ?? [0, criterion.weight];
                           const activeScore = submission.judge_criteria_scores?.[criterion.id] ?? null;
+                          const criterionAccent = getCriterionAccentStyle(criterion.id);
                           return (
                             <div
                               key={criterion.id}
-                              className="rounded-xl border border-border/50 bg-background/80 p-3"
+                              className={`rounded-xl border p-3 ${criterionAccent.card}`}
                             >
                               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-xs font-semibold text-foreground">{criterion.title}</p>
-                                <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                                <p className="text-sm font-semibold text-foreground">{criterion.title}</p>
+                                <span
+                                  className={`rounded-full border px-2.5 py-0.5 text-sm font-medium ${criterionAccent.pill}`}
+                                >
                                   {activeScore ?? 0}/{criterion.weight}
                                 </span>
                               </div>
-                              <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+                              <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
                                 {criterion.description}
                               </p>
-                              <div className="mb-2 flex flex-wrap gap-1.5">
+                              <div className="mb-2 flex flex-wrap items-center gap-1.5">
                                 {scoreStops.map((value) => {
                                   const isActive = activeScore === value;
                                   return (
                                     <button
                                       key={`${criterion.id}-${value}`}
                                       type="button"
-                                      className={`h-8 min-w-10 rounded-md border px-2 text-xs font-semibold transition ${
+                                      className={`h-9 min-w-12 rounded-md border px-2 text-sm font-semibold transition ${
                                         isActive
-                                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                                          : "border-border/70 bg-background hover:border-primary/40 hover:bg-primary/5"
+                                          ? `${criterionAccent.activeButton} shadow-sm`
+                                          : criterionAccent.inactiveButton
                                       }`}
                                       onClick={() =>
                                         onCriterionScoreChange(submission.id, criterion.id, value)
@@ -438,53 +566,55 @@ export function JudgeDashboard({
                                   );
                                 })}
                               </div>
-                              <Input
-                                type="number"
-                                min={0}
-                                max={criterion.weight}
-                                value={activeScore ?? ""}
-                                onChange={(e) => {
-                                  const raw = e.target.value.trim();
-                                  if (raw === "") {
-                                    onCriterionScoreChange(submission.id, criterion.id, null);
-                                    return;
-                                  }
-                                  const parsed = Number(raw);
-                                  if (Number.isNaN(parsed)) return;
-                                  onCriterionScoreChange(
-                                    submission.id,
-                                    criterion.id,
-                                    clampCriterionScore(parsed, criterion.weight)
-                                  );
-                                }}
-                                className="h-8 w-24 text-right text-xs"
-                              />
+                              <div className="flex justify-end">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={criterion.weight}
+                                  value={activeScore ?? ""}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.trim();
+                                    if (raw === "") {
+                                      onCriterionScoreChange(submission.id, criterion.id, null);
+                                      return;
+                                    }
+                                    const parsed = Number(raw);
+                                    if (Number.isNaN(parsed)) return;
+                                    onCriterionScoreChange(
+                                      submission.id,
+                                      criterion.id,
+                                      clampCriterionScore(parsed, criterion.weight)
+                                    );
+                                  }}
+                                  className={`h-9 w-28 text-right text-sm ${criterionAccent.input}`}
+                                />
+                              </div>
                             </div>
                           );
                         })}
-                        <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
-                          <p className="text-xs font-medium text-primary/90">Total score</p>
-                          <p className="font-display text-base font-semibold tabular-nums text-primary">
+                        <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+                          <p className="text-sm font-medium text-primary/90">Total score</p>
+                          <p className="font-display text-xl font-semibold tabular-nums text-primary">
                             {totalScore}/100
                           </p>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        <p className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                           Judge Notes
                         </p>
                         <Textarea
-                          rows={3}
+                          rows={4}
                           value={submission.judge_notes ?? ""}
                           onChange={(e) => onNotesChange(submission.id, e.target.value)}
-                          className="resize-y text-sm"
+                          className="resize-y text-base"
                         />
                       </div>
 
                       <Button
                         size="sm"
-                        className="h-9 w-full text-xs font-semibold"
+                        className="h-10 w-full text-sm font-semibold"
                         onClick={() => onSave(submission)}
                       >
                         Save
@@ -494,23 +624,25 @@ export function JudgeDashboard({
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto rounded-xl border border-border/40 md:block">
+              <div className="hidden rounded-2xl border border-border/40 bg-card/80 md:block">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border/50 hover:bg-transparent">
-                      <TableHead className="w-[180px] text-xs font-semibold">
+                      <TableHead className="w-[240px] text-sm font-semibold">
                         Project
                       </TableHead>
-                      <TableHead className="text-xs font-semibold">
+                      <TableHead className="text-sm font-semibold">
                         Links
                       </TableHead>
-                      <TableHead className="min-w-[520px] text-xs font-semibold">
+                      <TableHead className="min-w-[520px] text-sm font-semibold">
                         Score
                       </TableHead>
-                      <TableHead className="min-w-[220px] text-xs font-semibold">
+                      <TableHead className="min-w-[280px] text-sm font-semibold">
                         Judge Notes
                       </TableHead>
-                      <TableHead className="w-[80px]" />
+                      <TableHead className="w-[120px] text-right text-sm font-semibold">
+                        Action
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -519,20 +651,27 @@ export function JudgeDashboard({
                         submission.judge_criteria_scores && typeof submission.judge_criteria_scores === "object"
                           ? calculateTotalFromCriteria(submission.judge_criteria_scores)
                           : submission.judge_score ?? 0;
+                      const teamName = submission.team_name?.trim() || "Unnamed team";
+                      const teamAccent = getTeamAccentStyle(teamName);
                       return (
                         <TableRow key={submission.id} className="border-border/40 hover:bg-muted/20">
                           <TableCell className="align-top">
                             <div className="space-y-1">
-                              <p className="text-sm font-semibold">
+                              <span
+                                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${teamAccent.pill}`}
+                              >
+                                {teamName}
+                              </span>
+                              <p className="text-base font-semibold">
                                 {submission.title || "Untitled Project"}
                               </p>
-                              <p className="line-clamp-3 text-xs text-muted-foreground">
+                              <p className="line-clamp-3 text-sm text-muted-foreground">
                                 {submission.short_description || "No description provided."}
                               </p>
                             </div>
                           </TableCell>
                           <TableCell className="align-top">
-                            <div className="space-y-1 text-xs">
+                            <div className="space-y-1 text-sm">
                               {submission.project_url && (
                                 <a
                                   href={submission.project_url}
@@ -571,33 +710,36 @@ export function JudgeDashboard({
                                 const scoreStops =
                                   scoreButtonStopsByWeight[criterion.weight] ?? [0, criterion.weight];
                                 const activeScore = submission.judge_criteria_scores?.[criterion.id] ?? null;
+                                const criterionAccent = getCriterionAccentStyle(criterion.id);
                                 return (
                                   <div
                                     key={criterion.id}
-                                    className="rounded-xl border border-border/50 bg-muted/20 p-3"
+                                    className={`rounded-xl border p-4 ${criterionAccent.card}`}
                                   >
                                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                      <p className="text-xs font-semibold text-foreground">
+                                      <p className="text-sm font-semibold text-foreground">
                                         {criterion.title}
                                       </p>
-                                      <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                                      <span
+                                        className={`rounded-full border px-2.5 py-0.5 text-sm font-medium ${criterionAccent.pill}`}
+                                      >
                                         {activeScore ?? 0}/{criterion.weight}
                                       </span>
                                     </div>
-                                    <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+                                    <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
                                       {criterion.description}
                                     </p>
-                                    <div className="mb-2 flex flex-wrap gap-1.5">
+                                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
                                       {scoreStops.map((value) => {
                                         const isActive = activeScore === value;
                                         return (
                                           <button
                                             key={`${criterion.id}-${value}`}
                                             type="button"
-                                            className={`h-8 min-w-10 rounded-md border px-2 text-xs font-semibold transition ${
+                                            className={`h-9 min-w-12 rounded-md border px-2 text-sm font-semibold transition ${
                                               isActive
-                                                ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                                                : "border-border/70 bg-background hover:border-primary/40 hover:bg-primary/5"
+                                                ? `${criterionAccent.activeButton} shadow-sm`
+                                                : criterionAccent.inactiveButton
                                             }`}
                                             onClick={() =>
                                               onCriterionScoreChange(submission.id, criterion.id, value)
@@ -608,35 +750,37 @@ export function JudgeDashboard({
                                         );
                                       })}
                                     </div>
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      max={criterion.weight}
-                                      value={activeScore ?? ""}
-                                      onChange={(e) => {
-                                        const raw = e.target.value.trim();
-                                        if (raw === "") {
-                                          onCriterionScoreChange(submission.id, criterion.id, null);
-                                          return;
-                                        }
-                                        const parsed = Number(raw);
-                                        if (Number.isNaN(parsed)) return;
-                                        onCriterionScoreChange(
-                                          submission.id,
-                                          criterion.id,
-                                          clampCriterionScore(parsed, criterion.weight)
-                                        );
-                                      }}
-                                      className="h-8 w-24 text-right text-xs"
-                                    />
+                                    <div className="flex justify-end">
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        max={criterion.weight}
+                                        value={activeScore ?? ""}
+                                        onChange={(e) => {
+                                          const raw = e.target.value.trim();
+                                          if (raw === "") {
+                                            onCriterionScoreChange(submission.id, criterion.id, null);
+                                            return;
+                                          }
+                                          const parsed = Number(raw);
+                                          if (Number.isNaN(parsed)) return;
+                                          onCriterionScoreChange(
+                                            submission.id,
+                                            criterion.id,
+                                            clampCriterionScore(parsed, criterion.weight)
+                                          );
+                                        }}
+                                        className={`h-9 w-28 text-right text-sm ${criterionAccent.input}`}
+                                      />
+                                    </div>
                                   </div>
                                 );
                               })}
-                              <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
-                                <p className="text-xs font-medium text-primary/90">
+                              <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+                                <p className="text-sm font-medium text-primary/90">
                                   Total score
                                 </p>
-                                <p className="font-display text-base font-semibold tabular-nums text-primary">
+                                <p className="font-display text-xl font-semibold tabular-nums text-primary">
                                   {totalScore}/100
                                 </p>
                               </div>
@@ -644,16 +788,16 @@ export function JudgeDashboard({
                           </TableCell>
                           <TableCell className="align-top">
                             <Textarea
-                              rows={3}
+                              rows={4}
                               value={submission.judge_notes ?? ""}
                               onChange={(e) => onNotesChange(submission.id, e.target.value)}
-                              className="min-w-[200px] resize-y text-sm"
+                              className="min-w-[240px] resize-y text-base"
                             />
                           </TableCell>
-                          <TableCell className="align-top">
+                          <TableCell className="align-top text-right whitespace-nowrap">
                             <Button
                               size="sm"
-                              className="h-8 px-3 text-xs font-semibold"
+                              className="h-10 w-full min-w-0 px-3 text-sm font-semibold"
                               onClick={() => onSave(submission)}
                             >
                               Save
