@@ -1,8 +1,7 @@
-import { Menu } from "lucide-react";
-import { useCallback, useState, type MouseEvent } from "react";
+import { Menu, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import GoogleTranslate from "@/components/GoogleTranslate";
 import { cn } from "@/lib/utils";
 import tokyoNeonAlley from "@/assets/tokyo-neon-alley.jpg";
@@ -37,29 +36,41 @@ const SiteHeader = () => {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const openMobileNav = useCallback(() => setIsMobileNavOpen(true), []);
+  const closeMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
+
+  useEffect(() => {
+    if (!isMobileNavOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileNavOpen]);
 
   const handleMobileNavClick = useCallback(
-    (event: MouseEvent<HTMLAnchorElement>, href: string) => {
+    (href: string) => {
       // Route links should navigate via React Router
       // so they work reliably on mobile and close the sheet.
       if (!href.startsWith("#")) {
-        event.preventDefault();
-        setIsMobileNavOpen(false);
+        closeMobileNav();
         navigate(href);
         return;
       }
 
-      event.preventDefault();
-
       // If we're not on the homepage, go there with the hash
       // so section links like "#about" work from any page.
       if (location.pathname !== "/") {
-        setIsMobileNavOpen(false);
+        closeMobileNav();
         navigate(`/${href}`);
         return;
       }
 
-      setIsMobileNavOpen(false);
+      closeMobileNav();
 
       const target = document.querySelector(href);
       if (!target) {
@@ -77,12 +88,13 @@ const SiteHeader = () => {
         window.scrollTo({ top: scrollTop, behavior: "smooth" });
       }, 200);
     },
-    [location.pathname, navigate],
+    [closeMobileNav, location.pathname, navigate],
   );
 
   return (
-    <header className="fixed top-0 z-40 w-full border-b border-border/50 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-6xl items-stretch px-4 sm:px-6 lg:px-8">
+    <>
+      <header className="fixed top-0 z-40 w-full border-b border-border/50 bg-background/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-6xl items-stretch px-4 sm:px-6 lg:px-8">
         {/* Left: logo */}
         <div className="flex min-w-0 flex-1 items-center md:flex-none">
           <a
@@ -126,7 +138,9 @@ const SiteHeader = () => {
 
         {/* Right: actions */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3 md:flex-none">
-          <GoogleTranslate />
+          <div className="hidden md:flex">
+            <GoogleTranslate />
+          </div>
           <div className="hidden items-center gap-2 md:flex">
             <Link
               to="/signin"
@@ -138,57 +152,101 @@ const SiteHeader = () => {
               Log in
             </Link>
           </div>
-          <div className="md:hidden">
-            <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Open navigation menu">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent
-                side="right"
-                className="relative overflow-hidden border-l border-border/50 bg-background/95 backdrop-blur-md"
-              >
-                <div className="absolute inset-0">
-                  <img
-                    src={tokyoNeonAlley}
-                    alt=""
-                    className="h-full w-full object-cover opacity-25"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/90 to-background/95" />
-                </div>
-
-                <div className="relative flex flex-col gap-6 pt-10 pb-6" aria-label="Mobile navigation">
-                  {navSections.map((section) => (
-                    <nav key={section.title} className="flex flex-col gap-2.5" aria-label={section.title}>
-                      <span className="font-nav text-[11px] font-medium tracking-[0.18em] text-muted-foreground">
-                        {section.title}
-                      </span>
-                      <div className="flex flex-col gap-0.5">
-                        {section.links.map((link) => (
-                          <SheetClose key={link.href} asChild>
-                            <a
-                              href={link.href}
-                              onClick={(event) => handleMobileNavClick(event, link.href)}
-                              className={cn(
-                                "font-nav inline-flex items-center rounded-md py-2.5 pl-3 pr-4 text-[13px] font-medium tracking-[0.1em]",
-                                "text-foreground/85 transition-colors hover:bg-primary/10 hover:text-primary",
-                              )}
-                            >
-                              {link.label}
-                            </a>
-                          </SheetClose>
-                        ))}
-                      </div>
-                    </nav>
-                  ))}
-                </div>
-              </SheetContent>
-            </Sheet>
+          <div className="relative z-[70] md:hidden">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="relative z-[71]"
+              aria-label="Open navigation menu"
+              aria-expanded={isMobileNavOpen}
+              aria-controls="mobile-nav-drawer"
+              onClick={openMobileNav}
+              onTouchStart={openMobileNav}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       </div>
-    </header>
+      </header>
+
+      {isMobileNavOpen ? (
+        <div className="fixed inset-0 z-[80] md:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            aria-label="Close navigation menu"
+            className="absolute inset-0 bg-black/70"
+            onClick={closeMobileNav}
+          />
+
+          <aside
+            id="mobile-nav-drawer"
+            className="absolute right-0 top-0 h-full w-[82vw] max-w-sm overflow-hidden border-l border-border/50 bg-background/95 p-6 backdrop-blur-md"
+          >
+            <div className="absolute inset-0">
+              <img
+                src={tokyoNeonAlley}
+                alt=""
+                className="h-full w-full object-cover opacity-25"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/90 to-background/95" />
+            </div>
+
+            <div className="relative flex items-center justify-between">
+              <span className="font-nav text-[11px] tracking-[0.2em] text-muted-foreground">MENU</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Close navigation menu"
+                onClick={closeMobileNav}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="relative flex flex-col gap-6 pt-6 pb-6" aria-label="Mobile navigation">
+              {navSections.map((section) => (
+                <nav key={section.title} className="flex flex-col gap-2.5" aria-label={section.title}>
+                  <span className="font-nav text-[11px] font-medium tracking-[0.18em] text-muted-foreground">
+                    {section.title}
+                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    {section.links.map((link) => (
+                      <button
+                        key={link.href}
+                        type="button"
+                        onClick={() => handleMobileNavClick(link.href)}
+                        className={cn(
+                          "font-nav inline-flex items-center rounded-md py-2.5 pl-3 pr-4 text-left text-[13px] font-medium tracking-[0.1em]",
+                          "text-foreground/85 transition-colors hover:bg-primary/10 hover:text-primary",
+                        )}
+                      >
+                        {link.label}
+                      </button>
+                    ))}
+                  </div>
+                </nav>
+              ))}
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleMobileNavClick("/signin")}
+                  className={cn(
+                    "font-nav inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-[13px] font-medium tracking-[0.1em] text-primary-foreground",
+                    "transition-colors hover:bg-primary/90",
+                  )}
+                >
+                  Log in
+                </button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : null}
+    </>
   );
 };
 

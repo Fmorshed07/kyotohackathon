@@ -128,6 +128,15 @@
     display: none !important;
   }
 
+  .goog-te-menu-frame,
+  iframe.goog-te-menu-frame,
+  iframe.goog-te-banner-frame,
+  .VIpgJd-ZVi9od-ORHb-OEVmcd,
+  .VIpgJd-ZVi9od-l4eHX-hSRGPd {
+    display: none !important;
+    pointer-events: none !important;
+  }
+
   .skiptranslate {
     display: none !important;
   }
