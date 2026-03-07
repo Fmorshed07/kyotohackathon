@@ -92,6 +92,16 @@ export default function ParticipantDashboardPage() {
     void loadSubmission();
   }, [sessionUser, db]);
 
+  const handleSelectSubmission = (submissionId: string) => {
+    const selectedSubmission = participantSubmissions.find((submission) => submission.id === submissionId);
+    if (!selectedSubmission) return;
+
+    setActiveSubmissionId(selectedSubmission.id);
+    setParticipantSubmission(selectedSubmission);
+    setParticipantForm(mapSubmissionToForm(selectedSubmission));
+    setSubmissionMessage(null);
+  };
+
   const handleParticipantSubmit = async () => {
     if (!sessionUser) return;
 
@@ -131,16 +141,6 @@ export default function ParticipantDashboardPage() {
         });
         setSubmissionMessage("Submission saved successfully.");
       }
-  const handleSelectSubmission = (submissionId: string) => {
-    const selectedSubmission = participantSubmissions.find((submission) => submission.id === submissionId);
-    if (!selectedSubmission) return;
-
-    setActiveSubmissionId(selectedSubmission.id);
-    setParticipantSubmission(selectedSubmission);
-    setParticipantForm(mapSubmissionToForm(selectedSubmission));
-    setSubmissionMessage(null);
-  };
-
     } catch (error: unknown) {
       const message =
         typeof error === "object" && error && "message" in error
