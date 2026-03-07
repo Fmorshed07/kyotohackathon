@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,18 @@ import {
   clampCriterionScore,
   type JudgingCriterionId,
 } from "@/components/dashboard/judgingCriteria";
+
+type TeamSummary = {
+  name: string;
+  submissions: Submission[];
+  members: string[];
+};
+
+const parseMemberNames = (rawMemberNames: string | null | undefined) =>
+  (rawMemberNames ?? "")
+    .split(/[\n,;]+/)
+    .map((name) => name.trim())
+    .filter(Boolean);
 
 export type JudgeDashboardProps = {
   submissions: Submission[];
@@ -45,11 +58,36 @@ export function JudgeDashboard({
   onNotesChange,
   onSave,
 }: JudgeDashboardProps) {
+  const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
   const scoreButtonStopsByWeight: Record<number, number[]> = {
     25: [0, 5, 10, 15, 20, 25],
     20: [0, 4, 8, 12, 16, 20],
     15: [0, 3, 6, 9, 12, 15],
   };
+  const teams = Array.from(
+    submissions.reduce<Map<string, TeamSummary>>((acc, submission) => {
+      const teamName = submission.team_name?.trim() || "Unnamed team";
+      const existing = acc.get(teamName);
+      if (!existing) {
+        acc.set(teamName, {
+          name: teamName,
+          submissions: [submission],
+          members: parseMemberNames(submission.member_names),
+        });
+        return acc;
+      }
+
+      const combinedMembers = [
+        ...existing.members,
+        ...parseMemberNames(submission.member_names),
+      ];
+      existing.members = Array.from(new Set(combinedMembers));
+      existing.submissions.push(submission);
+      return acc;
+    }, new Map())
+    .values()
+  ).sort((left, right) => left.name.localeCompare(right.name));
+  const activeTeam = teams.find((team) => team.name === selectedTeamName) ?? teams[0] ?? null;
 
   return (
     <div className="space-y-8" id="overview">
@@ -99,6 +137,103 @@ export function JudgeDashboard({
           <p className="mt-4 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
             {judgeMessage}
           </p>
+        )}
+      </section>
+
+      <section className={`${sectionClass} p-6`} id="teams" aria-label="Teams">
+        <div className="mb-5 border-b border-border/40 pb-4">
+          <h2 className="text-lg font-semibold text-foreground">Teams</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Team names are listed separately for quick review before scoring.
+          </p>
+        </div>
+        {isLoadingSubmissions ? (
+          <p className="text-sm text-muted-foreground">Loading teams…</p>
+        ) : teams.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-10 text-center text-sm text-muted-foreground">
+            No teams available yet.
+          </p>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              {teams.map((team) => {
+                const isActive = activeTeam?.name === team.name;
+                return (
+                  <button
+                    key={team.name}
+                    type="button"
+                    onClick={() => setSelectedTeamName(team.name)}
+                    className={`rounded-xl border px-4 py-3 text-left transition ${
+                      isActive
+                        ? "border-primary/50 bg-primary/10"
+                        : "border-border/50 bg-muted/20 hover:border-primary/30 hover:bg-primary/5"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-foreground">{team.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {team.submissions.length}{" "}
+                      {team.submissions.length === 1 ? "submission" : "submissions"}{" "}
+                      - {team.members.length} {team.members.length === 1 ? "member" : "members"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+              {activeTeam ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      Team Details
+                    </p>
+                    <h3 className="mt-1 text-base font-semibold text-foreground">{activeTeam.name}</h3>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Members
+                    </p>
+                    {activeTeam.members.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {activeTeam.members.map((member) => (
+                          <span
+                            key={`${activeTeam.name}-${member}`}
+                            className="rounded-full border border-border/60 bg-background px-2.5 py-1 text-xs text-foreground"
+                          >
+                            {member}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-muted-foreground">No member names provided.</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Submissions
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {activeTeam.submissions.map((submission) => (
+                        <div
+                          key={`${activeTeam.name}-${submission.id}`}
+                          className="rounded-lg border border-border/60 bg-background/80 px-3 py-2"
+                        >
+                          <p className="text-sm font-medium text-foreground">
+                            {submission.title || "Untitled Project"}
+                          </p>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                            {submission.short_description || "No description provided."}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
         )}
       </section>
 

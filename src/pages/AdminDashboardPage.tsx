@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { collection, doc, getDocs, setDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import {
   AdminDashboard,
+  type NewSubmissionInput,
   type AdminSubmissionRow,
   type AdminUser,
 } from "@/components/dashboard/AdminDashboard";
@@ -40,6 +41,8 @@ export default function AdminDashboardPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [pendingRoles, setPendingRoles] = useState<Record<string, PortalRole>>({});
+  const [isCreatingSubmission, setIsCreatingSubmission] = useState(false);
+  const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -301,6 +304,66 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleCreateSubmission = async (payload: NewSubmissionInput) => {
+    if (!payload.participantId) {
+      setMessage("Please select a participant for the new submission.");
+      return;
+    }
+
+    setMessage(null);
+    setIsCreatingSubmission(true);
+    try {
+      const submissionPayload: Omit<Submission, "id"> = {
+        user_id: payload.participantId,
+        title: payload.title.trim() || null,
+        team_name: null,
+        member_names: null,
+        short_description: payload.shortDescription.trim() || null,
+        project_url: payload.projectUrl.trim() || null,
+        submission_pdf_url: payload.submissionPdfUrl.trim() || null,
+        demo_video_url: payload.demoVideoUrl.trim() || null,
+        created_at: new Date().toISOString(),
+        judge_id: null,
+        judge_score: null,
+        judge_notes: null,
+        judge_scores: null,
+        judge_notes_by_judge: null,
+        judge_criteria_scores: null,
+        judge_criteria_scores_by_judge: null,
+      };
+
+      const ref = await addDoc(collection(db, "submissions"), submissionPayload);
+      setSubmissions((current) => [...current, { id: ref.id, ...submissionPayload }]);
+      setMessage("Submission added.");
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to add submission.";
+      setMessage(text);
+    } finally {
+      setIsCreatingSubmission(false);
+    }
+  };
+
+  const handleDeleteSubmission = async (submissionId: string) => {
+    setMessage(null);
+    setDeletingSubmissionId(submissionId);
+    try {
+      await deleteDoc(doc(db, "submissions", submissionId));
+      setSubmissions((current) => current.filter((submission) => submission.id !== submissionId));
+      setMessage("Submission removed.");
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to remove submission.";
+      setMessage(text);
+    } finally {
+      setDeletingSubmissionId(null);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
@@ -340,6 +403,10 @@ export default function AdminDashboardPage() {
         onRoleChange={handleRoleChange}
         onSaveRole={handleSaveRole}
         onApproveJudge={handleApproveJudge}
+        isCreatingSubmission={isCreatingSubmission}
+        deletingSubmissionId={deletingSubmissionId}
+        onCreateSubmission={handleCreateSubmission}
+        onDeleteSubmission={handleDeleteSubmission}
       />
     </DashboardLayout>
   );

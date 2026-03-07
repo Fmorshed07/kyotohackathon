@@ -83,14 +83,24 @@ export function DashboardLayout({ sessionUser, role, children, onSignOut }: Dash
                   </SidebarMenuItem>
                 )}
                 {role === "judge" && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <a href="#submissions" className="cursor-pointer">
-                        <ClipboardList className="h-4 w-4" />
-                        <span>Submissions</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <a href="#teams" className="cursor-pointer">
+                          <Users className="h-4 w-4" />
+                          <span>Teams</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <a href="#submissions" className="cursor-pointer">
+                          <ClipboardList className="h-4 w-4" />
+                          <span>Submissions</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </>
                 )}
                 {role === "admin" && (
                   <>

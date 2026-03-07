@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -44,6 +46,15 @@ export type AdminSubmissionRow = {
   scoredByCount: number;
 };
 
+export type NewSubmissionInput = {
+  participantId: string;
+  title: string;
+  shortDescription: string;
+  projectUrl: string;
+  submissionPdfUrl: string;
+  demoVideoUrl: string;
+};
+
 type AdminAnalytics = {
   totalSubmissions: number;
   scoredSubmissions: number;
@@ -70,6 +81,10 @@ type AdminDashboardProps = {
   onRoleChange: (userId: string, role: PortalRole) => void;
   onSaveRole: (user: AdminUser) => Promise<void>;
   onApproveJudge: (user: AdminUser) => Promise<void>;
+  isCreatingSubmission: boolean;
+  deletingSubmissionId: string | null;
+  onCreateSubmission: (payload: NewSubmissionInput) => Promise<void>;
+  onDeleteSubmission: (submissionId: string) => Promise<void>;
 };
 
 const roleBadgeVariant: Record<PortalRole, "default" | "secondary" | "outline"> = {
@@ -217,7 +232,19 @@ export function AdminDashboard({
   onRoleChange,
   onSaveRole,
   onApproveJudge,
+  isCreatingSubmission,
+  deletingSubmissionId,
+  onCreateSubmission,
+  onDeleteSubmission,
 }: AdminDashboardProps) {
+  const [newSubmission, setNewSubmission] = useState<NewSubmissionInput>({
+    participantId: "",
+    title: "",
+    shortDescription: "",
+    projectUrl: "",
+    submissionPdfUrl: "",
+    demoVideoUrl: "",
+  });
   const participants = users.filter((user) => user.role === "participant");
   const judges = users.filter((user) => user.role === "judge");
   const winnerNames = winner.winners
@@ -350,6 +377,94 @@ export function AdminDashboard({
           </p>
         </div>
         <div className="p-4 sm:p-6">
+          <div className="mb-5 rounded-xl border border-border/40 bg-muted/20 p-4">
+            <p className="text-[0.7rem] uppercase tracking-[0.22em] text-muted-foreground">
+              Add submission
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <Select
+                value={newSubmission.participantId}
+                onValueChange={(value) =>
+                  setNewSubmission((current) => ({
+                    ...current,
+                    participantId: value,
+                  }))
+                }
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Choose participant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {participants.map((participant) => (
+                    <SelectItem key={participant.id} value={participant.id}>
+                      {participant.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                value={newSubmission.title}
+                onChange={(event) =>
+                  setNewSubmission((current) => ({ ...current, title: event.target.value }))
+                }
+                placeholder="Project title"
+              />
+              <Input
+                value={newSubmission.projectUrl}
+                onChange={(event) =>
+                  setNewSubmission((current) => ({ ...current, projectUrl: event.target.value }))
+                }
+                placeholder="Project URL (optional)"
+              />
+              <Input
+                value={newSubmission.submissionPdfUrl}
+                onChange={(event) =>
+                  setNewSubmission((current) => ({
+                    ...current,
+                    submissionPdfUrl: event.target.value,
+                  }))
+                }
+                placeholder="PDF URL (optional)"
+              />
+              <Input
+                value={newSubmission.demoVideoUrl}
+                onChange={(event) =>
+                  setNewSubmission((current) => ({ ...current, demoVideoUrl: event.target.value }))
+                }
+                placeholder="Demo video URL (optional)"
+              />
+              <Input
+                value={newSubmission.shortDescription}
+                onChange={(event) =>
+                  setNewSubmission((current) => ({
+                    ...current,
+                    shortDescription: event.target.value,
+                  }))
+                }
+                placeholder="Short description (optional)"
+              />
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button
+                className="h-9 px-4 text-[0.7rem] uppercase tracking-[0.22em]"
+                disabled={isCreatingSubmission || !newSubmission.participantId}
+                onClick={async () => {
+                  await onCreateSubmission(newSubmission);
+                  setNewSubmission({
+                    participantId: "",
+                    title: "",
+                    shortDescription: "",
+                    projectUrl: "",
+                    submissionPdfUrl: "",
+                    demoVideoUrl: "",
+                  });
+                }}
+              >
+                {isCreatingSubmission ? "Adding..." : "Add submission"}
+              </Button>
+            </div>
+          </div>
+
           {isLoadingSubmissions ? (
             <p className="text-sm text-muted-foreground">Loading submissions...</p>
           ) : submissions.length === 0 ? (
@@ -371,6 +486,9 @@ export function AdminDashboard({
                     </TableHead>
                     <TableHead className="w-[90px] text-right text-xs uppercase tracking-[0.22em]">
                       Avg
+                    </TableHead>
+                    <TableHead className="w-[110px] text-right text-xs uppercase tracking-[0.22em]">
+                      Action
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -440,6 +558,22 @@ export function AdminDashboard({
                           {submission.averageScore != null ? submission.averageScore.toFixed(1) : "—"}
                         </p>
                         <p className="text-[0.65rem] text-muted-foreground">{submission.scoredByCount} judges</p>
+                      </TableCell>
+                      <TableCell className="align-top text-right">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
+                          disabled={deletingSubmissionId === submission.id}
+                          onClick={async () => {
+                            if (!window.confirm("Remove this submission? This cannot be undone.")) {
+                              return;
+                            }
+                            await onDeleteSubmission(submission.id);
+                          }}
+                        >
+                          {deletingSubmissionId === submission.id ? "Removing..." : "Remove"}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
