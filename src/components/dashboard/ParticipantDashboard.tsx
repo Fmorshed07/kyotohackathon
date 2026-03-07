@@ -77,10 +77,10 @@ export function ParticipantDashboard({
 
   return (
     <div className="space-y-8" id="overview">
-      <section className={`${sectionClass} p-6`} aria-label="Participant overview">
+      <section className={`${sectionClass} p-4 sm:p-6`} aria-label="Participant overview">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="font-display text-sm uppercase tracking-[0.28em] text-foreground">
+            <h2 className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]">
               Submission overview
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -112,14 +112,14 @@ export function ParticipantDashboard({
 
       {/* Overview / Project details */}
       <section
-        className={`${sectionClass} p-6`}
+        className={`${sectionClass} p-4 sm:p-6`}
         id="my-project"
         aria-labelledby="project-details-heading"
       >
         <div className="mb-6 border-b border-border/40 pb-4">
           <h2
             id="project-details-heading"
-            className="font-display text-sm uppercase tracking-[0.28em] text-foreground"
+            className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]"
           >
             Project details
           </h2>
@@ -172,13 +172,13 @@ export function ParticipantDashboard({
 
       {/* Team details */}
       <section
-        className={`${sectionClass} p-6`}
+        className={`${sectionClass} p-4 sm:p-6`}
         aria-labelledby="team-details-heading"
       >
         <div className="mb-6 border-b border-border/40 pb-4">
           <h2
             id="team-details-heading"
-            className="font-display text-sm uppercase tracking-[0.28em] text-foreground"
+            className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]"
           >
             Team details
           </h2>
@@ -217,13 +217,13 @@ export function ParticipantDashboard({
 
       {/* Links & media */}
       <section
-        className={`${sectionClass} p-6`}
+        className={`${sectionClass} p-4 sm:p-6`}
         aria-labelledby="links-media-heading"
       >
         <div className="mb-6 border-b border-border/40 pb-4">
           <h2
             id="links-media-heading"
-            className="font-display text-sm uppercase tracking-[0.28em] text-foreground"
+            className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]"
           >
             Links & media
           </h2>
@@ -300,12 +300,12 @@ export function ParticipantDashboard({
       </section>
 
       {/* Save submission */}
-      <section className={`${sectionClass} p-6`} aria-labelledby="submit-heading">
+      <section className={`${sectionClass} p-4 sm:p-6`} aria-labelledby="submit-heading">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2
               id="submit-heading"
-              className="font-display text-sm uppercase tracking-[0.28em] text-foreground"
+              className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]"
             >
               Save submission
             </h2>
@@ -322,7 +322,7 @@ export function ParticipantDashboard({
             <Button
               onClick={onSave}
               disabled={isSubmittingProject}
-              className="tracking-[0.24em] uppercase"
+              className="w-full uppercase tracking-[0.12em] sm:w-auto sm:tracking-[0.24em]"
             >
               {isSubmittingProject ? "Saving..." : "Save Submission"}
             </Button>

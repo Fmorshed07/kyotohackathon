@@ -177,7 +177,7 @@ export function DashboardLayout({ sessionUser, role, children, onSignOut }: Dash
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-4 border-b border-border/40 bg-background/85 px-6 py-2 backdrop-blur-sm">
+        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b border-border/40 bg-background/85 px-3 py-2 backdrop-blur-sm sm:px-4 md:gap-4 md:px-6">
           <div className="flex flex-1 flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-foreground">
               {role === "participant"
@@ -187,7 +187,7 @@ export function DashboardLayout({ sessionUser, role, children, onSignOut }: Dash
                   : "Admin"}{" "}
               Dashboard
             </span>
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="text-[0.65rem] sm:text-xs">
               {sessionUser.role}
             </Badge>
           </div>
@@ -195,7 +195,7 @@ export function DashboardLayout({ sessionUser, role, children, onSignOut }: Dash
             {sessionUser.email}
           </div>
         </header>
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
           <div className="mx-auto w-full max-w-[1400px]">
           {children}
           </div>
