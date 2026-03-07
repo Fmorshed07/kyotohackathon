@@ -13,6 +13,8 @@ const initialParticipantForm = {
   projectUrl: "",
   submissionPdfUrl: "",
   demoVideoUrl: "",
+  teamName: "",
+  memberNames: "",
 };
 
 export default function ParticipantDashboardPage() {
@@ -44,6 +46,8 @@ export default function ParticipantDashboardPage() {
           projectUrl: data.project_url ?? "",
           submissionPdfUrl: data.submission_pdf_url ?? "",
           demoVideoUrl: data.demo_video_url ?? "",
+          teamName: data.team_name ?? "",
+          memberNames: data.member_names ?? "",
         });
       } catch {
         // ignore load errors and keep editable form state
@@ -66,6 +70,8 @@ export default function ParticipantDashboardPage() {
         project_url: participantForm.projectUrl,
         submission_pdf_url: participantForm.submissionPdfUrl,
         demo_video_url: participantForm.demoVideoUrl,
+        team_name: participantForm.teamName,
+        member_names: participantForm.memberNames,
         role: "participant",
       };
       const submissionRef = doc(db, "submissions", sessionUser.id);

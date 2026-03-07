@@ -5,6 +5,8 @@ export type Submission = {
   id: string;
   user_id: string;
   title: string | null;
+  team_name?: string | null;
+  member_names?: string | null;
   short_description: string | null;
   project_url: string | null;
   submission_pdf_url: string | null;

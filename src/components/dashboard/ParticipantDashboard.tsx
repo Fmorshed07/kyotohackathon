@@ -45,6 +45,8 @@ export type ParticipantDashboardProps = {
     projectUrl: string;
     submissionPdfUrl: string;
     demoVideoUrl: string;
+    teamName: string;
+    memberNames: string;
   };
   setParticipantForm: React.Dispatch<
     React.SetStateAction<{
@@ -53,6 +55,8 @@ export type ParticipantDashboardProps = {
       projectUrl: string;
       submissionPdfUrl: string;
       demoVideoUrl: string;
+      teamName: string;
+      memberNames: string;
     }>
   >;
   participantSubmission: Submission | null;
@@ -160,6 +164,51 @@ export function ParticipantDashboard({
                 setParticipantForm((prev) => ({ ...prev, shortDescription: e.target.value }))
               }
               placeholder="Describe your project in a few sentences."
+              rows={4}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Team details */}
+      <section
+        className={`${sectionClass} p-6`}
+        aria-labelledby="team-details-heading"
+      >
+        <div className="mb-6 border-b border-border/40 pb-4">
+          <h2
+            id="team-details-heading"
+            className="font-display text-sm uppercase tracking-[0.28em] text-foreground"
+          >
+            Team details
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Add your team name and all member names.
+          </p>
+        </div>
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+              Team Name
+            </label>
+            <Input
+              value={participantForm.teamName}
+              onChange={(e) =>
+                setParticipantForm((prev) => ({ ...prev, teamName: e.target.value }))
+              }
+              placeholder="Your team name"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+              Member Names
+            </label>
+            <Textarea
+              value={participantForm.memberNames}
+              onChange={(e) =>
+                setParticipantForm((prev) => ({ ...prev, memberNames: e.target.value }))
+              }
+              placeholder="List all members, one per line."
               rows={4}
             />
           </div>
