@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import tokyoSkyline from "@/assets/tokyo-skyline.jpg";
+import kyotoSkyline from "@/assets/kyoto-skyline.jpg";
 
 const AboutSection = () => {
   const { ref: sectionRef, isVisible: sectionVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.1 });
@@ -17,7 +17,7 @@ const AboutSection = () => {
         transition={{ duration: 1.5 }}
       >
         <img
-          src={tokyoSkyline}
+          src={kyotoSkyline}
           alt=""
           className="h-full w-full object-cover opacity-20"
         />
@@ -76,7 +76,7 @@ const AboutSection = () => {
             transition={{ duration: 0.8, delay: 0.6 }}
           >
             <p className="font-body text-xl leading-relaxed text-muted-foreground md:text-2xl">
-              Impact Tokyo brings together the world's most ambitious builders to solve
+              Impact Kyoto brings together the world's most ambitious builders to solve
               real problems. No pitch decks. No vanity metrics. Just{" "}
               <span className="text-secondary">working solutions</span> that make a
               difference.
@@ -89,7 +89,7 @@ const AboutSection = () => {
           {[
             { label: "Problem-First", desc: "Start with impact, not technology", icon: "◆" },
             { label: "Global Scale", desc: "Solutions for worldwide challenges", icon: "◇" },
-            { label: "Built in Tokyo", desc: "For the world", icon: "○" },
+            { label: "Built in Kyoto", desc: "For the world", icon: "○" },
           ].map((item, i) => (
             <motion.div
               key={item.label}

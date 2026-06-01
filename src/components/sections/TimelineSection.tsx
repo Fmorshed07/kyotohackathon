@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import tokyoStation from "@/assets/tokyo-station.jpg";
-import tokyoHero from "@/assets/tokyo-hero.jpg";
+import kyotoStation from "@/assets/kyoto-station.jpg";
+import kyotoHero from "@/assets/kyoto-hero.jpg";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const milestones = [
@@ -43,7 +43,7 @@ const TimelineSection = () => {
         transition={{ duration: 1.5 }}
       >
         <img
-          src={tokyoStation}
+          src={kyotoStation}
           alt=""
           className="h-full w-full object-cover opacity-15"
         />
@@ -62,8 +62,8 @@ const TimelineSection = () => {
             <CardContent className="grid gap-6 p-6 md:grid-cols-[1.1fr_1fr] md:items-stretch">
               <div className="relative overflow-hidden rounded-md border border-border/60 bg-black/20">
                 <img
-                  src={tokyoHero}
-                  alt="Impact Tokyo Hackathon 2026"
+                  src={kyotoHero}
+                  alt="Impact Kyoto Hackathon 2026"
                   className="h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/30 to-transparent" />
@@ -74,10 +74,10 @@ const TimelineSection = () => {
               <div className="flex flex-col justify-between gap-6">
                 <div className="space-y-3">
                   <CardTitle className="text-2xl tracking-wide text-foreground">
-                    Impact Tokyo Hackathon 2026: AI for Global Good
+                    Impact Kyoto Hackathon 2026: AI for Global Good
                   </CardTitle>
                   <p className="text-sm text-foreground/90">
-                    Hosted by Cognisor AI • Antler in Japan, Tokyo
+                    Hosted by Cognisor AI • Antler in Japan, Kyoto
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Approval required • Request to join on Luma
@@ -133,7 +133,7 @@ const TimelineSection = () => {
               Event Day Schedule
             </motion.span>
             <span className="rounded-full border border-border px-4 py-1 font-display text-sm text-muted-foreground">
-              Tokyo, Japan
+              Kyoto, Japan
             </span>
             <span className="rounded-full border border-border px-4 py-1 font-display text-sm text-muted-foreground">
               In-Person

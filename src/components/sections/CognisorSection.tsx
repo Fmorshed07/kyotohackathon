@@ -1,16 +1,20 @@
 import { motion } from "framer-motion";
+import PreviousHackathonsLivePreview from "@/components/PreviousHackathonsLivePreview";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const CognisorSection = () => {
-  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.2 });
+  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.08 });
 
   return (
     <section className="relative min-h-screen px-6 py-32" id="cognisor">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute left-1/2 top-24 h-96 w-96 -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[120px]" />
-        <div className="absolute right-0 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-navy-500/10 blur-[120px]" />
+        <div className="absolute left-1/2 top-24 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/10 blur-[120px]" />
+        <div className="absolute right-0 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-secondary/10 blur-[120px]" />
       </div>
-      <div ref={ref} className="mx-auto max-w-5xl text-center">
+      <div ref={ref} className="mx-auto max-w-5xl">
+        <PreviousHackathonsLivePreview isVisible={isVisible} />
+
+        <div className="text-center">
         {/* Organized By */}
         <motion.span
           className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/40 px-4 py-2 font-display text-xs tracking-[0.3em] text-muted-foreground shadow-sm backdrop-blur"
@@ -18,7 +22,7 @@ const CognisorSection = () => {
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
         >
-          <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_12px_hsl(185_100%_50%/0.8)]" />
+          <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_hsl(199_89%_68%_/_0.8)]" />
           ORGANIZED BY
         </motion.span>
 
@@ -36,9 +40,9 @@ const CognisorSection = () => {
             className="text-gradient-cyan transition-colors hover:text-primary"
             animate={isVisible ? {
               textShadow: [
-                "0 0 20px hsl(185 100% 50% / 0.3)",
-                "0 0 40px hsl(185 100% 50% / 0.5)",
-                "0 0 20px hsl(185 100% 50% / 0.3)",
+                "0 0 20px hsl(199 89% 68% / 0.3)",
+                "0 0 40px hsl(199 89% 68% / 0.5)",
+                "0 0 20px hsl(199 89% 68% / 0.3)",
               ],
             } : {}}
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
@@ -78,28 +82,32 @@ const CognisorSection = () => {
             automation workflows tailored to business needs, supported by consultations
             and a growing catalog of AI tools.
           </p>
-          <div className="relative overflow-hidden rounded-3xl border border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 via-navy-500/10 to-transparent p-8 text-left shadow-[0_25px_80px_-50px_hsl(185_100%_50%/0.6)] backdrop-blur">
-            <div className="pointer-events-none absolute -top-20 right-0 h-40 w-40 rounded-full bg-cyan-400/20 blur-[60px]" />
-            <div className="pointer-events-none absolute -bottom-16 left-0 h-40 w-40 rounded-full bg-navy-400/20 blur-[60px]" />
+          <div className="poster-card relative p-8 text-left">
+            <div className="pointer-events-none absolute -top-20 right-0 h-40 w-40 rounded-full bg-primary/20 blur-[60px]" />
+            <div className="pointer-events-none absolute -bottom-16 left-0 h-40 w-40 rounded-full bg-secondary/15 blur-[60px]" />
             <div className="relative">
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-cyan-100">
-                <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_hsl(185_100%_50%/0.9)]" />
-                Sushi Tech Tokyo 2026
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_hsl(199_89%_68%/0.9)]" />
+                IVS Japan
               </div>
               <h3 className="mt-5 font-display text-2xl font-semibold tracking-wide text-foreground md:text-3xl">
-                TIU Impact Next & Cognisor AI are the event ambassadors
+                Cognisor AI are the event ambassadors of IVS Japan
               </h3>
               <p className="mt-4 font-body text-lg text-muted-foreground/90">
-                As we connect with Sushi Tech Tokyo 2026, we are offering{" "}
+                As we connect with the Kyoto innovation community, we are offering{" "}
                 <span className="text-foreground">discounted tickets</span> to our
                 community through this partnership.
               </p>
+              <p className="mt-4 font-body text-lg text-muted-foreground/90">
+                <span className="text-foreground">All international students</span> win a{" "}
+                <span className="text-foreground">free ticket</span>.
+              </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                {["TIU Impact Next", "Cognisor AI", "Sushi Tech Tokyo 2026"].map(
+                {["IVS Japan", "Cognisor AI", "Impact Kyoto 2026"].map(
                   (label) => (
                     <span
                       key={label}
-                      className="rounded-full border border-border/60 bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground"
+                      className="rounded-full border border-secondary/30 bg-secondary/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-secondary"
                     >
                       {label}
                     </span>
@@ -133,13 +141,13 @@ const CognisorSection = () => {
             ].map((item) => (
               <div
                 key={item.title}
-                className="group rounded-2xl border border-border/70 bg-card/40 p-5 shadow-sm backdrop-blur transition hover:border-cyan-400/40 hover:bg-card/60"
+                className="poster-detail-tile group p-5 transition hover:border-primary/35 hover:bg-card/50"
               >
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-lg tracking-wide text-foreground">
                     {item.title}
                   </h3>
-                  <span className="h-2.5 w-2.5 rounded-full bg-cyan-400/80 opacity-60 transition group-hover:opacity-100" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-primary/80 opacity-60 transition group-hover:opacity-100" />
                 </div>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground/80">
                   {item.description}
@@ -151,11 +159,11 @@ const CognisorSection = () => {
 
         {/* Mission Statement */}
         <motion.div
-          className="mt-16 overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-card/40 via-card/20 to-transparent p-8 text-left shadow-lg backdrop-blur md:p-12"
+          className="mt-16 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-card/50 via-card/30 to-transparent p-8 text-left shadow-[0_0_40px_hsl(199_89%_68%_/_0.08)] backdrop-blur md:p-12"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={isVisible ? { opacity: 1, scale: 1 } : {}}
           transition={{ duration: 0.8, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          whileHover={{ borderColor: "hsl(185 100% 50% / 0.3)" }}
+          whileHover={{ borderColor: "hsl(199 89% 68% / 0.35)" }}
         >
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Cognisor AI Philosophy
@@ -178,6 +186,7 @@ const CognisorSection = () => {
             — Cognisor AI
           </motion.p>
         </motion.div>
+        </div>
       </div>
     </section>
   );

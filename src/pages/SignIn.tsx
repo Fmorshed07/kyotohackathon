@@ -227,7 +227,7 @@ export default function SignIn() {
           aria-label="Sign in header"
         >
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-primary/70">Impact Tokyo</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-primary/70">Impact Kyoto</p>
             <h1 className="mt-2 font-display text-2xl tracking-[0.18em] uppercase md:text-3xl">
               Sign In
             </h1>

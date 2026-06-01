@@ -110,7 +110,7 @@ export default function AdminSignIn() {
           className={`${sectionClass} mb-8 flex flex-col gap-4 p-6`}
           aria-label="Admin sign in header"
         >
-          <p className="text-xs uppercase tracking-[0.3em] text-primary/70">Impact Tokyo</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-primary/70">Impact Kyoto</p>
           <h1 className="font-display text-2xl tracking-[0.18em] uppercase md:text-3xl">Admin Sign In</h1>
           <p className="max-w-xl text-sm text-muted-foreground">
             This page is restricted to admin accounts only.

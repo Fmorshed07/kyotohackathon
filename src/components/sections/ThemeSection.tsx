@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import tokyoTemple from "@/assets/tokyo-temple.jpg";
+import kyotoTemple from "@/assets/kyoto-temple.jpg";
 
 const tracks = [
   {
@@ -50,7 +50,7 @@ const ThemeSection = () => {
         transition={{ duration: 1.5 }}
       >
         <img
-          src={tokyoTemple}
+          src={kyotoTemple}
           alt=""
           className="h-full w-full object-cover opacity-15"
         />

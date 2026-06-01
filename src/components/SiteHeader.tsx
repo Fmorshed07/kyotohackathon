@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import GoogleTranslate from "@/components/GoogleTranslate";
 import { cn } from "@/lib/utils";
-import tokyoNeonAlley from "@/assets/tokyo-neon-alley.jpg";
 
 type NavLink = { label: string; href: string };
 
@@ -27,6 +26,7 @@ const navSections: { title: string; links: NavLink[] }[] = [
   {
     title: "Partners",
     links: [
+      { label: "Past hackathons", href: "#previous-hackathons" },
       { label: "Cognisor", href: "#cognisor" },
     ],
   },
@@ -93,15 +93,15 @@ const SiteHeader = () => {
 
   return (
     <>
-      <header className="fixed top-0 z-40 w-full border-b border-border/50 bg-background/85 backdrop-blur-md">
+      <header className="fixed top-0 z-40 w-full border-b border-white/10 bg-[hsl(248_45%_8%_/_0.75)] backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-stretch px-4 sm:px-6 lg:px-8">
         {/* Left: logo */}
         <div className="flex min-w-0 flex-1 items-center md:flex-none">
           <a
             href="/"
-            className="font-nav text-[13px] font-medium tracking-[0.2em] text-foreground/90 transition-colors hover:text-primary"
+            className="font-nav text-[13px] font-medium tracking-[0.2em] text-white/90 transition-colors hover:text-primary"
           >
-            IMPACT TOKYO
+            IMPACT KYOTO
           </a>
         </div>
 
@@ -125,7 +125,7 @@ const SiteHeader = () => {
                     href={link.href}
                     className={cn(
                       "font-nav inline-flex items-center whitespace-nowrap rounded px-2.5 py-2 text-[13px] font-medium tracking-[0.1em] sm:px-3",
-                      "text-foreground/70 transition-colors hover:bg-primary/10 hover:text-primary",
+                      "text-white/70 transition-colors hover:bg-white/10 hover:text-primary",
                     )}
                   >
                     {link.label}
@@ -186,7 +186,7 @@ const SiteHeader = () => {
           >
             <div className="absolute inset-0">
               <img
-                src={tokyoNeonAlley}
+                src="/banner.png"
                 alt=""
                 className="h-full w-full object-cover opacity-25"
               />

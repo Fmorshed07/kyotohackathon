@@ -36,7 +36,7 @@ const PartnerWithSection = () => {
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.8, delay: 0.1 }}
         >
-          <span className="text-gradient-cyan">Partner</span> with Impact Tokyo
+          <span className="text-gradient-cyan">Partner</span> with Impact Kyoto
         </motion.h2>
         <motion.p
           className="mx-auto mt-6 max-w-2xl font-body text-base text-muted-foreground sm:mt-8 sm:text-lg lg:text-xl"

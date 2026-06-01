@@ -1,8 +1,8 @@
-# IMPACT TOKYO 2026
+# IMPACT KYOTO 2026
 
 ## Project info
 
-A hackathon website for IMPACT TOKYO 2026 - AI for Global Good.
+A hackathon website for IMPACT KYOTO 2026 - AI for Global Good.
 
 ## How can I edit this code?
 

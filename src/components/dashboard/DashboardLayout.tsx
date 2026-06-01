@@ -53,7 +53,7 @@ export function DashboardLayout({ sessionUser, role, children, onSignOut }: Dash
           <div className="flex h-14 items-center gap-2 bg-gradient-to-r from-sidebar-background to-sidebar-accent/20 px-3">
             <SidebarTrigger className="text-sidebar-foreground" />
             <span className="text-sm font-semibold tracking-normal text-sidebar-foreground">
-              Impact Tokyo
+              Impact Kyoto
             </span>
           </div>
         </SidebarHeader>

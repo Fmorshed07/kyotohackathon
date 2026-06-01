@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import tokyoAbstract from "@/assets/tokyo-abstract.jpg";
+import kyotoAbstract from "@/assets/kyoto-abstract.jpg";
 
 const deliverables = [
   { title: "Working Prototype", kanji: "試作品" },
@@ -25,7 +25,7 @@ const DeliverablesSection = () => {
         transition={{ duration: 1.5 }}
       >
         <img
-          src={tokyoAbstract}
+          src={kyotoAbstract}
           alt=""
           className="h-full w-full object-cover opacity-10"
         />

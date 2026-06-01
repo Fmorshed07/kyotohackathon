@@ -21,12 +21,6 @@ const partners = [
     logoClassName: "h-[140%] w-[170%] max-w-none max-h-none",
   },
   {
-    name: "Creator Labo",
-    src: "/partners/creatorlabo-log.png",
-    alt: "Creator Labo logo",
-    logoClassName: "max-h-16 md:max-h-20",
-  },
-  {
     name: "Orange Partner",
     src: "/partners/orange-partner.png",
     alt: "Orange partner logo",

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import tokyoNeonAlley from "@/assets/tokyo-neon-alley.jpg";
+import kyotoNeonAlley from "@/assets/kyoto-neon-alley.jpg";
 
 const participants = [
   {
@@ -44,7 +44,7 @@ const ParticipantsSection = () => {
         transition={{ duration: 1.5 }}
       >
         <img
-          src={tokyoNeonAlley}
+          src={kyotoNeonAlley}
           alt=""
           className="h-full w-full object-cover opacity-20"
         />

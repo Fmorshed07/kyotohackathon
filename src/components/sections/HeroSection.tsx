@@ -1,217 +1,101 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import tokyoHero from "@/assets/tokyo-hero.jpg";
+
+const LUMA_URL = "https://luma.com/2f3omvqa";
 
 const HeroSection = () => {
-  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.2 });
+  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.1 });
 
   return (
-    <section
-      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-20"
-    >
-      {/* Scroll trigger */}
-      <div ref={ref} className="absolute inset-0" />
-      {/* Background Image with Parallax */}
-      <motion.div
-        className="absolute inset-0 -z-10"
-        initial={{ scale: 1.1 }}
-        animate={{ scale: 1 }}
-        transition={{ duration: 1.5, ease: "easeOut" }}
-      >
+    <section className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#1A1B4B]">
+      <div ref={ref} className="absolute inset-0" aria-hidden />
+
+      {/* Background */}
+      <div className="absolute inset-0">
         <img
-          src={tokyoHero}
-          alt="Tokyo cityscape"
-          className="h-full w-full object-cover"
+          src="/banner.png"
+          alt=""
+          className="h-full w-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/40" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-transparent to-background" />
-      </motion.div>
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1A1B4B]/50 via-[#1A1B4B]/20 to-[#1A1B4B]/70" />
+      </div>
 
-      {/* Animated grain overlay */}
-      <div
-        className="absolute inset-0 -z-5 opacity-[0.03]"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-        }}
-      />
-
-      <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
-        <motion.div
-          className="mb-3 flex flex-col items-center font-display text-xs tracking-[0.3em] text-muted-foreground/85 md:text-sm"
+      {/* Hero content */}
+      <div className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-5xl flex-col items-center justify-center px-6 pb-16 pt-24 text-center">
+        <motion.p
+          className="text-gradient-japanese font-display text-sm tracking-[0.35em] md:text-base"
           initial={{ opacity: 0, y: 16 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.15 }}
+          transition={{ duration: 0.7, delay: 0.1 }}
         >
-          <img
-            src="/partners/cognisor.png"
-            alt="Cognisor AI logo"
-            className="h-16 w-auto object-contain md:h-20"
-            loading="lazy"
-          />
-          <span className="mt-1">PRESENTS</span>
-        </motion.div>
+          インパクト京都 2026
+        </motion.p>
 
-        {/* Japanese subtitle */}
-        <motion.span
-          className="mb-4 inline-block font-display text-sm tracking-[0.4em] text-primary/70"
-          initial={{ opacity: 0, y: 20 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.2 }}
-        >
-          インパクト東京 2026
-        </motion.span>
-
-        {/* Main Title */}
         <motion.h1
-          className="font-display text-5xl font-bold tracking-[0.1em] md:text-7xl lg:text-8xl"
-          initial={{ opacity: 0, y: 30 }}
+          className="mt-4 font-display font-bold leading-[0.95] tracking-[0.06em]"
+          initial={{ opacity: 0, y: 24 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.9, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
         >
-          <motion.span
-            className="text-gradient-cyan inline-block"
-            animate={{
-              textShadow: [
-                "0 0 20px hsl(185 100% 50% / 0.3)",
-                "0 0 40px hsl(185 100% 50% / 0.5)",
-                "0 0 20px hsl(185 100% 50% / 0.3)",
-              ],
-            }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          >
+          <span className="glow-impact block text-5xl text-gradient-impact sm:text-6xl md:text-7xl lg:text-8xl">
             IMPACT
-          </motion.span>{" "}
-          <motion.span
-            className="inline-block text-foreground"
-            animate={{
-              y: [0, -2, 0],
-              textShadow: [
-                "0 0 10px hsl(0 0% 100% / 0.1)",
-                "0 0 22px hsl(0 0% 100% / 0.25)",
-                "0 0 10px hsl(0 0% 100% / 0.1)",
-              ],
-            }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          >
-            TOKYO
-          </motion.span>{" "}
-          <motion.span
-            className="inline-block text-foreground/80"
-            animate={{
-              y: [0, 2, 0],
-              textShadow: [
-                "0 0 8px hsl(0 0% 100% / 0.08)",
-                "0 0 18px hsl(0 0% 100% / 0.2)",
-                "0 0 8px hsl(0 0% 100% / 0.08)",
-              ],
-            }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
-          >
-            2026
-          </motion.span>
+          </span>
+          <span className="mt-1 block text-5xl text-white drop-shadow-[0_4px_32px_rgba(0,0,0,0.6)] sm:text-6xl md:text-7xl lg:text-8xl">
+            KYOTO
+          </span>
         </motion.h1>
 
-        {/* Subtitle */}
         <motion.p
-          className="mt-6 font-display text-xl tracking-[0.2em] text-secondary md:text-2xl lg:text-3xl"
-          initial={{ opacity: 0, y: 20 }}
+          className="glow-violet mt-5 font-display text-base font-medium tracking-[0.25em] text-secondary sm:text-lg md:text-xl"
+          initial={{ opacity: 0, y: 12 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.5 }}
-          style={{
-            textShadow: "0 0 30px hsl(270 70% 60% / 0.4)",
-          }}
+          transition={{ duration: 0.6, delay: 0.35 }}
         >
           AI FOR GLOBAL GOOD
         </motion.p>
 
-        {/* Tagline */}
         <motion.p
-          className="mt-8 font-body text-lg text-foreground/80 md:text-xl"
-          initial={{ opacity: 0, y: 20 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.6 }}
-        >
-          Build With Purpose. Code With Vision. Impact the World.
-        </motion.p>
-
-        {/* Organizer */}
-        <motion.p
-          className="mt-4 font-body text-sm tracking-wide text-muted-foreground/70"
+          className="mt-4 max-w-lg font-body text-sm text-white/85 sm:text-base"
           initial={{ opacity: 0 }}
           animate={isVisible ? { opacity: 1 } : {}}
-          transition={{ duration: 0.8, delay: 0.7 }}
+          transition={{ duration: 0.6, delay: 0.45 }}
         >
-          Organized by{" "}
-          <a
-            href="https://cognisorai.com"
-            className="text-muted-foreground/80 transition-colors hover:text-primary"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Cognisor AI
-          </a>
-        </motion.p>
-        <motion.p
-          className="mt-2 font-body text-sm tracking-wide text-muted-foreground/70"
-          initial={{ opacity: 0 }}
-          animate={isVisible ? { opacity: 1 } : {}}
-          transition={{ duration: 0.8, delay: 0.75 }}
-        >
-          Co-host: Creator Labo and TIU Impact Next
+          28th June 2026 · Kyoto, Japan · In-Person
         </motion.p>
 
-        {/* Event Info Pills */}
         <motion.div
-          className="mt-8 flex flex-wrap items-center justify-center gap-4"
+          className="mt-10"
           initial={{ opacity: 0, y: 20 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.8 }}
-        >
-          <span className="rounded-full border border-primary/40 bg-primary/10 px-5 py-2 font-display text-sm tracking-wider text-primary backdrop-blur-sm">
-            FEBRUARY 2026
-          </span>
-          <span className="rounded-full border border-border/50 bg-card/30 px-5 py-2 font-display text-sm tracking-wider text-foreground/80 backdrop-blur-sm">
-            TOKYO, JAPAN
-          </span>
-          <span className="rounded-full border border-secondary/40 bg-secondary/10 px-5 py-2 font-display text-sm tracking-wider text-secondary backdrop-blur-sm">
-            IN-PERSON
-          </span>
-        </motion.div>
-
-        {/* CTA Button */}
-        <motion.div
-          className="mt-12 flex justify-center"
-          initial={{ opacity: 0, y: 30 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.9 }}
+          transition={{ duration: 0.7, delay: 0.55 }}
         >
           <motion.a
-            href="https://luma.com/2f3omvqa"
-            className="group relative inline-flex items-center justify-center overflow-hidden rounded-lg border border-secondary/50 bg-secondary/10 px-8 py-4 font-display text-sm tracking-wider text-secondary backdrop-blur-sm transition-all duration-300 hover:bg-secondary/20"
-            whileHover={{ scale: 1.02, boxShadow: "0 0 30px hsl(270 70% 60% / 0.4)" }}
+            href={LUMA_URL}
+            className="btn-poster-cta min-w-[220px]"
+            whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.98 }}
             target="_blank"
             rel="noreferrer"
           >
-            <span className="relative z-10">JOIN THE HACKATHON</span>
+            REGISTER
           </motion.a>
         </motion.div>
       </div>
 
-      {/* Scroll Indicator */}
+      {/* Scroll indicator */}
       <motion.div
-        className="absolute bottom-10 left-1/2 -translate-x-1/2"
-        initial={{ opacity: 0, y: -20 }}
-        animate={isVisible ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.8, delay: 1.2 }}
+        className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2"
+        initial={{ opacity: 0 }}
+        animate={isVisible ? { opacity: 1 } : {}}
+        transition={{ delay: 0.9 }}
       >
         <motion.div
           className="flex flex-col items-center gap-2"
-          animate={{ y: [0, 8, 0] }}
+          animate={{ y: [0, 6, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         >
-          <span className="text-xs tracking-widest text-muted-foreground/50">SCROLL</span>
-          <div className="h-12 w-[1px] bg-gradient-to-b from-primary/50 to-transparent" />
+          <span className="text-[10px] tracking-[0.3em] text-white/40">SCROLL</span>
+          <div className="h-8 w-px bg-gradient-to-b from-primary/60 to-transparent" />
         </motion.div>
       </motion.div>
     </section>

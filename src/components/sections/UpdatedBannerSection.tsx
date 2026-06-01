@@ -16,7 +16,7 @@ const UpdatedBannerSection = () => {
         >
           <img
             src="/banner.png"
-            alt="Impact Tokyo 2026 event banner"
+            alt="Impact Kyoto 2026 event banner"
             className="h-auto w-full object-cover"
             loading="lazy"
           />

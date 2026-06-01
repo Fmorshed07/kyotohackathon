@@ -4,7 +4,6 @@ import LoadingExperience from "@/components/LoadingExperience";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import SiteHeader from "@/components/SiteHeader";
 import HeroSection from "@/components/sections/HeroSection";
-import UpdatedBannerSection from "@/components/sections/UpdatedBannerSection";
 import AboutSection from "@/components/sections/AboutSection";
 import ThemeSection from "@/components/sections/ThemeSection";
 import TimelineSection from "@/components/sections/TimelineSection";
@@ -34,9 +33,8 @@ const Index = () => {
 
         <SiteHeader />
 
-        <main className="relative pt-16">
+        <main className="relative">
           <HeroSection />
-          <UpdatedBannerSection />
           <AboutSection />
           <ThemeSection />
           <TimelineSection />

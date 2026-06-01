@@ -31,14 +31,14 @@ mutation SeedData @transaction @auth(level: USER, insecureReason: "Seed data ope
   hackathon_insertMany(data: [
     {
       id: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
-      name: "Tokyo Hackathon 2024",
+      name: "Kyoto Hackathon 2026",
       startDate: "2024-03-15T09:00:00Z",
       endDate: "2024-03-17T17:00:00Z",
       status: "Upcoming",
       organizerId: "b21a8a20-8b01-4c12-8d76-5a9e0f6b3e70",
-      description: "Annual hackathon in Tokyo focusing on AI and Sustainability.",
-      website: "https://tokyohackathon.example.com",
-      location: "Tokyo Big Sight"
+      description: "Annual hackathon in Kyoto focusing on AI and Sustainability.",
+      website: "https://kyotohackathon.example.com",
+      location: "Kyoto International Conference Center"
     },
     {
       id: "d4d5e6f7-a8b9-0c1d-2e3f-4a5b6c7d8e9f",
@@ -58,7 +58,7 @@ mutation SeedData @transaction @auth(level: USER, insecureReason: "Seed data ope
       name: "Team Alpha",
       hackathonId: "c7c8d9e0-f1a2-3b4c-5d6e-7f8a9b0c1d2e",
       leadUserId: "a1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
-      description: "Developing a smart waste management solution for Tokyo Hackathon."
+      description: "Developing a smart waste management solution for Kyoto Hackathon."
     },
     {
       id: "f6a7b8c9-d0e1-f2a3-b4c5-d6e7f8a9b0c1",

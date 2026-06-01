@@ -1,28 +1,7 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import tokyoAbstract from "@/assets/tokyo-abstract.jpg";
 
-const prizePool = [
-  {
-    title: "🥇 Champion Team",
-    rewards: ["¥15,000 Amazon Gift Card", "$300 Alibaba Cloud credits"],
-  },
-  {
-    title: "🥈 1st runner-up Team",
-    rewards: ["¥10,000 Amazon Gift Card", "$200 Alibaba Cloud credits"],
-  },
-  {
-    title: "🥉 2nd runner-up Team",
-    rewards: ["¥5,000 Amazon Gift Card", "$200 Alibaba Cloud credits"],
-  },
-];
-
-const participantBenefits = [
-  "$10 AI Coding Plan Lite on Alibaba",
-  "$10 Alibaba Cloud - Model Studio API & Cloud Services",
-  "1-Month Lovable Pro",
-  "1-Month n8n Cloud Pro",
-];
+const LUMA_URL = "https://luma.com/2f3omvqa";
 
 const moreBenefits = [
   "Direct Mentorship from investors & startup founders",
@@ -43,7 +22,7 @@ const FinalCTASection = () => {
     >
       {/* Scroll trigger */}
       <div ref={ref} className="absolute inset-0" />
-      {/* Background */}
+      {/* Background — subtle banner tint (same palette as hero, not a second full banner) */}
       <motion.div
         className="absolute inset-0 -z-10"
         initial={{ opacity: 0 }}
@@ -51,24 +30,20 @@ const FinalCTASection = () => {
         transition={{ duration: 1.5 }}
       >
         <img
-          src={tokyoAbstract}
+          src="/banner.png"
           alt=""
-          className="h-full w-full object-cover opacity-30"
+          className="h-full w-full object-cover object-center opacity-[0.12]"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/60" />
-        
-        {/* Animated gradient overlay */}
-        <motion.div
+        <div className="absolute inset-0 poster-section-bg opacity-95" />
+        <div className="absolute inset-0 section-glow-top" />
+        <div
           className="absolute inset-0"
-          animate={{
-            background: [
-              "radial-gradient(circle at 30% 50%, hsl(185 100% 50% / 0.1) 0%, transparent 50%)",
-              "radial-gradient(circle at 70% 50%, hsl(270 70% 60% / 0.1) 0%, transparent 50%)",
-              "radial-gradient(circle at 30% 50%, hsl(185 100% 50% / 0.1) 0%, transparent 50%)",
-            ],
+          style={{
+            background:
+              "radial-gradient(ellipse 50% 40% at 50% 100%, hsl(18 95% 58% / 0.1), transparent)",
           }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-background/70" />
       </motion.div>
 
       <div className="max-w-4xl text-center">
@@ -92,17 +67,17 @@ const FinalCTASection = () => {
           Build the future of AI
           <br />
           <motion.span
-            className="text-gradient-cyan"
+            className="text-gradient-sunset"
             animate={isVisible ? {
               textShadow: [
-                "0 0 20px hsl(185 100% 50% / 0.3)",
-                "0 0 40px hsl(185 100% 50% / 0.5)",
-                "0 0 20px hsl(185 100% 50% / 0.3)",
+                "0 0 20px hsl(18 95% 58% / 0.3)",
+                "0 0 40px hsl(270 55% 72% / 0.35)",
+                "0 0 20px hsl(18 95% 58% / 0.3)",
               ],
             } : {}}
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
           >
-            in Tokyo.
+            in Kyoto.
           </motion.span>
         </motion.h2>
 
@@ -113,7 +88,7 @@ const FinalCTASection = () => {
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          February 2026. Tokyo, Japan. Be part of a global movement to create AI
+          28th June 2026. Kyoto, Japan. Be part of a global movement to create AI
           that matters.
         </motion.p>
 
@@ -125,31 +100,12 @@ const FinalCTASection = () => {
         >
           <div className="rounded-2xl border border-primary/30 bg-card/40 p-6 backdrop-blur-sm md:col-span-2">
             <h3 className="font-display text-xl tracking-wide text-primary">Prizepool</h3>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              {prizePool.map((tier) => (
-                <div key={tier.title} className="rounded-xl border border-border/80 bg-background/40 p-4">
-                  <p className="font-display text-sm tracking-wide text-foreground">{tier.title}</p>
-                  <ul className="mt-3 space-y-2">
-                    {tier.rewards.map((reward) => (
-                      <li key={reward} className="font-body text-sm text-muted-foreground">
-                        {reward}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+            <p className="mt-4 font-body text-lg text-muted-foreground">Coming soon</p>
           </div>
 
           <div className="rounded-2xl border border-secondary/30 bg-card/40 p-6 backdrop-blur-sm">
             <h3 className="font-display text-xl tracking-wide text-secondary">Participant Benefits</h3>
-            <ul className="mt-4 space-y-2">
-              {participantBenefits.map((benefit) => (
-                <li key={benefit} className="font-body text-sm text-muted-foreground">
-                  {benefit}
-                </li>
-              ))}
-            </ul>
+            <p className="mt-4 font-body text-lg text-muted-foreground">Coming soon</p>
           </div>
 
           <div className="rounded-2xl border border-primary/30 bg-card/40 p-6 backdrop-blur-sm">
@@ -172,14 +128,14 @@ const FinalCTASection = () => {
           transition={{ duration: 0.6, delay: 0.8 }}
         >
           <motion.a
-            href="https://luma.com/2f3omvqa"
-            className="group relative inline-flex items-center justify-center overflow-hidden rounded-lg border border-secondary/50 bg-secondary/10 px-10 py-5 font-display text-base tracking-wider text-secondary backdrop-blur-sm transition-all duration-300 hover:bg-secondary/20"
-            whileHover={{ scale: 1.02, boxShadow: "0 0 40px hsl(270 70% 60% / 0.4)" }}
+            href={LUMA_URL}
+            className="btn-poster-cta"
+            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             target="_blank"
             rel="noreferrer"
           >
-            <span className="relative z-10">GET INVOLVED</span>
+            <span className="relative z-10">REGISTER</span>
           </motion.a>
         </motion.div>
 
@@ -191,7 +147,7 @@ const FinalCTASection = () => {
           animate={isVisible ? { opacity: 1 } : {}}
           transition={{ duration: 0.6, delay: 0.9 }}
         >
-          IMPACT TOKYO 2026 • AI FOR GLOBAL GOOD • ORGANIZED BY COGNISOR AI
+          IMPACT KYOTO 2026 • AI FOR GLOBAL GOOD • ORGANIZED BY COGNISOR AI
         </motion.p>
       </div>
     </section>

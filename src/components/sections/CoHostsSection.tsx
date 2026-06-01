@@ -23,7 +23,7 @@ const CoHostsSection = () => {
           animate={isVisible ? { opacity: 1 } : {}}
           transition={{ duration: 0.6 }}
         >
-          CO-HOSTS
+          CO-HOSTED &amp; SUPPORTED BY
         </motion.span>
         <motion.h2
           className="mt-4 font-display text-3xl font-bold tracking-tight text-foreground md:text-4xl lg:text-5xl"
