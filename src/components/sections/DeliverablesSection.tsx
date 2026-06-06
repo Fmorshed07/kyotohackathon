@@ -2,12 +2,32 @@ import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import kyotoAbstract from "@/assets/kyoto-abstract.jpg";
 
-const deliverables = [
-  { title: "Working Prototype", kanji: "試作品" },
-  { title: "Problem Statement", kanji: "課題定義" },
-  { title: "Impact Explanation", kanji: "影響説明" },
-  { title: "AI Architecture", kanji: "AI設計" },
-  { title: "Vision for Scale", kanji: "拡大計画" },
+const experiences = [
+  {
+    title: "Team Formation",
+    description: "Meet like minded innovators and form interdisciplinary teams.",
+    kanji: "チーム結成",
+  },
+  {
+    title: "Build & Innovate",
+    description: "Develop AI solutions addressing real world challenges.",
+    kanji: "開発",
+  },
+  {
+    title: "Mentorship",
+    description: "Receive guidance from experienced founders, engineers, and industry experts.",
+    kanji: "メンター",
+  },
+  {
+    title: "Demo Day",
+    description: "Present your solution to judges, partners, and ecosystem leaders.",
+    kanji: "デモデー",
+  },
+  {
+    title: "Networking",
+    description: "Connect with startups, companies, investors, researchers, and fellow innovators.",
+    kanji: "交流",
+  },
 ];
 
 const DeliverablesSection = () => {
@@ -16,8 +36,7 @@ const DeliverablesSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="deliverables">
-      {/* Background Image */}
+    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="experience">
       <motion.div
         className="absolute inset-0 -z-10"
         initial={{ opacity: 0 }}
@@ -33,7 +52,6 @@ const DeliverablesSection = () => {
       </motion.div>
 
       <div className="mx-auto max-w-5xl">
-        {/* Section Header */}
         <motion.div
           ref={headerRef}
           className="mb-20"
@@ -47,7 +65,7 @@ const DeliverablesSection = () => {
             animate={headerVisible ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            DELIVERABLES
+            EVENT EXPERIENCE
           </motion.span>
           <motion.h2
             className="mt-4 font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl"
@@ -55,13 +73,12 @@ const DeliverablesSection = () => {
             animate={headerVisible ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.3 }}
           >
-            What You Ship
+            What To Expect
           </motion.h2>
         </motion.div>
 
-        {/* Deliverables List */}
         <div className="space-y-4">
-          {deliverables.map((item, index) => {
+          {experiences.map((item, index) => {
             const { ref, isVisible } = useScrollReveal<HTMLDivElement>({
               threshold: 0.5,
             });
@@ -70,11 +87,11 @@ const DeliverablesSection = () => {
               <motion.div
                 key={item.title}
                 ref={ref}
-                className="group relative flex items-center gap-6 border-l-2 border-primary/30 py-5 pl-6 transition-all duration-300"
+                className="group relative flex items-start gap-6 border-l-2 border-primary/30 py-5 pl-6 transition-all duration-300"
                 initial={{ opacity: 0, x: -40 }}
                 animate={isVisible ? { opacity: 1, x: 0 } : {}}
                 transition={{ duration: 0.5, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                whileHover={{ 
+                whileHover={{
                   borderColor: "hsl(185 100% 50%)",
                   backgroundColor: "hsl(185 100% 50% / 0.05)",
                   x: 10,
@@ -86,9 +103,14 @@ const DeliverablesSection = () => {
                 >
                   {String(index + 1).padStart(2, "0")}
                 </motion.span>
-                <span className="flex-1 font-display text-xl tracking-wide text-foreground md:text-2xl">
-                  {item.title}
-                </span>
+                <div className="flex-1">
+                  <span className="font-display text-xl tracking-wide text-foreground md:text-2xl">
+                    {item.title}
+                  </span>
+                  <p className="mt-2 font-body text-sm text-muted-foreground md:text-base">
+                    {item.description}
+                  </p>
+                </div>
                 <span className="hidden text-sm text-muted-foreground/40 md:block">
                   {item.kanji}
                 </span>

@@ -5,33 +5,38 @@ import kyotoTemple from "@/assets/kyoto-temple.jpg";
 const tracks = [
   {
     number: "01",
-    title: "Aging Society & Care Tech",
-    description: "AI solutions for elder care, accessibility, and intergenerational connection",
-    kanji: "高齢社会",
+    title: "Education & Career Development",
+    description:
+      "Create AI tutors, learning assistants, career advisors, and research agents that help students and lifelong learners succeed.",
+    kanji: "教育",
   },
   {
     number: "02",
-    title: "Smart Cities & Urban Resilience",
-    description: "Building sustainable, intelligent infrastructure for tomorrow's cities",
-    kanji: "都市開発",
+    title: "Tourism & Smart Cities",
+    description:
+      "Build intelligent travel assistants, multilingual support systems, local discovery platforms, and smart city solutions.",
+    kanji: "観光",
   },
   {
     number: "03",
-    title: "Education, Skills & Workforce",
-    description: "Reimagining learning and work for the AI age",
-    kanji: "教育改革",
+    title: "Healthcare & Aging Society",
+    description:
+      "Develop solutions that support elderly citizens, caregivers, healthcare professionals, and accessibility initiatives.",
+    kanji: "医療",
   },
   {
     number: "04",
-    title: "Human-Centered AI & Ethics",
-    description: "Ensuring AI serves humanity with fairness and transparency",
-    kanji: "人間中心",
+    title: "Startup & SME Productivity",
+    description:
+      "Create AI sales agents, operations assistants, market research tools, and workflow automation systems.",
+    kanji: "起業",
   },
   {
     number: "05",
-    title: "Open Impact",
-    description: "Your wildcard—solve any global challenge with AI",
-    kanji: "自由課題",
+    title: "Sustainability & Social Impact",
+    description:
+      "Build solutions that address environmental challenges, disaster preparedness, resource management, and community support.",
+    kanji: "社会",
   },
 ];
 
@@ -41,8 +46,7 @@ const ThemeSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="theme">
-      {/* Background Image */}
+    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="challenges">
       <motion.div
         className="absolute inset-0 -z-10"
         initial={{ opacity: 0 }}
@@ -57,7 +61,6 @@ const ThemeSection = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
       </motion.div>
       <div className="mx-auto max-w-5xl">
-        {/* Section Header */}
         <motion.div
           ref={headerRef}
           className="mb-20"
@@ -71,7 +74,7 @@ const ThemeSection = () => {
             animate={headerVisible ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            THEME
+            CHALLENGE AREAS
           </motion.span>
           <motion.h2
             className="mt-4 font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl"
@@ -79,19 +82,10 @@ const ThemeSection = () => {
             animate={headerVisible ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.3 }}
           >
-            AI for Global Good
+            Build Solutions That Matter
           </motion.h2>
-          <motion.p
-            className="mt-6 max-w-2xl font-body text-lg text-muted-foreground"
-            initial={{ opacity: 0 }}
-            animate={headerVisible ? { opacity: 1 } : {}}
-            transition={{ duration: 0.6, delay: 0.4 }}
-          >
-            Five tracks. One mission. Build AI that creates lasting positive impact.
-          </motion.p>
         </motion.div>
 
-        {/* Tracks List */}
         <div className="space-y-1">
           {tracks.map((track, index) => {
             const { ref, isVisible } = useScrollReveal<HTMLDivElement>({

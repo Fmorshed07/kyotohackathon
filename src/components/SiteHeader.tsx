@@ -12,22 +12,24 @@ const navSections: { title: string; links: NavLink[] }[] = [
     title: "Event",
     links: [
       { label: "About", href: "#about" },
-      { label: "Theme", href: "#theme" },
+      { label: "Agentic AI", href: "#why-agentic-ai" },
+      { label: "Challenges", href: "#challenges" },
       { label: "Timeline", href: "#timeline" },
     ],
   },
   {
     title: "Participation",
     links: [
-      { label: "Deliverables", href: "#deliverables" },
-      { label: "Judging", href: "#judging" },
+      { label: "Who Should Join", href: "#participants" },
+      { label: "Experience", href: "#experience" },
+      { label: "Why Kyoto", href: "#why-kyoto" },
     ],
   },
   {
     title: "Partners",
     links: [
-      { label: "Past hackathons", href: "#previous-hackathons" },
-      { label: "Cognisor", href: "#cognisor" },
+      { label: "Partnerships", href: "#partnerships" },
+      { label: "Organizers", href: "#organizers" },
     ],
   },
 ];

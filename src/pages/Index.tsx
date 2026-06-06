@@ -5,12 +5,14 @@ import AnimatedBackground from "@/components/AnimatedBackground";
 import SiteHeader from "@/components/SiteHeader";
 import HeroSection from "@/components/sections/HeroSection";
 import AboutSection from "@/components/sections/AboutSection";
-import ThemeSection from "@/components/sections/ThemeSection";
-import TimelineSection from "@/components/sections/TimelineSection";
-import DeliverablesSection from "@/components/sections/DeliverablesSection";
 import JudgingSection from "@/components/sections/JudgingSection";
-import HostSection from "@/components/sections/HostSection";
-import CognisorSection from "@/components/sections/CognisorSection";
+import ThemeSection from "@/components/sections/ThemeSection";
+import ParticipantsSection from "@/components/sections/ParticipantsSection";
+import DeliverablesSection from "@/components/sections/DeliverablesSection";
+import WhyKyotoSection from "@/components/sections/WhyKyotoSection";
+import TimelineSection from "@/components/sections/TimelineSection";
+import PartnerWithSection from "@/components/sections/PartnerWithSection";
+import OrganizersPartnersSection from "@/components/sections/OrganizersPartnersSection";
 import FinalCTASection from "@/components/sections/FinalCTASection";
 
 const Index = () => {
@@ -36,12 +38,14 @@ const Index = () => {
         <main className="relative">
           <HeroSection />
           <AboutSection />
-          <ThemeSection />
-          <TimelineSection />
-          <DeliverablesSection />
           <JudgingSection />
-          <HostSection />
-          <CognisorSection />
+          <ThemeSection />
+          <ParticipantsSection />
+          <DeliverablesSection />
+          <WhyKyotoSection />
+          <TimelineSection />
+          <PartnerWithSection />
+          <OrganizersPartnersSection />
           <FinalCTASection />
         </main>
       </motion.div>

@@ -1,12 +1,14 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
-const criteria = [
-  { title: "Problem Relevance & Social Impact", weight: "25%", kanji: "社会的影響" },
-  { title: "Effectiveness of AI Usage", weight: "25%", kanji: "AI活用度" },
-  { title: "Human-Centered Design", weight: "20%", kanji: "人間中心" },
-  { title: "Clarity of Vision & Storytelling", weight: "15%", kanji: "ビジョン" },
-  { title: "Technical Feasibility & Scalability", weight: "15%", kanji: "技術実現性" },
+const capabilities = [
+  { title: "Understand goals", kanji: "目標理解" },
+  { title: "Create plans", kanji: "計画立案" },
+  { title: "Use external tools and APIs", kanji: "ツール連携" },
+  { title: "Execute complex workflows", kanji: "ワークフロー" },
+  { title: "Collaborate with humans", kanji: "協働" },
+  { title: "Coordinate multiple agents", kanji: "エージェント" },
+  { title: "Learn and adapt", kanji: "学習適応" },
 ];
 
 const JudgingSection = () => {
@@ -15,9 +17,8 @@ const JudgingSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen px-6 py-32" id="judging">
+    <section className="relative min-h-screen px-6 py-32" id="why-agentic-ai">
       <div className="mx-auto max-w-5xl">
-        {/* Section Header */}
         <motion.div
           ref={headerRef}
           className="mb-20"
@@ -31,7 +32,7 @@ const JudgingSection = () => {
             animate={headerVisible ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            EVALUATION
+            WHY AGENTIC AI
           </motion.span>
           <motion.h2
             className="mt-4 font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl"
@@ -39,13 +40,20 @@ const JudgingSection = () => {
             animate={headerVisible ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.3 }}
           >
-            How It's Judged
+            The Next Generation of Artificial Intelligence
           </motion.h2>
+          <motion.p
+            className="mt-6 max-w-2xl font-body text-lg text-muted-foreground"
+            initial={{ opacity: 0 }}
+            animate={headerVisible ? { opacity: 1 } : {}}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            Agentic AI systems can:
+          </motion.p>
         </motion.div>
 
-        {/* Criteria Grid */}
-        <div className="grid gap-4">
-          {criteria.map((item, index) => {
+        <div className="grid gap-4 md:grid-cols-2">
+          {capabilities.map((item, index) => {
             const { ref, isVisible } = useScrollReveal<HTMLDivElement>({
               threshold: 0.4,
             });
@@ -54,41 +62,40 @@ const JudgingSection = () => {
               <motion.div
                 key={item.title}
                 ref={ref}
-                className="group relative flex items-center justify-between overflow-hidden rounded-xl border border-border bg-card/30 p-6 backdrop-blur-sm transition-all duration-300"
+                className="group relative flex items-center gap-4 overflow-hidden rounded-xl border border-border bg-card/30 p-6 backdrop-blur-sm transition-all duration-300"
                 initial={{ opacity: 0, y: 30 }}
                 animate={isVisible ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.5, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                whileHover={{ 
+                whileHover={{
                   borderColor: "hsl(270 70% 60% / 0.4)",
                   backgroundColor: "hsl(270 70% 60% / 0.05)",
                 }}
               >
-                <div className="flex items-center gap-4">
-                  <span className="hidden text-xs text-muted-foreground/40 md:block">
-                    {item.kanji}
-                  </span>
+                <span className="font-display text-sm text-primary/60">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="flex flex-1 items-center justify-between gap-4">
                   <span className="font-display text-lg tracking-wide text-foreground md:text-xl">
                     {item.title}
                   </span>
+                  <span className="hidden text-xs text-muted-foreground/40 md:block">
+                    {item.kanji}
+                  </span>
                 </div>
-                <motion.span
-                  className="font-display text-2xl text-secondary/80 md:text-3xl"
-                  whileHover={{ scale: 1.1 }}
-                >
-                  {item.weight}
-                </motion.span>
-
-                {/* Progress bar */}
-                <motion.div
-                  className="absolute bottom-0 left-0 h-[2px] bg-gradient-to-r from-secondary/50 to-secondary"
-                  initial={{ width: 0 }}
-                  animate={isVisible ? { width: item.weight } : {}}
-                  transition={{ duration: 1, delay: index * 0.1 + 0.3, ease: "easeOut" }}
-                />
               </motion.div>
             );
           })}
         </div>
+
+        <motion.p
+          className="mt-12 max-w-3xl font-body text-lg leading-relaxed text-muted-foreground md:text-xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={headerVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.6 }}
+        >
+          From healthcare and education to tourism and business operations, Agentic AI has the
+          potential to transform how work gets done.
+        </motion.p>
       </div>
     </section>
   );

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const LUMA_URL = "https://luma.com/2f3omvqa";
+const PARTNER_EMAIL = "mailto:cognisorai@gmail.com?subject=Impact%20Kyoto%202026%20Partnership";
 
 const HeroSection = () => {
   const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.1 });
@@ -46,25 +47,36 @@ const HeroSection = () => {
         </motion.h1>
 
         <motion.p
-          className="glow-violet mt-5 font-display text-base font-medium tracking-[0.25em] text-secondary sm:text-lg md:text-xl"
+          className="glow-violet mt-5 font-display text-base font-medium tracking-[0.15em] text-secondary sm:text-lg md:text-xl"
           initial={{ opacity: 0, y: 12 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.35 }}
         >
-          AI FOR GLOBAL GOOD
+          Agentic AI for Japan&apos;s Future
         </motion.p>
 
         <motion.p
-          className="mt-4 max-w-lg font-body text-sm text-white/85 sm:text-base"
+          className="mt-4 max-w-xl font-body text-sm text-white/90 sm:text-base md:text-lg"
           initial={{ opacity: 0 }}
           animate={isVisible ? { opacity: 1 } : {}}
-          transition={{ duration: 0.6, delay: 0.45 }}
+          transition={{ duration: 0.6, delay: 0.42 }}
         >
-          28th June 2026 · Kyoto, Japan · In-Person
+          Building autonomous AI solutions for real world challenges.
+        </motion.p>
+
+        <motion.p
+          className="mt-4 max-w-2xl font-body text-sm leading-relaxed text-white/75 sm:text-base"
+          initial={{ opacity: 0 }}
+          animate={isVisible ? { opacity: 1 } : {}}
+          transition={{ duration: 0.6, delay: 0.48 }}
+        >
+          Join students, developers, founders, researchers, and innovators from across Japan
+          to create the next generation of AI agents that can transform industries, support
+          communities, and drive innovation.
         </motion.p>
 
         <motion.div
-          className="mt-10"
+          className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
           initial={{ opacity: 0, y: 20 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, delay: 0.55 }}
@@ -77,7 +89,15 @@ const HeroSection = () => {
             target="_blank"
             rel="noreferrer"
           >
-            REGISTER
+            Register Now
+          </motion.a>
+          <motion.a
+            href={PARTNER_EMAIL}
+            className="inline-flex min-w-[220px] items-center justify-center rounded-md border border-secondary/70 bg-secondary/20 px-6 py-3 font-display text-sm font-medium tracking-[0.15em] text-secondary transition-colors hover:bg-secondary/30"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            Become a Partner
           </motion.a>
         </motion.div>
       </div>

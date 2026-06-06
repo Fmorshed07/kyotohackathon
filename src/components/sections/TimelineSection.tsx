@@ -74,10 +74,10 @@ const TimelineSection = () => {
               <div className="flex flex-col justify-between gap-6">
                 <div className="space-y-3">
                   <CardTitle className="text-2xl tracking-wide text-foreground">
-                    Impact Kyoto Hackathon 2026: AI for Global Good
+                    Impact Kyoto 2026: Agentic AI for Japan&apos;s Future
                   </CardTitle>
                   <p className="text-sm text-foreground/90">
-                    Hosted by Cognisor AI • Antler in Japan, Kyoto
+                    Hosted by Cognisor AI • Kyoto, Japan
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Approval required • Request to join on Luma

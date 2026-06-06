@@ -4,28 +4,34 @@ import kyotoNeonAlley from "@/assets/kyoto-neon-alley.jpg";
 
 const participants = [
   {
-    title: "Students & Researchers",
-    description: "From universities and labs worldwide",
+    title: "Students",
+    description: "Gain hands on experience building real AI products and expand your professional network.",
     icon: "◇",
     kanji: "学生",
   },
   {
-    title: "Founders & Builders",
-    description: "Turning ideas into impactful products",
+    title: "Developers & AI Engineers",
+    description: "Experiment with cutting edge Agentic AI technologies and showcase your skills.",
     icon: "△",
+    kanji: "技術者",
+  },
+  {
+    title: "Startup Founders",
+    description: "Meet talented builders, validate ideas, and discover new opportunities.",
+    icon: "○",
     kanji: "創業者",
   },
   {
-    title: "Designers & Product Thinkers",
-    description: "Crafting human-centered experiences",
-    icon: "○",
-    kanji: "設計者",
+    title: "Researchers & Designers",
+    description: "Collaborate across disciplines and contribute to meaningful innovation.",
+    icon: "□",
+    kanji: "研究者",
   },
   {
-    title: "AI Engineers & Specialists",
-    description: "Pushing the boundaries of what's possible",
-    icon: "□",
-    kanji: "技術者",
+    title: "Industry Professionals",
+    description: "Connect with emerging talent and explore future technologies.",
+    icon: "◆",
+    kanji: "業界",
   },
 ];
 
@@ -36,7 +42,6 @@ const ParticipantsSection = () => {
 
   return (
     <section className="relative min-h-screen overflow-hidden px-6 py-32" id="participants">
-      {/* Background Image */}
       <motion.div
         className="absolute inset-0 -z-10"
         initial={{ opacity: 0 }}
@@ -52,7 +57,6 @@ const ParticipantsSection = () => {
       </motion.div>
 
       <div className="mx-auto max-w-5xl">
-        {/* Section Header */}
         <motion.div
           ref={headerRef}
           className="mb-20"
@@ -66,7 +70,7 @@ const ParticipantsSection = () => {
             animate={headerVisible ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            WHO
+            WHO SHOULD JOIN
           </motion.span>
           <motion.h2
             className="mt-4 font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl"
@@ -74,11 +78,10 @@ const ParticipantsSection = () => {
             animate={headerVisible ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.3 }}
           >
-            Who Should Join
+            Who Should Join?
           </motion.h2>
         </motion.div>
 
-        {/* Participants Grid */}
         <div className="grid gap-6 md:grid-cols-2">
           {participants.map((participant, index) => {
             const { ref, isVisible } = useScrollReveal<HTMLDivElement>({
@@ -93,16 +96,12 @@ const ParticipantsSection = () => {
                 initial={{ opacity: 0, y: 30, scale: 0.95 }}
                 animate={isVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
                 transition={{ duration: 0.6, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                whileHover={{ 
+                whileHover={{
                   borderColor: "hsl(185 100% 50% / 0.3)",
                   backgroundColor: "hsl(222 47% 8% / 0.8)",
                 }}
               >
-                {/* Icon */}
-                <motion.div
-                  className="mb-4 flex items-center gap-4"
-                  whileHover={{ x: 5 }}
-                >
+                <motion.div className="mb-4 flex items-center gap-4" whileHover={{ x: 5 }}>
                   <motion.span
                     className="text-2xl text-primary/50 transition-colors group-hover:text-primary"
                     whileHover={{ rotate: 180, scale: 1.2 }}
@@ -112,7 +111,7 @@ const ParticipantsSection = () => {
                   </motion.span>
                   <span className="text-xs text-muted-foreground/40">{participant.kanji}</span>
                 </motion.div>
-                
+
                 <h3 className="font-display text-xl tracking-wide text-foreground transition-colors group-hover:text-primary">
                   {participant.title}
                 </h3>
@@ -120,11 +119,11 @@ const ParticipantsSection = () => {
                   {participant.description}
                 </p>
 
-                {/* Hover gradient */}
                 <motion.div
                   className="absolute inset-0 -z-10 opacity-0 transition-opacity group-hover:opacity-100"
                   style={{
-                    background: "radial-gradient(circle at 50% 50%, hsl(185 100% 50% / 0.05) 0%, transparent 70%)",
+                    background:
+                      "radial-gradient(circle at 50% 50%, hsl(185 100% 50% / 0.05) 0%, transparent 70%)",
                   }}
                 />
               </motion.div>
