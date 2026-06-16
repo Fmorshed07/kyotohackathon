@@ -83,7 +83,7 @@ const TimelineSection = () => {
                   </p>
                 </div>
                 <a
-                  href="https://luma.com/2f3omvqa"
+                  href="https://luma.com/cmevass2"
                   className="inline-flex items-center justify-center rounded-md border border-secondary/70 bg-secondary/20 px-5 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-secondary transition-colors hover:bg-secondary/30"
                   target="_blank"
                   rel="noreferrer"

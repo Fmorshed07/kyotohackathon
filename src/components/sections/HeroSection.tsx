@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
-const LUMA_URL = "https://luma.com/2f3omvqa";
+const LUMA_URL = "https://luma.com/cmevass2";
 const PARTNER_EMAIL = "mailto:cognisorai@gmail.com?subject=Impact%20Kyoto%202026%20Partnership";
 const EVENT_DATE_LABEL = "4th July";
 const EVENT_DATE = "2026-07-04T00:00:00+09:00";

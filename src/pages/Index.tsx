@@ -11,6 +11,7 @@ import ParticipantsSection from "@/components/sections/ParticipantsSection";
 import DeliverablesSection from "@/components/sections/DeliverablesSection";
 import WhyKyotoSection from "@/components/sections/WhyKyotoSection";
 import TimelineSection from "@/components/sections/TimelineSection";
+import VolunteerSection from "@/components/sections/VolunteerSection";
 import PartnerWithSection from "@/components/sections/PartnerWithSection";
 import OrganizersPartnersSection from "@/components/sections/OrganizersPartnersSection";
 import FinalCTASection from "@/components/sections/FinalCTASection";
@@ -44,6 +45,7 @@ const Index = () => {
           <DeliverablesSection />
           <WhyKyotoSection />
           <TimelineSection />
+          <VolunteerSection />
           <PartnerWithSection />
           <OrganizersPartnersSection />
           <FinalCTASection />
