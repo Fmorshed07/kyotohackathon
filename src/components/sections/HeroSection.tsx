@@ -1,11 +1,55 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const LUMA_URL = "https://luma.com/2f3omvqa";
 const PARTNER_EMAIL = "mailto:cognisorai@gmail.com?subject=Impact%20Kyoto%202026%20Partnership";
+const EVENT_DATE_LABEL = "4th July";
+const EVENT_DATE = "2026-07-04T00:00:00+09:00";
+
+type Countdown = {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  isEnded: boolean;
+};
+
+const getCountdown = (targetDate: string): Countdown => {
+  const target = new Date(targetDate).getTime();
+  const now = Date.now();
+  const distance = target - now;
+
+  if (distance <= 0) {
+    return {
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+      isEnded: true,
+    };
+  }
+
+  return {
+    days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+    hours: Math.floor((distance / (1000 * 60 * 60)) % 24),
+    minutes: Math.floor((distance / (1000 * 60)) % 60),
+    seconds: Math.floor((distance / 1000) % 60),
+    isEnded: false,
+  };
+};
 
 const HeroSection = () => {
   const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.1 });
+  const [countdown, setCountdown] = useState<Countdown>(() => getCountdown(EVENT_DATE));
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCountdown(getCountdown(EVENT_DATE));
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   return (
     <section className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#1A1B4B]">
@@ -65,6 +109,15 @@ const HeroSection = () => {
         </motion.p>
 
         <motion.p
+          className="mt-4 rounded-full border border-primary/40 bg-background/35 px-4 py-2 font-display text-xs tracking-[0.2em] text-primary sm:text-sm"
+          initial={{ opacity: 0 }}
+          animate={isVisible ? { opacity: 1 } : {}}
+          transition={{ duration: 0.6, delay: 0.45 }}
+        >
+          EVENT DATE: {EVENT_DATE_LABEL}
+        </motion.p>
+
+        <motion.p
           className="mt-4 max-w-2xl font-body text-sm leading-relaxed text-white/75 sm:text-base"
           initial={{ opacity: 0 }}
           animate={isVisible ? { opacity: 1 } : {}}
@@ -74,6 +127,35 @@ const HeroSection = () => {
           to create the next generation of AI agents that can transform industries, support
           communities, and drive innovation.
         </motion.p>
+
+        <motion.div
+          className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"
+          initial={{ opacity: 0, y: 12 }}
+          animate={isVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.5 }}
+        >
+          {[
+            { label: "Days", value: countdown.days },
+            { label: "Hours", value: countdown.hours },
+            { label: "Minutes", value: countdown.minutes },
+            { label: "Seconds", value: countdown.seconds },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="min-w-[88px] rounded-lg border border-white/20 bg-background/35 px-4 py-3"
+            >
+              <p className="font-display text-2xl text-white sm:text-3xl">
+                {String(item.value).padStart(2, "0")}
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/70">
+                {item.label}
+              </p>
+            </div>
+          ))}
+        </motion.div>
+        {countdown.isEnded ? (
+          <p className="mt-3 text-sm text-secondary">The event has started.</p>
+        ) : null}
 
         <motion.div
           className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
