@@ -29,7 +29,8 @@ import {
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
-import type { PortalHackathon, HackathonId } from "@/lib/hackathons";
+import { getHackathonById, type PortalHackathon, type HackathonId } from "@/lib/hackathons";
+import type { AdminGrantRecord } from "@/lib/adminGrants";
 import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { MarkingCriteriaSection } from "@/components/dashboard/MarkingCriteriaSection";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
@@ -96,6 +97,11 @@ type AdminDashboardProps = {
   onRoleChange: (userId: string, role: PortalRole) => void;
   onSaveRole: (user: AdminUser) => Promise<void>;
   onApproveJudge: (user: AdminUser) => Promise<void>;
+  adminGrantEmail: string;
+  onAdminGrantEmailChange: (email: string) => void;
+  pendingAdminGrants: AdminGrantRecord[];
+  isGrantingAdmin: boolean;
+  onGrantAdminAccess: () => Promise<void>;
   isCreatingSubmission: boolean;
   deletingSubmissionId: string | null;
   onCreateSubmission: (payload: NewSubmissionInput) => Promise<void>;
@@ -278,6 +284,11 @@ export function AdminDashboard({
   onRoleChange,
   onSaveRole,
   onApproveJudge,
+  adminGrantEmail,
+  onAdminGrantEmailChange,
+  pendingAdminGrants,
+  isGrantingAdmin,
+  onGrantAdminAccess,
   isCreatingSubmission,
   deletingSubmissionId,
   onCreateSubmission,
@@ -358,6 +369,62 @@ export function AdminDashboard({
             {message}
           </p>
         )}
+      </section>
+
+      <section className={`${sectionClass} overflow-hidden p-0`} id="grant-admin-access">
+        <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
+          <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Access control</p>
+            <h2 className="dash-title">Grant admin access</h2>
+            <p className="dash-subtitle">
+              Promote an existing account or pre-authorize an email before first sign-in.
+            </p>
+          </div>
+        </div>
+        <div className="space-y-4 p-4 sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-2">
+              <label
+                htmlFor="admin-grant-email"
+                className="text-xs uppercase tracking-[0.22em] text-muted-foreground"
+              >
+                Email address
+              </label>
+              <Input
+                id="admin-grant-email"
+                type="email"
+                placeholder="organizer@example.com"
+                value={adminGrantEmail}
+                onChange={(event) => onAdminGrantEmailChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    void onGrantAdminAccess();
+                  }
+                }}
+              />
+            </div>
+            <Button
+              className="h-10 px-4 text-[0.7rem] uppercase tracking-[0.22em]"
+              disabled={isGrantingAdmin || !adminGrantEmail.trim()}
+              onClick={() => void onGrantAdminAccess()}
+            >
+              {isGrantingAdmin ? "Granting..." : "Grant admin"}
+            </Button>
+          </div>
+          {pendingAdminGrants.length > 0 ? (
+            <div className="rounded-xl border border-white/10 bg-muted/10 p-4">
+              <p className="dash-eyebrow">Pending invitations</p>
+              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                {pendingAdminGrants.map((grant) => (
+                  <li key={grant.email}>{grant.email}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <MarkingCriteriaSection

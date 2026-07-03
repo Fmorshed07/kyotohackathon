@@ -70,7 +70,10 @@ export function usePortalAuth() {
           const judgeApprovalStatus = normalizeJudgeApprovalStatus(userSnap.data()?.judgeApprovalStatus);
           setSessionUser({
             id: user.uid,
-            email: user.email ?? "",
+            email:
+              typeof userSnap.data()?.email === "string" && userSnap.data()?.email.trim()
+                ? userSnap.data()?.email.trim()
+                : (user.email ?? ""),
             role,
             judgeApprovalStatus,
           });

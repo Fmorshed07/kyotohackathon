@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
+import {
+  grantAdminAccessByEmail,
+  normalizeGrantEmail,
+  type AdminGrantRecord,
+} from "@/lib/adminGrants";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import {
   AdminDashboard,
@@ -63,6 +68,9 @@ export default function AdminDashboardPage() {
   const [isCreatingSubmission, setIsCreatingSubmission] = useState(false);
   const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
   const [isSavingCriteria, setIsSavingCriteria] = useState(false);
+  const [adminGrantEmail, setAdminGrantEmail] = useState("");
+  const [pendingAdminGrants, setPendingAdminGrants] = useState<AdminGrantRecord[]>([]);
+  const [isGrantingAdmin, setIsGrantingAdmin] = useState(false);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -108,6 +116,32 @@ export default function AdminDashboardPage() {
       }
     };
 
+    const loadPendingAdminGrants = async () => {
+      try {
+        const grantsRef = collection(db, "admin_grants");
+        const snapshot = await getDocs(grantsRef);
+        const grants = snapshot.docs
+          .map((docSnap) => {
+            const data = docSnap.data();
+            if (typeof data.email !== "string" || !data.email.trim()) return null;
+            return {
+              email: data.email.trim(),
+              grantedAt:
+                typeof data.grantedAt === "string" ? data.grantedAt : new Date(0).toISOString(),
+            } satisfies AdminGrantRecord;
+          })
+          .filter((grant): grant is AdminGrantRecord => grant !== null)
+          .sort((left, right) => right.grantedAt.localeCompare(left.grantedAt));
+        setPendingAdminGrants(grants);
+      } catch (error: unknown) {
+        const text =
+          typeof error === "object" && error && "message" in error
+            ? String((error as { message?: string }).message)
+            : "Failed to load pending admin grants.";
+        setMessage(text);
+      }
+    };
+
     const loadSubmissions = async () => {
       setIsLoadingSubmissions(true);
       try {
@@ -125,6 +159,7 @@ export default function AdminDashboardPage() {
     };
 
     void loadUsers();
+    void loadPendingAdminGrants();
     void loadSubmissions();
   }, [sessionUser, db, selectedHackathonId]);
 
@@ -392,6 +427,65 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleGrantAdminAccess = async () => {
+    const email = adminGrantEmail.trim();
+    if (!email) {
+      setMessage("Enter an email address to grant admin access.");
+      return;
+    }
+
+    setMessage(null);
+    setIsGrantingAdmin(true);
+    try {
+      const result = await grantAdminAccessByEmail(db, email, (normalizedEmail) =>
+        users.find((user) => normalizeGrantEmail(user.email) === normalizedEmail),
+      );
+
+      if (result.status === "invalid_email") {
+        setMessage("Enter a valid email address.");
+        return;
+      }
+
+      if (result.status === "already_admin") {
+        setMessage(`${result.email} already has admin access.`);
+        return;
+      }
+
+      if (result.status === "granted") {
+        setUsers((current) =>
+          current.map((currentUser) =>
+            currentUser.id === result.userId
+              ? { ...currentUser, role: "admin", judgeApprovalStatus: undefined }
+              : currentUser,
+          ),
+        );
+        setMessage(`Granted admin access to ${result.email}.`);
+        setAdminGrantEmail("");
+        return;
+      }
+
+      setPendingAdminGrants((current) => [
+        {
+          email: result.email,
+          grantedAt: new Date().toISOString(),
+        },
+        ...current.filter((grant) => normalizeGrantEmail(grant.email) !== normalizeGrantEmail(result.email)),
+      ]);
+      setMessage(
+        `${result.email} will receive admin access when they sign in with Google for the first time.`,
+      );
+      setAdminGrantEmail("");
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to grant admin access.";
+      setMessage(text);
+    } finally {
+      setIsGrantingAdmin(false);
+    }
+  };
+
   const handleDeleteSubmission = async (submissionId: string) => {
     setMessage(null);
     setDeletingSubmissionId(submissionId);
@@ -445,6 +539,11 @@ export default function AdminDashboardPage() {
         onRoleChange={handleRoleChange}
         onSaveRole={handleSaveRole}
         onApproveJudge={handleApproveJudge}
+        adminGrantEmail={adminGrantEmail}
+        onAdminGrantEmailChange={setAdminGrantEmail}
+        pendingAdminGrants={pendingAdminGrants}
+        isGrantingAdmin={isGrantingAdmin}
+        onGrantAdminAccess={handleGrantAdminAccess}
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}
         onCreateSubmission={handleCreateSubmission}

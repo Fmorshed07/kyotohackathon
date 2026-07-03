@@ -6,16 +6,40 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function userDocExists() {
+      return isSignedIn() && exists(userDocPath());
+    }
+
     function currentUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return userDocExists() ? get(userDocPath()).data.role : null;
+    }
+
+    // Built-in portal admin account (username/password login — hidden Firebase email).
+    function isPortalAdminAccount() {
+      return isSignedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email.matches('portal-admin\\..*@firebase\\.app');
     }
 
     function isAdmin() {
-      return isSignedIn() && (currentUserRole() == "admin" || currentUserRole() == "admins");
+      return isSignedIn() && (
+        isPortalAdminAccount()
+        || currentUserRole() == "admin"
+        || currentUserRole() == "admins"
+      );
     }
 
     function isStaff() {
-      return isSignedIn() && (currentUserRole() == "judge" || currentUserRole() == "judges" || currentUserRole() == "mentor" || currentUserRole() == "mentors");
+      return isSignedIn() && (
+        currentUserRole() == "judge"
+        || currentUserRole() == "judges"
+        || currentUserRole() == "mentor"
+        || currentUserRole() == "mentors"
+      );
     }
 
     match /users/{userId} {
@@ -35,6 +59,18 @@ service cloud.firestore {
     match /hackathon_criteria/{hackathonId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /admin_grants/{grantEmail} {
+      allow get: if isSignedIn() && (
+        isAdmin()
+        || (
+          request.auth.token.email != null
+          && grantEmail == request.auth.token.email.lower()
+        )
+      );
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
   }
 }

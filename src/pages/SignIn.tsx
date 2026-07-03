@@ -8,6 +8,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
 import { getDashboardPathForUser } from "@/lib/portalRoutes";
+import { consumePendingAdminGrant } from "@/lib/adminGrants";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { SITE_HACKATHON_ID } from "@/lib/hackathons";
 import type { JudgeApprovalStatus, PortalRole } from "@/types/portal";
@@ -125,7 +126,9 @@ export default function SignIn() {
         return;
       }
 
-      if (mode === "signin" && existingRole && existingRole !== authRole) {
+      const hasPendingAdminGrant = await consumePendingAdminGrant(db, user.email);
+
+      if (mode === "signin" && existingRole && existingRole !== authRole && !hasPendingAdminGrant) {
         navigate(getDashboardPathForUser(existingRole, existingJudgeApprovalStatus), {
           replace: true,
         });
@@ -138,7 +141,7 @@ export default function SignIn() {
         return;
       }
 
-      const targetRole = existingRole ?? authRole;
+      const targetRole = hasPendingAdminGrant ? "admin" : (existingRole ?? authRole);
       const targetJudgeApprovalStatus = isStaffRole(targetRole)
         ? existingJudgeApprovalStatus ?? (existingRole ? "approved" : "pending")
         : undefined;
@@ -153,7 +156,12 @@ export default function SignIn() {
         },
         { merge: true }
       );
-      navigate(getDashboardPathForUser(targetRole, targetJudgeApprovalStatus), { replace: true });
+      navigate(
+        targetRole === "admin"
+          ? "/dashboard/admin"
+          : getDashboardPathForUser(targetRole, targetJudgeApprovalStatus),
+        { replace: true },
+      );
     } catch (error: unknown) {
       const message =
         typeof error === "object" && error && "message" in error
