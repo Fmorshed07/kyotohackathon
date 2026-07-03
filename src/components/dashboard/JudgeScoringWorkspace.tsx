@@ -26,7 +26,8 @@ type JudgeScoringWorkspaceProps = {
     value: number | null
   ) => void;
   onNotesChange: (id: string, value: string) => void;
-  onSave: (submission: Submission) => Promise<void>;
+  onSave: (submissionId: string) => Promise<void>;
+  savingSubmissionId?: string | null;
 };
 
 function getSubmissionTotal(submission: Submission) {
@@ -50,6 +51,7 @@ export function JudgeScoringWorkspace({
   onCriterionScoreChange,
   onNotesChange,
   onSave,
+  savingSubmissionId,
 }: JudgeScoringWorkspaceProps) {
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [criterionStep, setCriterionStep] = useState(0);
@@ -289,10 +291,11 @@ export function JudgeScoringWorkspace({
             <Button
               size="lg"
               className="h-11 w-full text-sm font-semibold sm:w-auto"
-              onClick={() => onSave(activeSubmission)}
+              disabled={savingSubmissionId === activeSubmission.id}
+              onClick={() => void onSave(activeSubmission.id)}
             >
               <Save className="h-4 w-4" />
-              Save scores for this idea
+              {savingSubmissionId === activeSubmission.id ? "Saving..." : "Save scores for this idea"}
             </Button>
           </div>
         )}

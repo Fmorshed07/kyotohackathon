@@ -1,8 +1,8 @@
 import type { JudgeApprovalStatus, PortalRole } from "@/types/portal";
 
-const isStaffRole = (role?: PortalRole) => role === "mentor" || role === "judge";
+export const isStaffRole = (role?: PortalRole) => role === "mentor" || role === "judge";
 
-const canAccessStaffDashboard = (
+export const canAccessStaffDashboard = (
   role?: PortalRole,
   judgeApprovalStatus?: JudgeApprovalStatus
 ) => isStaffRole(role) && judgeApprovalStatus !== "pending";

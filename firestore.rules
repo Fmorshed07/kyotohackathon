@@ -42,6 +42,13 @@ service cloud.firestore {
       );
     }
 
+    function isApprovedStaff() {
+      return isStaff() && (
+        !userDocExists()
+        || get(userDocPath()).data.judgeApprovalStatus != "pending"
+      );
+    }
+
     match /users/{userId} {
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
@@ -52,7 +59,11 @@ service cloud.firestore {
     match /submissions/{submissionId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (request.auth.uid == request.resource.data.user_id || isAdmin());
-      allow update: if isSignedIn() && (request.auth.uid == resource.data.user_id || isStaff() || isAdmin());
+      allow update: if isSignedIn() && (
+        request.auth.uid == resource.data.user_id
+        || isApprovedStaff()
+        || isAdmin()
+      );
       allow delete: if isAdmin();
     }
 

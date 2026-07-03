@@ -56,7 +56,8 @@ export type JudgeDashboardProps = {
     value: number | null
   ) => void;
   onNotesChange: (id: string, value: string) => void;
-  onSave: (submission: Submission) => Promise<void>;
+  onSave: (submissionId: string) => Promise<void>;
+  savingSubmissionId?: string | null;
 };
 
 export function JudgeDashboard({
@@ -70,6 +71,7 @@ export function JudgeDashboard({
   onCriterionScoreChange,
   onNotesChange,
   onSave,
+  savingSubmissionId,
 }: JudgeDashboardProps) {
   const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -464,6 +466,7 @@ export function JudgeDashboard({
               onCriterionScoreChange={onCriterionScoreChange}
               onNotesChange={onNotesChange}
               onSave={onSave}
+              savingSubmissionId={savingSubmissionId}
             />
           )}
         </div>

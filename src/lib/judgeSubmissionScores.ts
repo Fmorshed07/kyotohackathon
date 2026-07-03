@@ -73,15 +73,27 @@ export function mapSubmissionForJudge(
   };
 }
 
+export function sanitizeCriteriaScores(
+  criteriaScores: Record<string, number | null>
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(criteriaScores).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number"
+    )
+  );
+}
+
 export function buildJudgeScoreFirestoreUpdate(
   judgeId: string,
   score: number | null,
   notes: string,
   criteriaScores: Record<string, number | null>
 ): Record<string, unknown> {
+  const cleanedCriteriaScores = sanitizeCriteriaScores(criteriaScores);
+
   return {
     [`judge_scores.${judgeId}`]: score,
     [`judge_notes_by_judge.${judgeId}`]: notes,
-    [`judge_criteria_scores_by_judge.${judgeId}`]: criteriaScores,
+    [`judge_criteria_scores_by_judge.${judgeId}`]: cleanedCriteriaScores,
   };
 }

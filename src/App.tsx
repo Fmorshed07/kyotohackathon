@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { usePortalAuth } from "./hooks/usePortalAuth";
+import { getDashboardPathForUser, canAccessStaffDashboard } from "./lib/portalRoutes";
 import Index from "./pages/Index";
 import SignIn from "./pages/SignIn";
 import AdminSignIn from "./pages/AdminSignIn";
@@ -77,6 +78,29 @@ function AdminProtectedRoute({ children }: { children: JSX.Element }) {
   return children;
 }
 
+function StaffProtectedRoute({ children }: { children: JSX.Element }) {
+  const { sessionUser, loading } = usePortalAuth();
+
+  if (loading) {
+    return <FullScreenMessage message="Loading..." />;
+  }
+
+  if (!sessionUser) {
+    return <Navigate to="/signin" replace />;
+  }
+
+  if (!canAccessStaffDashboard(sessionUser.role, sessionUser.judgeApprovalStatus)) {
+    return (
+      <Navigate
+        to={getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus)}
+        replace
+      />
+    );
+  }
+
+  return children;
+}
+
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { sessionUser, loading } = usePortalAuth();
 
@@ -142,9 +166,9 @@ const App = () => (
           <Route
             path="/dashboard/judge"
             element={
-              <ProtectedRoute>
+              <StaffProtectedRoute>
                 <JudgeDashboardPage />
-              </ProtectedRoute>
+              </StaffProtectedRoute>
             }
           />
           <Route

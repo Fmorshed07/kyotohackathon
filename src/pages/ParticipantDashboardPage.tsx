@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
+import { getDashboardPathForUser } from "@/lib/portalRoutes";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -168,8 +169,13 @@ export default function ParticipantDashboardPage() {
     return <Navigate to="/signin" replace />;
   }
 
-  if (sessionUser.role === "judge") {
-    return <Navigate to="/dashboard/judge" replace />;
+  if (sessionUser.role === "judge" || sessionUser.role === "mentor") {
+    return (
+      <Navigate
+        to={getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus)}
+        replace
+      />
+    );
   }
 
   if (sessionUser.role !== "participant") {

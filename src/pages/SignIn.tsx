@@ -16,7 +16,7 @@ import type { JudgeApprovalStatus, PortalRole } from "@/types/portal";
 const sectionClass =
   "rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm shadow-lg shadow-black/10";
 
-type AuthRole = "participant" | "mentor";
+type AuthRole = "participant" | "mentor" | "judge";
 
 const normalizePortalRole = (value: unknown): PortalRole | undefined => {
   if (typeof value !== "string") return undefined;
@@ -204,8 +204,8 @@ export default function SignIn() {
             </h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
               {mode === "signup"
-                ? "Create your account as a participant or mentor using Google."
-                : "Log in as a participant or mentor with your Google account."}
+                ? "Create your account as a participant, judge, or mentor using Google."
+                : "Log in as a participant, judge, or mentor with your Google account."}
             </p>
           </div>
         </section>
@@ -226,8 +226,9 @@ export default function SignIn() {
                 onValueChange={(v) => setAuthRole(v as AuthRole)}
                 className="w-full sm:w-auto"
               >
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="participant">Participant</TabsTrigger>
+                  <TabsTrigger value="judge">Judge</TabsTrigger>
                   <TabsTrigger value="mentor">Mentor</TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -256,7 +257,9 @@ export default function SignIn() {
                 </div>
                 <p className="text-[0.7rem] text-muted-foreground">
                   {mode === "signup"
-                    ? `Register as a ${authRole}.`
+                    ? authRole === "judge" || authRole === "mentor"
+                      ? `Register as a ${authRole}. Judge and mentor accounts require admin approval before access.`
+                      : `Register as a ${authRole}.`
                     : `Log in to your ${authRole} account.`}
                 </p>
               </div>
@@ -279,7 +282,8 @@ export default function SignIn() {
               {authError && <p className="text-xs text-destructive">{authError}</p>}
 
               <p className="border-t border-border/40 pt-4 text-[0.7rem] text-muted-foreground">
-                Participant and mentor accounts use Google sign-in only. Admin access is available at{" "}
+                Participant accounts are active immediately. Judge and mentor accounts need admin approval
+                before they can score submissions. Admin access is available at{" "}
                 <a href="/admin" className="text-primary underline underline-offset-4">
                   /admin
                 </a>
