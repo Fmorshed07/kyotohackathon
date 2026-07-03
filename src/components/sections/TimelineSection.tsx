@@ -61,9 +61,11 @@ const TimelineSection = () => {
             <CardContent className="grid gap-6 p-6 md:grid-cols-[1.1fr_1fr] md:items-stretch">
               <div className="relative min-h-[200px] overflow-hidden rounded-md border border-border/60 bg-black/20 md:min-h-[240px]">
                 <img
-                  src="/banner.png"
+                  src="/h1.png"
                   alt="Impact Kyoto Hackathon 2026"
-                  className="h-full w-full object-cover object-center"
+                  width={1024}
+                  height={457}
+                  className="h-full w-full object-contain object-center"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/30 to-transparent" />
                 <div className="absolute left-4 top-4 inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs tracking-[0.2em] text-primary">

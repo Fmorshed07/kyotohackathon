@@ -1,9 +1,10 @@
-export type PortalRole = "participant" | "judge" | "admin";
+export type PortalRole = "participant" | "mentor" | "judge" | "admin";
 export type JudgeApprovalStatus = "pending" | "approved";
 
 export type Submission = {
   id: string;
   user_id: string;
+  hackathon_id?: string | null;
   title: string | null;
   team_name?: string | null;
   member_names?: string | null;

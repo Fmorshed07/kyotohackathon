@@ -20,17 +20,17 @@ export default function Dashboard() {
     return <Navigate to="/dashboard/participant" replace />;
   }
 
-  if (sessionUser.role === "judge") {
+  if (sessionUser.role === "judge" || sessionUser.role === "mentor") {
     if (sessionUser.judgeApprovalStatus === "pending") {
       return (
         <div className="flex min-h-svh items-center justify-center bg-background px-6">
           <div className="max-w-xl rounded-xl border border-border/50 bg-card/80 p-8 text-center">
             <p className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
-              Judge approval pending
+              {sessionUser.role === "mentor" ? "Mentor" : "Judge"} approval pending
             </p>
             <p className="mt-2 text-sm text-foreground">
-              Your judge account is waiting for admin approval. You will be able to access the judge
-              dashboard after approval.
+              Your {sessionUser.role === "mentor" ? "mentor" : "judge"} account is waiting for admin
+              approval. You will be able to access the dashboard after approval.
             </p>
             <button
               type="button"
@@ -50,7 +50,7 @@ export default function Dashboard() {
     return <Navigate to="/dashboard/admin" replace />;
   }
 
-  if (sessionUser.role !== "participant" && sessionUser.role !== "judge" && sessionUser.role !== "admin") {
+  if (sessionUser.role !== "participant" && sessionUser.role !== "judge" && sessionUser.role !== "mentor" && sessionUser.role !== "admin") {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
         <div className="rounded-xl border border-border/50 bg-card/80 p-8 text-center">
@@ -58,7 +58,7 @@ export default function Dashboard() {
             No role assigned
           </p>
           <p className="mt-2 text-sm text-foreground">
-            Your account does not have a participant, judge, or admin role. Please contact organisers or sign in with a different account.
+            Your account does not have a participant, mentor, or admin role. Please contact organisers or sign in with a different account.
           </p>
           <button
             type="button"

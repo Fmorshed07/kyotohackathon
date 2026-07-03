@@ -5,6 +5,7 @@ import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ParticipantDashboard } from "@/components/dashboard/ParticipantDashboard";
+import { getSubmissionHackathonId, SITE_HACKATHON_ID } from "@/lib/hackathons";
 import type { Submission } from "@/types/portal";
 
 const initialParticipantForm = {
@@ -43,17 +44,18 @@ export default function ParticipantDashboardPage() {
 
     const loadSubmission = async () => {
       try {
-        const ownSubmissionsQuery = query(
+        const kyotoSubmissionsQuery = query(
           collection(db, "submissions"),
-          where("user_id", "==", sessionUser.id)
+          where("user_id", "==", sessionUser.id),
+          where("hackathon_id", "==", SITE_HACKATHON_ID)
         );
-        const ownSubmissionsSnap = await getDocs(ownSubmissionsQuery);
-        const ownSubmissions = ownSubmissionsSnap.docs.map((docSnap) => ({
+        const kyotoSubmissionsSnap = await getDocs(kyotoSubmissionsQuery);
+        const kyotoSubmissions = kyotoSubmissionsSnap.docs.map((docSnap) => ({
           id: docSnap.id,
           ...(docSnap.data() as Omit<Submission, "id">),
         })) as Submission[];
 
-        const sortedSubmissions = ownSubmissions.sort((left, right) => {
+        const sortedSubmissions = kyotoSubmissions.sort((left, right) => {
           const leftDate = Date.parse(left.created_at ?? "");
           const rightDate = Date.parse(right.created_at ?? "");
           if (Number.isNaN(leftDate) && Number.isNaN(rightDate)) return 0;
@@ -68,22 +70,7 @@ export default function ParticipantDashboardPage() {
           setActiveSubmissionId(activeSubmission.id);
           setParticipantSubmission(activeSubmission);
           setParticipantForm(mapSubmissionToForm(activeSubmission));
-          return;
         }
-
-        // Backward-compatible fallback for setups that still use uid as document id.
-        const legacySubmissionRef = doc(db, "submissions", sessionUser.id);
-        const legacySubmissionSnap = await getDoc(legacySubmissionRef);
-        if (!legacySubmissionSnap.exists()) return;
-
-        const legacySubmission = {
-          id: legacySubmissionSnap.id,
-          ...(legacySubmissionSnap.data() as Omit<Submission, "id">),
-        } as Submission;
-        setParticipantSubmissions([legacySubmission]);
-        setActiveSubmissionId(legacySubmission.id);
-        setParticipantSubmission(legacySubmission);
-        setParticipantForm(mapSubmissionToForm(legacySubmission));
       } catch {
         // ignore load errors and keep editable form state
       }
@@ -108,8 +95,14 @@ export default function ParticipantDashboardPage() {
     setIsSubmittingProject(true);
     setSubmissionMessage(null);
     try {
+      const hasKyotoSubmission =
+        participantSubmission &&
+        activeSubmissionId &&
+        getSubmissionHackathonId(participantSubmission) === SITE_HACKATHON_ID;
+
       const payload = {
         user_id: sessionUser.id,
+        hackathon_id: SITE_HACKATHON_ID,
         title: participantForm.title,
         short_description: participantForm.shortDescription,
         project_url: participantForm.projectUrl,
@@ -118,10 +111,21 @@ export default function ParticipantDashboardPage() {
         team_name: participantForm.teamName,
         member_names: participantForm.memberNames,
         role: "participant",
-        created_at: participantSubmission?.created_at ?? new Date().toISOString(),
+        created_at: hasKyotoSubmission
+          ? (participantSubmission?.created_at ?? new Date().toISOString())
+          : new Date().toISOString(),
       };
-      const submissionRef = doc(db, "submissions", activeSubmissionId ?? sessionUser.id);
-      await setDoc(submissionRef, payload, { merge: true });
+
+      const submissionRef = hasKyotoSubmission
+        ? doc(db, "submissions", activeSubmissionId!)
+        : doc(collection(db, "submissions"));
+
+      if (hasKyotoSubmission) {
+        await setDoc(submissionRef, payload, { merge: true });
+      } else {
+        await setDoc(submissionRef, payload);
+      }
+
       const submissionSnap = await getDoc(submissionRef);
       if (submissionSnap.exists()) {
         const data = {

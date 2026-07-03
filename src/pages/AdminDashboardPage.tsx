@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
@@ -10,12 +9,15 @@ import {
   type AdminSubmissionRow,
   type AdminUser,
 } from "@/components/dashboard/AdminDashboard";
+import { fetchSubmissionsForHackathon, HACKATHON_STORAGE_KEYS, PORTAL_HACKATHONS } from "@/lib/hackathons";
+import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import type { JudgeApprovalStatus, PortalRole, Submission } from "@/types/portal";
 
 const normalizePortalRole = (value: unknown): PortalRole | undefined => {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim().toLowerCase();
   if (normalized === "judge" || normalized === "judges") return "judge";
+  if (normalized === "mentor" || normalized === "mentors") return "mentor";
   if (normalized === "participant" || normalized === "participants") return "participant";
   if (normalized === "admin" || normalized === "admins") return "admin";
   return undefined;
@@ -29,9 +31,14 @@ const normalizeJudgeApprovalStatus = (value: unknown): JudgeApprovalStatus | und
   return undefined;
 };
 
+const isStaffRole = (role: PortalRole) => role === "judge" || role === "mentor";
+
 export default function AdminDashboardPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
+  const { selectedHackathonId, selectedHackathon, setSelectedHackathonId } = useHackathonSelection(
+    HACKATHON_STORAGE_KEYS.admin
+  );
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [userEmailLookup, setUserEmailLookup] = useState<Record<string, string>>({});
@@ -63,8 +70,7 @@ export default function AdminDashboardPage() {
             }
             const role = normalizePortalRole(data.role);
             if (!role || !data.email || typeof data.email !== "string") return null;
-            const judgeApprovalStatus =
-              role === "judge"
+            const judgeApprovalStatus = isStaffRole(role)
                 ? normalizeJudgeApprovalStatus(data.judgeApprovalStatus) ?? "approved"
                 : undefined;
             return {
@@ -91,13 +97,8 @@ export default function AdminDashboardPage() {
     const loadSubmissions = async () => {
       setIsLoadingSubmissions(true);
       try {
-        const submissionsRef = collection(db, "submissions");
-        const snapshot = await getDocs(submissionsRef);
-        const allSubmissions: Submission[] = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Omit<Submission, "id">),
-        }));
-        setSubmissions(allSubmissions);
+        const hackathonSubmissions = await fetchSubmissionsForHackathon(db, selectedHackathonId);
+        setSubmissions(hackathonSubmissions);
       } catch (error: unknown) {
         const text =
           typeof error === "object" && error && "message" in error
@@ -111,7 +112,7 @@ export default function AdminDashboardPage() {
 
     void loadUsers();
     void loadSubmissions();
-  }, [sessionUser, db]);
+  }, [sessionUser, db, selectedHackathonId]);
 
   const getUserEmail = (identifier: string | null | undefined) => {
     if (!identifier) return null;
@@ -127,14 +128,16 @@ export default function AdminDashboardPage() {
     }, {});
 
   const judgeById = users
-    .filter((user) => user.role === "judge")
+    .filter((user) => isStaffRole(user.role))
     .reduce<Record<string, AdminUser>>((acc, user) => {
       acc[user.id] = user;
       return acc;
     }, {});
 
-  const adminSubmissionRows: AdminSubmissionRow[] = submissions
-    .map((submission) => {
+  const adminSubmissionRows: AdminSubmissionRow[] = useMemo(
+    () =>
+      submissions
+        .map((submission) => {
       const participantId = submission.user_id || submission.id;
       const participantEmail =
         getUserEmail(participantId) ??
@@ -185,11 +188,13 @@ export default function AdminDashboardPage() {
         scoredByCount: validScores.length,
       };
     })
-    .sort((a, b) => {
-      const left = a.averageScore ?? -1;
-      const right = b.averageScore ?? -1;
-      return right - left;
-    });
+        .sort((a, b) => {
+          const left = a.averageScore ?? -1;
+          const right = b.averageScore ?? -1;
+          return right - left;
+        }),
+    [submissions, users, userEmailLookup]
+  );
 
   const scoredRows = adminSubmissionRows.filter((row) => row.averageScore != null);
   const topScore =
@@ -233,9 +238,8 @@ export default function AdminDashboardPage() {
     setSavingUserId(user.id);
     try {
       const userRef = doc(db, "users", user.id);
-      const nextJudgeApprovalStatus =
-        nextRole === "judge"
-          ? user.role === "judge" && user.judgeApprovalStatus === "pending"
+      const nextJudgeApprovalStatus = isStaffRole(nextRole)
+          ? isStaffRole(user.role) && user.judgeApprovalStatus === "pending"
             ? "pending"
             : "approved"
           : null;
@@ -253,7 +257,7 @@ export default function AdminDashboardPage() {
             ? {
                 ...currentUser,
                 role: nextRole,
-                judgeApprovalStatus: nextRole === "judge" ? nextJudgeApprovalStatus ?? "approved" : undefined,
+                judgeApprovalStatus: isStaffRole(nextRole) ? nextJudgeApprovalStatus ?? "approved" : undefined,
               }
             : currentUser
         )
@@ -276,7 +280,7 @@ export default function AdminDashboardPage() {
   };
 
   const handleApproveJudge = async (user: AdminUser) => {
-    if (user.role !== "judge" || user.judgeApprovalStatus !== "pending") return;
+    if (!isStaffRole(user.role) || user.judgeApprovalStatus !== "pending") return;
     setMessage(null);
     setSavingUserId(user.id);
     try {
@@ -292,7 +296,7 @@ export default function AdminDashboardPage() {
             : currentUser
         )
       );
-      setMessage(`Approved judge access for ${user.email}.`);
+      setMessage(`Approved ${user.role} access for ${user.email}.`);
     } catch (error: unknown) {
       const text =
         typeof error === "object" && error && "message" in error
@@ -315,6 +319,7 @@ export default function AdminDashboardPage() {
     try {
       const submissionPayload: Omit<Submission, "id"> = {
         user_id: payload.participantId,
+        hackathon_id: selectedHackathonId,
         title: payload.title.trim() || null,
         team_name: null,
         member_names: null,
@@ -364,7 +369,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || !sessionUser) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Loading...</p>
@@ -372,25 +377,17 @@ export default function AdminDashboardPage() {
     );
   }
 
-  if (!sessionUser) {
-    return <Navigate to="/signin" replace />;
-  }
-
-  if (sessionUser.role === "participant") {
-    return <Navigate to="/dashboard/participant" replace />;
-  }
-
-  if (sessionUser.role === "judge") {
-    return <Navigate to="/dashboard/judge" replace />;
-  }
-
-  if (sessionUser.role !== "admin") {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   return (
-    <DashboardLayout sessionUser={sessionUser} role="admin" onSignOut={signOut}>
+    <DashboardLayout
+      sessionUser={sessionUser}
+      role="admin"
+      onSignOut={signOut}
+      hackathons={PORTAL_HACKATHONS}
+      selectedHackathonId={selectedHackathonId}
+      onHackathonChange={setSelectedHackathonId}
+    >
       <AdminDashboard
+        selectedHackathon={selectedHackathon}
         users={users}
         isLoadingUsers={isLoadingUsers}
         submissions={adminSubmissionRows}

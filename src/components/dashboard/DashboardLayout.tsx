@@ -7,6 +7,7 @@ import {
   Scale,
   BarChart3,
   Trophy,
+  CalendarRange,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -26,20 +27,34 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { HackathonSelector } from "@/components/dashboard/HackathonSelector";
+import type { HackathonId, PortalHackathon } from "@/lib/hackathons";
 import type { SessionUser } from "@/types/portal";
 
 type DashboardLayoutProps = {
   sessionUser: SessionUser;
-  role: "participant" | "judge" | "admin";
+  role: "participant" | "judge" | "mentor" | "admin";
   children: React.ReactNode;
   onSignOut: () => Promise<void>;
+  hackathons?: PortalHackathon[];
+  selectedHackathonId?: HackathonId;
+  onHackathonChange?: (hackathonId: HackathonId) => void;
 };
 
 const sectionClass =
   "rounded-2xl border border-border/60 bg-card/85 backdrop-blur-sm shadow-xl shadow-black/20";
 
-export function DashboardLayout({ sessionUser, role, children, onSignOut }: DashboardLayoutProps) {
+export function DashboardLayout({
+  sessionUser,
+  role,
+  children,
+  onSignOut,
+  hackathons,
+  selectedHackathonId,
+  onHackathonChange,
+}: DashboardLayoutProps) {
   const navigate = useNavigate();
+  const isStaffDashboard = role === "judge" || role === "mentor";
 
   const handleSignOut = async () => {
     await onSignOut();
@@ -82,7 +97,7 @@ export function DashboardLayout({ sessionUser, role, children, onSignOut }: Dash
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
-                {role === "judge" && (
+                {isStaffDashboard && (
                   <>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
@@ -149,6 +164,40 @@ export function DashboardLayout({ sessionUser, role, children, onSignOut }: Dash
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+          {(role === "admin" || isStaffDashboard) &&
+            hackathons &&
+            selectedHackathonId &&
+            onHackathonChange && (
+              <SidebarGroup>
+                <SidebarGroupLabel className="text-xs font-medium tracking-normal text-muted-foreground">
+                  Hackathons
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {hackathons.map((hackathon) => {
+                      const isActive = hackathon.id === selectedHackathonId;
+                      return (
+                        <SidebarMenuItem key={hackathon.id}>
+                          <SidebarMenuButton
+                            isActive={isActive}
+                            className="h-auto cursor-pointer py-2.5"
+                            onClick={() => onHackathonChange(hackathon.id)}
+                          >
+                            <CalendarRange className="h-4 w-4 shrink-0" />
+                            <span className="flex min-w-0 flex-col items-start gap-0.5">
+                              <span className="truncate text-sm">{hackathon.shortName}</span>
+                              <span className="truncate text-[0.65rem] text-muted-foreground">
+                                {hackathon.eventDate}
+                              </span>
+                            </span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
         </SidebarContent>
         <SidebarFooter className="border-t border-sidebar-border">
           <div className="p-2">
@@ -177,23 +226,36 @@ export function DashboardLayout({ sessionUser, role, children, onSignOut }: Dash
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b border-border/40 bg-background/85 px-3 py-2 backdrop-blur-sm sm:px-4 md:gap-4 md:px-6">
-          <div className="flex flex-1 flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-foreground">
-              {role === "participant"
-                ? "Participant"
-                : role === "judge"
-                  ? "Judge"
-                  : "Admin"}{" "}
-              Dashboard
-            </span>
-            <Badge variant="outline" className="text-[0.65rem] sm:text-xs">
-              {sessionUser.role}
-            </Badge>
+        <header className="sticky top-0 z-30 flex min-h-14 flex-col gap-3 border-b border-border/40 bg-background/85 px-3 py-3 backdrop-blur-sm sm:px-4 md:px-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">
+                {role === "participant"
+                  ? "Participant"
+                  : role === "mentor"
+                    ? "Mentor"
+                    : role === "judge"
+                      ? "Judge"
+                      : "Admin"}{" "}
+                Dashboard
+              </span>
+              <Badge variant="outline" className="text-[0.65rem] sm:text-xs">
+                {sessionUser.role}
+              </Badge>
+            </div>
+            <div className="hidden max-w-[46ch] text-right text-xs text-muted-foreground md:block">
+              {sessionUser.email}
+            </div>
           </div>
-          <div className="hidden max-w-[46ch] text-right text-xs text-muted-foreground md:block">
-            {sessionUser.email}
-          </div>
+          {(role === "admin" || isStaffDashboard) &&
+            selectedHackathonId &&
+            onHackathonChange && (
+              <HackathonSelector
+                selectedHackathonId={selectedHackathonId}
+                onSelect={onHackathonChange}
+                compact
+              />
+            )}
         </header>
         <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
           <div className="mx-auto w-full max-w-[1400px]">

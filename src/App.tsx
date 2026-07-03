@@ -34,7 +34,7 @@ function PublicOnlyRoute({ children }: { children: JSX.Element }) {
     if (sessionUser.role === "admin") {
       return <Navigate to="/dashboard/admin" replace />;
     }
-    if (sessionUser.role === "judge") {
+    if (sessionUser.role === "judge" || sessionUser.role === "mentor") {
       if (sessionUser.judgeApprovalStatus === "pending") {
         return <Navigate to="/dashboard" replace />;
       }
@@ -44,6 +44,34 @@ function PublicOnlyRoute({ children }: { children: JSX.Element }) {
       return <Navigate to="/dashboard/participant" replace />;
     }
     return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
+function AdminSignInRoute({ children }: { children: JSX.Element }) {
+  const { sessionUser, loading } = usePortalAuth();
+
+  if (loading) {
+    return <FullScreenMessage message="Loading..." />;
+  }
+
+  if (sessionUser?.role === "admin") {
+    return <Navigate to="/dashboard/admin" replace />;
+  }
+
+  return children;
+}
+
+function AdminProtectedRoute({ children }: { children: JSX.Element }) {
+  const { sessionUser, loading } = usePortalAuth();
+
+  if (loading) {
+    return <FullScreenMessage message="Loading..." />;
+  }
+
+  if (!sessionUser || sessionUser.role !== "admin") {
+    return <Navigate to="/admin" replace />;
   }
 
   return children;
@@ -80,11 +108,19 @@ const App = () => (
             }
           />
           <Route
-            path="/admin"
+            path="/signup"
             element={
               <PublicOnlyRoute>
-                <AdminSignIn />
+                <SignIn />
               </PublicOnlyRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <AdminSignInRoute>
+                <AdminSignIn />
+              </AdminSignInRoute>
             }
           />
           <Route
@@ -114,9 +150,9 @@ const App = () => (
           <Route
             path="/dashboard/admin"
             element={
-              <ProtectedRoute>
+              <AdminProtectedRoute>
                 <AdminDashboardPage />
-              </ProtectedRoute>
+              </AdminProtectedRoute>
             }
           />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -14,8 +14,8 @@ service cloud.firestore {
       return isSignedIn() && (currentUserRole() == "admin" || currentUserRole() == "admins");
     }
 
-    function isJudge() {
-      return isSignedIn() && (currentUserRole() == "judge" || currentUserRole() == "judges");
+    function isStaff() {
+      return isSignedIn() && (currentUserRole() == "judge" || currentUserRole() == "judges" || currentUserRole() == "mentor" || currentUserRole() == "mentors");
     }
 
     match /users/{userId} {
@@ -28,7 +28,7 @@ service cloud.firestore {
     match /submissions/{submissionId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (request.auth.uid == request.resource.data.user_id || isAdmin());
-      allow update: if isSignedIn() && (request.auth.uid == resource.data.user_id || isJudge() || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == resource.data.user_id || isStaff() || isAdmin());
       allow delete: if isAdmin();
     }
   }

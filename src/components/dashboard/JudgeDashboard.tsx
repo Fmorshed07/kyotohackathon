@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
+import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
+import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
+import { submissionMatchesSearch } from "@/lib/submissionSearch";
+import type { PortalHackathon } from "@/lib/hackathons";
 import type { Submission } from "@/types/portal";
 import {
   JUDGING_CRITERIA,
@@ -122,12 +126,17 @@ const parseMemberNames = (rawMemberNames: string | null | undefined) =>
     .map((name) => name.trim())
     .filter(Boolean);
 
-const getTeamAccentStyle = (teamName: string) => {
-  const seed = teamName
+const getAccentStyleFromSeed = (seed: string) => {
+  const hash = seed
     .split("")
-    .reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % TEAM_ACCENT_STYLES.length, 0);
-  return TEAM_ACCENT_STYLES[Math.abs(seed) % TEAM_ACCENT_STYLES.length];
+    .reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) % TEAM_ACCENT_STYLES.length, 0);
+  return TEAM_ACCENT_STYLES[Math.abs(hash) % TEAM_ACCENT_STYLES.length];
 };
+
+const getTeamAccentStyle = (teamName: string) => getAccentStyleFromSeed(teamName);
+
+const getSubmissionAccentStyle = (submission: Submission) =>
+  getAccentStyleFromSeed(submission.id || submission.title?.trim() || "untitled");
 
 const getCriterionAccentStyle = (criterionId: JudgingCriterionId) =>
   CRITERION_ACCENT_STYLES[criterionId];
@@ -140,6 +149,7 @@ const formatSubmittedAt = (createdAt: string | null | undefined) => {
 };
 
 export type JudgeDashboardProps = {
+  selectedHackathon: PortalHackathon;
   submissions: Submission[];
   isLoadingSubmissions: boolean;
   judgeMessage: string | null;
@@ -158,6 +168,7 @@ export type JudgeDashboardProps = {
 };
 
 export function JudgeDashboard({
+  selectedHackathon,
   submissions,
   isLoadingSubmissions,
   judgeMessage,
@@ -167,6 +178,13 @@ export function JudgeDashboard({
   onSave,
 }: JudgeDashboardProps) {
   const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    setSelectedTeamName(null);
+    setSearchQuery("");
+  }, [selectedHackathon.id]);
+
   const scoreButtonStopsByWeight: Record<number, number[]> = {
     25: [0, 5, 10, 15, 20, 25],
     20: [0, 4, 8, 12, 16, 20],
@@ -195,11 +213,28 @@ export function JudgeDashboard({
     }, new Map())
     .values()
   ).sort((left, right) => left.name.localeCompare(right.name));
-  const activeTeam = teams.find((team) => team.name === selectedTeamName) ?? teams[0] ?? null;
+  const filteredTeams = useMemo(() => {
+    if (!searchQuery.trim()) return teams;
+    return teams.filter(
+      (team) =>
+        submissionMatchesSearch(searchQuery, { team_name: team.name }) ||
+        team.members.some((member) => submissionMatchesSearch(searchQuery, { title: member })) ||
+        team.submissions.some((submission) => submissionMatchesSearch(searchQuery, submission))
+    );
+  }, [searchQuery, teams]);
+  const filteredSubmissions = useMemo(() => {
+    if (!searchQuery.trim()) return submissions;
+    return submissions.filter((submission) => submissionMatchesSearch(searchQuery, submission));
+  }, [searchQuery, submissions]);
+  const activeTeam =
+    filteredTeams.find((team) => team.name === selectedTeamName) ?? filteredTeams[0] ?? null;
   const activeTeamAccent = activeTeam ? getTeamAccentStyle(activeTeam.name) : null;
+  const hasSearchQuery = searchQuery.trim().length > 0;
 
   return (
     <div className="space-y-8" id="overview">
+      <HackathonContextBanner hackathon={selectedHackathon} role="judge" />
+
       {/* Overview */}
       <section className={`${sectionClass} p-4 sm:p-6`} aria-label="Judge overview">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -208,7 +243,7 @@ export function JudgeDashboard({
               Overview
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Track how many teams have submitted and how many you have scored.
+              Track submissions and scoring progress for {selectedHackathon.name}.
             </p>
           </div>
           <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-auto lg:gap-4">
@@ -247,6 +282,21 @@ export function JudgeDashboard({
             {judgeMessage}
           </p>
         )}
+        {!isLoadingSubmissions && submissions.length > 0 ? (
+          <div className="mt-4 max-w-xl">
+            <SubmissionSearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search teams, projects, or members..."
+            />
+            {hasSearchQuery ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Showing {filteredTeams.length} of {teams.length} teams and{" "}
+                {filteredSubmissions.length} of {submissions.length} submissions.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className={`${sectionClass} p-4 sm:p-6`} id="teams" aria-label="Teams">
@@ -260,12 +310,16 @@ export function JudgeDashboard({
           <p className="text-sm text-muted-foreground">Loading teams…</p>
         ) : teams.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-10 text-center text-sm text-muted-foreground">
-            No teams available yet.
+            No teams available yet for {selectedHackathon.name}.
+          </p>
+        ) : filteredTeams.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-10 text-center text-sm text-muted-foreground">
+            No teams match your search.
           </p>
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              {teams.map((team) => {
+              {filteredTeams.map((team) => {
                 const isActive = activeTeam?.name === team.name;
                 const accentStyle = getTeamAccentStyle(team.name);
                 return (
@@ -338,12 +392,14 @@ export function JudgeDashboard({
                       Submissions
                     </p>
                     <div className="mt-2 space-y-2">
-                      {activeTeam.submissions.map((submission) => (
+                      {activeTeam.submissions.map((submission) => {
+                        const ideaAccent = getSubmissionAccentStyle(submission);
+                        return (
                         <div
                           key={`${activeTeam.name}-${submission.id}`}
-                          className="space-y-3 rounded-lg border border-border/60 bg-background/80 px-3 py-3"
+                          className={`space-y-3 rounded-lg border px-3 py-3 ${ideaAccent.panel}`}
                         >
-                          <p className="text-sm font-medium text-foreground">
+                          <p className={`text-sm font-semibold ${ideaAccent.teamName}`}>
                             {submission.title || "Untitled Project"}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -418,7 +474,8 @@ export function JudgeDashboard({
                             </p>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -461,28 +518,32 @@ export function JudgeDashboard({
             <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-12 text-center text-sm text-muted-foreground">
               No submissions yet. Scores will appear here as teams submit.
             </p>
+          ) : filteredSubmissions.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-12 text-center text-sm text-muted-foreground">
+              No submissions match your search.
+            </p>
           ) : (
             <>
               <div className="space-y-4 md:hidden">
-                {submissions.map((submission) => {
+                {filteredSubmissions.map((submission) => {
                   const totalScore =
                     submission.judge_criteria_scores && typeof submission.judge_criteria_scores === "object"
                       ? calculateTotalFromCriteria(submission.judge_criteria_scores)
                       : submission.judge_score ?? 0;
                   const teamName = submission.team_name?.trim() || "Unnamed team";
-                  const teamAccent = getTeamAccentStyle(teamName);
+                  const ideaAccent = getSubmissionAccentStyle(submission);
                   return (
                     <article
                       key={submission.id}
-                      className="space-y-5 rounded-2xl border border-border/50 bg-muted/20 p-5"
+                      className={`space-y-5 rounded-2xl border p-5 ${ideaAccent.panel}`}
                     >
                       <div className="space-y-2">
                         <span
-                          className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${teamAccent.pill}`}
+                          className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${ideaAccent.pill}`}
                         >
                           {teamName}
                         </span>
-                        <p className="text-base font-semibold text-foreground">
+                        <p className={`text-base font-semibold ${ideaAccent.teamName}`}>
                           {submission.title || "Untitled Project"}
                         </p>
                         <p className="line-clamp-3 text-sm text-muted-foreground">
@@ -646,23 +707,26 @@ export function JudgeDashboard({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {submissions.map((submission) => {
+                    {filteredSubmissions.map((submission) => {
                       const totalScore =
                         submission.judge_criteria_scores && typeof submission.judge_criteria_scores === "object"
                           ? calculateTotalFromCriteria(submission.judge_criteria_scores)
                           : submission.judge_score ?? 0;
                       const teamName = submission.team_name?.trim() || "Unnamed team";
-                      const teamAccent = getTeamAccentStyle(teamName);
+                      const ideaAccent = getSubmissionAccentStyle(submission);
                       return (
-                        <TableRow key={submission.id} className="border-border/40 hover:bg-muted/20">
+                        <TableRow
+                          key={submission.id}
+                          className={`border-border/40 hover:bg-muted/20 ${ideaAccent.panel}`}
+                        >
                           <TableCell className="align-top">
                             <div className="space-y-1">
                               <span
-                                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${teamAccent.pill}`}
+                                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${ideaAccent.pill}`}
                               >
                                 {teamName}
                               </span>
-                              <p className="text-base font-semibold">
+                              <p className={`text-base font-semibold ${ideaAccent.teamName}`}>
                                 {submission.title || "Untitled Project"}
                               </p>
                               <p className="line-clamp-3 text-sm text-muted-foreground">

@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
+import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
+import type { PortalHackathon } from "@/lib/hackathons";
 import type { JudgeApprovalStatus, PortalRole } from "@/types/portal";
 
 export type AdminUser = {
@@ -69,6 +71,7 @@ type WinnerResult = {
 };
 
 type AdminDashboardProps = {
+  selectedHackathon: PortalHackathon;
   users: AdminUser[];
   isLoadingUsers: boolean;
   submissions: AdminSubmissionRow[];
@@ -89,9 +92,12 @@ type AdminDashboardProps = {
 
 const roleBadgeVariant: Record<PortalRole, "default" | "secondary" | "outline"> = {
   participant: "secondary",
+  mentor: "default",
   judge: "default",
   admin: "outline",
 };
+
+const isStaffRole = (role: PortalRole) => role === "judge" || role === "mentor";
 
 function UserManagementTable({
   users,
@@ -149,8 +155,8 @@ function UserManagementTable({
                 {users.map((user) => {
                   const selectedRole = pendingRoles[user.id] ?? user.role;
                   const hasPendingChange = selectedRole !== user.role;
-                  const isPendingJudge =
-                    user.role === "judge" && user.judgeApprovalStatus === "pending";
+                  const isPendingStaff =
+                    isStaffRole(user.role) && user.judgeApprovalStatus === "pending";
 
                   return (
                     <TableRow key={user.id} className="border-border/40">
@@ -170,15 +176,16 @@ function UserManagementTable({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="participant">participant</SelectItem>
+                            <SelectItem value="mentor">mentor</SelectItem>
                             <SelectItem value="judge">judge</SelectItem>
                             <SelectItem value="admin">admin</SelectItem>
                           </SelectContent>
                         </Select>
                       </TableCell>
                       <TableCell>
-                        {user.role === "judge" ? (
-                          <Badge variant={isPendingJudge ? "secondary" : "default"}>
-                            {isPendingJudge ? "Pending approval" : "Approved"}
+                        {isStaffRole(user.role) ? (
+                          <Badge variant={isPendingStaff ? "secondary" : "default"}>
+                            {isPendingStaff ? "Pending approval" : "Approved"}
                           </Badge>
                         ) : (
                           <span className="text-xs text-muted-foreground">N/A</span>
@@ -194,7 +201,7 @@ function UserManagementTable({
                           >
                             {savingUserId === user.id ? "Saving..." : "Save"}
                           </Button>
-                          {isPendingJudge ? (
+                          {isPendingStaff ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -220,6 +227,7 @@ function UserManagementTable({
 }
 
 export function AdminDashboard({
+  selectedHackathon,
   users,
   isLoadingUsers,
   submissions,
@@ -246,13 +254,15 @@ export function AdminDashboard({
     demoVideoUrl: "",
   });
   const participants = users.filter((user) => user.role === "participant");
-  const judges = users.filter((user) => user.role === "judge");
+  const staff = users.filter((user) => isStaffRole(user.role));
   const winnerNames = winner.winners
     .map((entry) => entry.title || entry.participantEmail || "Untitled Project")
     .join(", ");
 
   return (
     <div className="space-y-8" id="overview">
+      <HackathonContextBanner hackathon={selectedHackathon} role="admin" />
+
       <section className={`${sectionClass} relative overflow-hidden p-6`} aria-label="Admin overview">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -261,7 +271,7 @@ export function AdminDashboard({
               Admin overview
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Manage participant and judge access from one dashboard.
+              Manage users globally and review submissions for {selectedHackathon.shortName}.
             </p>
           </div>
           <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-auto lg:gap-4">
@@ -275,7 +285,7 @@ export function AdminDashboard({
             </div>
             <div className="rounded-xl border border-border/50 bg-muted/20 px-5 py-3 text-center">
               <p className="font-display text-2xl font-semibold tabular-nums text-primary">
-                {isLoadingUsers ? "—" : judges.length}
+                {isLoadingUsers ? "—" : staff.length}
               </p>
               <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
                 Judges
@@ -302,7 +312,7 @@ export function AdminDashboard({
         <div className="mb-5 border-b border-border/40 pb-4">
           <h2 className="font-display text-sm uppercase tracking-[0.28em] text-foreground">Analytics</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Submission health and scoring progress across all teams.
+            Submission health and scoring progress for {selectedHackathon.name}.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -344,7 +354,7 @@ export function AdminDashboard({
               Winner detection
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Winner is auto-detected from the highest average score across judges.
+              Winner is auto-detected from the highest average score for {selectedHackathon.shortName}.
             </p>
           </div>
           <Badge variant="outline" className="uppercase tracking-[0.14em]">
@@ -373,7 +383,7 @@ export function AdminDashboard({
             Participant submissions + judge marks
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Unified view of all participant projects and every judge score together.
+            Projects and judge marks for {selectedHackathon.name}.
           </p>
         </div>
         <div className="p-4 sm:p-6">
@@ -469,7 +479,7 @@ export function AdminDashboard({
             <p className="text-sm text-muted-foreground">Loading submissions...</p>
           ) : submissions.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-12 text-center text-sm text-muted-foreground">
-              No participant submissions yet.
+              No participant submissions yet for {selectedHackathon.name}.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-border/40">
@@ -613,9 +623,9 @@ export function AdminDashboard({
             onApproveJudge={onApproveJudge}
           />
           <UserManagementTable
-            users={judges}
-            title="Manage judges"
-            description="Review judge accounts and update access permissions."
+            users={staff}
+            title="Manage mentors & judges"
+            description="Review mentor and judge accounts and update access permissions."
             sectionId="manage-judges"
             savingUserId={savingUserId}
             pendingRoles={pendingRoles}

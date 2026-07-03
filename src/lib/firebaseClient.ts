@@ -1,17 +1,29 @@
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAnalytics, type Analytics } from "firebase/analytics";
+import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCtMqnY6NDGos70k-BHWAcMd5e-32Y7KRo",
-  authDomain: "hackathon-tokyo.firebaseapp.com",
-  projectId: "hackathon-tokyo",
-  storageBucket: "hackathon-tokyo.firebasestorage.app",
-  messagingSenderId: "89134934761",
-  appId: "1:89134934761:web:58e4914e9da2d9bafade78",
-  measurementId: "G-QRH98V86BC",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
+
+function assertFirebaseConfig(): void {
+  const missing = Object.entries(firebaseConfig)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `[Firebase] Missing environment variables: ${missing.join(", ")}. Configure them in .env.local.`,
+    );
+  }
+}
 
 let firebaseApp: FirebaseApp | null = null;
 let firebaseAnalytics: Analytics | null = null;
@@ -20,14 +32,18 @@ let firebaseDb: Firestore | null = null;
 
 function getAppInstance(): FirebaseApp {
   if (firebaseApp) return firebaseApp;
+  assertFirebaseConfig();
   firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   return firebaseApp;
 }
 
 export const getFirebaseApp = getAppInstance;
 
-export function getFirebaseAnalytics(): Analytics {
+export async function getFirebaseAnalytics(): Promise<Analytics | null> {
   if (firebaseAnalytics) return firebaseAnalytics;
+  if (typeof window === "undefined") return null;
+  const supported = await isSupported();
+  if (!supported) return null;
   firebaseAnalytics = getAnalytics(getAppInstance());
   return firebaseAnalytics;
 }

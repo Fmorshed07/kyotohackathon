@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import GoogleTranslate from "@/components/GoogleTranslate";
+import { usePortalAuth } from "@/hooks/usePortalAuth";
+import { getDashboardPathForUser } from "@/lib/portalRoutes";
 import { cn } from "@/lib/utils";
 
 type NavLink = { label: string; href: string };
@@ -35,12 +37,28 @@ const navSections: { title: string; links: NavLink[] }[] = [
   },
 ];
 
+const authButtonClass =
+  "font-nav inline-flex h-9 items-center whitespace-nowrap rounded-md px-3.5 text-[13px] font-medium tracking-[0.1em] transition-colors";
+
 const SiteHeader = () => {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { sessionUser, signOut } = usePortalAuth();
   const openMobileNav = useCallback(() => setIsMobileNavOpen(true), []);
   const closeMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
+
+  const handleLogout = useCallback(async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      closeMobileNav();
+      navigate("/");
+    } finally {
+      setIsSigningOut(false);
+    }
+  }, [closeMobileNav, navigate, signOut]);
 
   useEffect(() => {
     if (!isMobileNavOpen) {
@@ -94,12 +112,16 @@ const SiteHeader = () => {
     [closeMobileNav, location.pathname, navigate],
   );
 
+  const profilePath = sessionUser
+    ? getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus)
+    : "/signin";
+
   return (
     <>
       <header className="fixed top-0 z-40 w-full border-b border-white/10 bg-[hsl(248_45%_8%_/_0.75)] backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-6xl items-stretch px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:px-6 lg:gap-3 lg:px-8">
         {/* Left: logo */}
-        <div className="flex min-w-0 flex-1 items-center md:flex-none">
+        <div className="flex shrink-0 items-center">
           <a
             href="/"
             className="font-nav text-[13px] font-medium tracking-[0.2em] text-white/90 transition-colors hover:text-primary"
@@ -108,9 +130,9 @@ const SiteHeader = () => {
           </a>
         </div>
 
-        {/* Center: nav — centered */}
+        {/* Center: nav — scrollable on smaller desktops */}
         <nav
-          className="hidden items-center justify-center md:flex md:flex-1"
+          className="hidden min-w-0 flex-1 items-center justify-center overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Primary"
         >
           <div className="flex items-center gap-0.5 sm:gap-1">
@@ -140,22 +162,45 @@ const SiteHeader = () => {
         </nav>
 
         {/* Right: actions */}
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3 md:flex-none">
-          <div className="hidden md:flex">
-            <GoogleTranslate />
-          </div>
-          <div className="hidden items-center gap-2 md:flex">
+        <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">
+          {sessionUser ? (
+            <>
+              <Link
+                to={profilePath}
+                className={cn(
+                  authButtonClass,
+                  "border border-white/20 text-white/90 hover:bg-white/10 hover:text-primary",
+                )}
+              >
+                Profile
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={isSigningOut}
+                className={cn(
+                  authButtonClass,
+                  "border border-white/20 text-white/90 hover:bg-white/10 hover:text-primary disabled:opacity-60",
+                )}
+              >
+                {isSigningOut ? "…" : "Log out"}
+              </button>
+            </>
+          ) : (
             <Link
               to="/signin"
               className={cn(
-                "font-nav inline-flex h-9 items-center whitespace-nowrap rounded-md bg-primary px-3.5 text-[13px] font-medium tracking-[0.1em] text-primary-foreground",
-                "transition-colors hover:bg-primary/90",
+                authButtonClass,
+                "border border-white/20 text-white/90 hover:bg-white/10 hover:text-primary",
               )}
             >
               Log in
             </Link>
+          )}
+          <div className="hidden sm:flex">
+            <GoogleTranslate />
           </div>
-          <div className="relative z-[70] md:hidden">
+          <div className="md:hidden">
             <Button
               type="button"
               variant="ghost"
@@ -234,16 +279,54 @@ const SiteHeader = () => {
               ))}
 
               <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => handleMobileNavClick("/signin")}
-                  className={cn(
-                    "font-nav inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-[13px] font-medium tracking-[0.1em] text-primary-foreground",
-                    "transition-colors hover:bg-primary/90",
-                  )}
-                >
-                  Log in
-                </button>
+                {sessionUser ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleMobileNavClick(profilePath)}
+                      className={cn(
+                        "font-nav inline-flex h-10 w-full items-center justify-center rounded-md border border-border/60 px-4 text-[13px] font-medium tracking-[0.1em] text-foreground",
+                        "transition-colors hover:bg-primary/10 hover:text-primary",
+                      )}
+                    >
+                      Profile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={isSigningOut}
+                      className={cn(
+                        "font-nav inline-flex h-10 w-full items-center justify-center rounded-md border border-border/60 px-4 text-[13px] font-medium tracking-[0.1em] text-foreground",
+                        "transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-60",
+                      )}
+                    >
+                      {isSigningOut ? "Signing out…" : "Log out"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleMobileNavClick("/signin")}
+                      className={cn(
+                        "font-nav inline-flex h-10 w-full items-center justify-center rounded-md border border-border/60 px-4 text-[13px] font-medium tracking-[0.1em] text-foreground",
+                        "transition-colors hover:bg-primary/10 hover:text-primary",
+                      )}
+                    >
+                      Log in
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMobileNavClick("/signup")}
+                      className={cn(
+                        "font-nav inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-[13px] font-medium tracking-[0.1em] text-primary-foreground",
+                        "transition-colors hover:bg-primary/90",
+                      )}
+                    >
+                      Sign up
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </aside>

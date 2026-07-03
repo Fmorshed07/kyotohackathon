@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { collection, doc, getDocs, setDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { JudgeDashboard } from "@/components/dashboard/JudgeDashboard";
+import { fetchSubmissionsForHackathon, getHackathonById, SITE_HACKATHON_ID } from "@/lib/hackathons";
 import type { Submission } from "@/types/portal";
 import {
   JUDGING_CRITERIA,
@@ -16,6 +17,7 @@ import {
 export default function JudgeDashboardPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
+  const selectedHackathon = getHackathonById(SITE_HACKATHON_ID);
 
   const [judgeSubmissions, setJudgeSubmissions] = useState<Submission[]>([]);
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
@@ -44,15 +46,13 @@ export default function JudgeDashboardPage() {
   };
 
   useEffect(() => {
-    if (!sessionUser || sessionUser.role !== "judge") return;
+    if (!sessionUser || (sessionUser.role !== "judge" && sessionUser.role !== "mentor")) return;
 
-    const loadAllSubmissions = async () => {
+    const loadKyotoSubmissions = async () => {
       setIsLoadingSubmissions(true);
       try {
-        const submissionsRef = collection(db, "submissions");
-        const snapshot = await getDocs(submissionsRef);
-        const submissions: Submission[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as Omit<Submission, "id">;
+        const submissions = await fetchSubmissionsForHackathon(db, SITE_HACKATHON_ID);
+        const mappedSubmissions: Submission[] = submissions.map((data) => {
           const judgeScore = sessionUser ? data.judge_scores?.[sessionUser.id] : undefined;
           const judgeNotes = sessionUser ? data.judge_notes_by_judge?.[sessionUser.id] : undefined;
           const judgeCriteriaScores = sessionUser
@@ -60,7 +60,7 @@ export default function JudgeDashboardPage() {
             : undefined;
           const criteriaScores = judgeCriteriaScores ?? data.judge_criteria_scores ?? null;
           return {
-            id: docSnap.id,
+            id: data.id,
             ...data,
             judge_score:
               criteriaScores && typeof criteriaScores === "object"
@@ -72,31 +72,33 @@ export default function JudgeDashboardPage() {
             judge_criteria_scores: criteriaScores,
           };
         });
-        setJudgeSubmissions(submissions);
+        setJudgeSubmissions(mappedSubmissions);
       } finally {
         setIsLoadingSubmissions(false);
       }
     };
 
-    void loadAllSubmissions();
+    void loadKyotoSubmissions();
   }, [sessionUser, db]);
 
+  const filteredJudgeSubmissions = judgeSubmissions;
+
   const judgeSummary = useMemo(() => {
-    if (!judgeSubmissions.length) {
+    if (!filteredJudgeSubmissions.length) {
       return { total: 0, scored: 0, averageScore: null as number | null };
     }
-    const scoredSubmissions = judgeSubmissions.filter((s) => getCurrentJudgeScore(s) !== null);
+    const scoredSubmissions = filteredJudgeSubmissions.filter((s) => getCurrentJudgeScore(s) !== null);
     const scoredCount = scoredSubmissions.length;
     const averageScore =
       scoredCount === 0
         ? null
         : scoredSubmissions.reduce((sum, s) => sum + (getCurrentJudgeScore(s) ?? 0), 0) / scoredCount;
     return {
-      total: judgeSubmissions.length,
+      total: filteredJudgeSubmissions.length,
       scored: scoredCount,
       averageScore,
     };
-  }, [judgeSubmissions, sessionUser]);
+  }, [filteredJudgeSubmissions, sessionUser]);
 
   const handleJudgeNotesChange = (id: string, value: string) => {
     setJudgeSubmissions((current) =>
@@ -214,22 +216,27 @@ export default function JudgeDashboardPage() {
     return <Navigate to="/signin" replace />;
   }
 
-  if (sessionUser.role === "judge" && sessionUser.judgeApprovalStatus === "pending") {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  if (sessionUser.role === "participant") {
+  if (sessionUser.role === "judge" || sessionUser.role === "mentor") {
+    if (sessionUser.judgeApprovalStatus === "pending") {
+      return <Navigate to="/dashboard" replace />;
+    }
+  } else if (sessionUser.role === "participant") {
     return <Navigate to="/dashboard/participant" replace />;
-  }
-
-  if (sessionUser.role !== "judge") {
+  } else {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const layoutRole = sessionUser.role === "mentor" ? "mentor" : "judge";
 
   return (
-    <DashboardLayout sessionUser={sessionUser} role="judge" onSignOut={signOut}>
+    <DashboardLayout
+      sessionUser={sessionUser}
+      role={layoutRole}
+      onSignOut={signOut}
+    >
       <JudgeDashboard
-        submissions={judgeSubmissions}
+        selectedHackathon={selectedHackathon}
+        submissions={filteredJudgeSubmissions}
         isLoadingSubmissions={isLoadingSubmissions}
         judgeMessage={judgeMessage}
         summary={judgeSummary}

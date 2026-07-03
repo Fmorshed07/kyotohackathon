@@ -12,13 +12,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
+import {
+  ensureAdminUserRecord,
+  isReservedAdminUsername,
+  normalizePortalRole,
+  resolveAdminSignInEmail,
+  signInOrCreateReservedAdmin,
+} from "@/lib/adminAuth";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 
 const sectionClass =
   "rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm shadow-lg shadow-black/10";
-
-const getDashboardPathForCurrentRole = (role?: string) =>
-  role === "admin" ? "/dashboard/admin" : role === "judge" ? "/dashboard/judge" : "/dashboard/participant";
 
 export default function AdminSignIn() {
   const navigate = useNavigate();
@@ -26,28 +30,30 @@ export default function AdminSignIn() {
   const db = getFirestoreDb();
   const { sessionUser, loading: authLoading } = usePortalAuth();
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (authLoading || !sessionUser?.role) return;
-    navigate(getDashboardPathForCurrentRole(sessionUser.role), { replace: true });
+    if (authLoading) return;
+    if (sessionUser?.role === "admin") {
+      navigate("/dashboard/admin", { replace: true });
+    }
   }, [authLoading, sessionUser, navigate]);
 
   const ensureAdminOrReject = async () => {
     const user = auth.currentUser;
     if (!user) return false;
     const userSnap = await getDoc(doc(db, "users", user.uid));
-    const role = userSnap.data()?.role;
+    const role = normalizePortalRole(userSnap.data()?.role);
     if (role === "admin") {
       navigate("/dashboard/admin", { replace: true });
       return true;
     }
 
     await firebaseSignOut(auth);
-    setAuthError("Admin access only. Please use /signin for participant or judge access.");
+    setAuthError("Admin access only. Use /signin for participant or mentor accounts.");
     return false;
   };
 
@@ -69,15 +75,38 @@ export default function AdminSignIn() {
     }
   };
 
-  const handleEmailSignIn = async () => {
+  const handleCredentialSignIn = async () => {
     setIsAuthLoading(true);
     setAuthError(null);
     try {
-      if (!email || !password) {
-        setAuthError("Please enter both email and password.");
+      if (!username || !password) {
+        setAuthError("Please enter both username and password.");
         return;
       }
-      await signInWithEmailAndPassword(auth, email, password);
+
+      const email = resolveAdminSignInEmail(username);
+      if (!email) {
+        setAuthError("Please enter a valid username or email.");
+        return;
+      }
+
+      const usingReservedAdminUsername = isReservedAdminUsername(username);
+
+      if (auth.currentUser) {
+        await firebaseSignOut(auth);
+      }
+
+      if (usingReservedAdminUsername) {
+        await signInOrCreateReservedAdmin(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+
+      const user = auth.currentUser;
+      if (user && usingReservedAdminUsername) {
+        await ensureAdminUserRecord(db, user.uid, email);
+      }
+
       await ensureAdminOrReject();
     } catch (error: unknown) {
       const message =
@@ -113,8 +142,19 @@ export default function AdminSignIn() {
           <p className="text-xs uppercase tracking-[0.3em] text-primary/70">Impact Kyoto</p>
           <h1 className="font-display text-2xl tracking-[0.18em] uppercase md:text-3xl">Admin Sign In</h1>
           <p className="max-w-xl text-sm text-muted-foreground">
-            This page is restricted to admin accounts only.
+            This page is restricted to admin accounts only. Participant and mentor sign-in is at{" "}
+            <a href="/signin" className="text-primary underline underline-offset-4">
+              /signin
+            </a>
+            .
           </p>
+          {sessionUser && sessionUser.role !== "admin" ? (
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90">
+              You are signed in as {sessionUser.email}
+              {sessionUser.role ? ` (${sessionUser.role})` : ""}. Admin sign-in will switch to an admin
+              account.
+            </p>
+          ) : null}
         </section>
 
         <section className={sectionClass} aria-labelledby="admin-auth-heading">
@@ -139,19 +179,20 @@ export default function AdminSignIn() {
               </Button>
 
               <p className="text-center text-[0.7rem] text-muted-foreground">
-                or use admin email and password
+                or use admin username and password
               </p>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-                    Email
+                    Username
                   </label>
                   <Input
-                    type="email"
-                    placeholder="admin@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text"
+                    placeholder="admin"
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -161,8 +202,14 @@ export default function AdminSignIn() {
                   <Input
                     type="password"
                     placeholder="••••••••"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        void handleCredentialSignIn();
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -171,7 +218,7 @@ export default function AdminSignIn() {
 
               <div className="flex justify-end border-t border-border/40 pt-4">
                 <Button
-                  onClick={handleEmailSignIn}
+                  onClick={handleCredentialSignIn}
                   disabled={isAuthLoading}
                   className="tracking-[0.24em] uppercase"
                 >

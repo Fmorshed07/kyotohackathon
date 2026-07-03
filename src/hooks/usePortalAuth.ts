@@ -10,6 +10,7 @@ const normalizePortalRole = (value: unknown): PortalRole | undefined => {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim().toLowerCase();
   if (normalized === "judge" || normalized === "judges") return "judge";
+  if (normalized === "mentor" || normalized === "mentors") return "mentor";
   if (normalized === "participant" || normalized === "participants") return "participant";
   if (normalized === "admin" || normalized === "admins") return "admin";
   return undefined;

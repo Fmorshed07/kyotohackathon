@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -9,6 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
+import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
+import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import type { Submission } from "@/types/portal";
 
 const ensureAbsoluteUrl = (value: string) => {
@@ -85,8 +88,15 @@ export function ParticipantDashboard({
   isSubmittingProject,
   onSave,
 }: ParticipantDashboardProps) {
+  const [submissionSearchQuery, setSubmissionSearchQuery] = useState("");
   const normalizedPdfUrl = ensureAbsoluteUrl(participantForm.submissionPdfUrl);
   const pdfPreviewUrl = toPdfPreviewUrl(participantForm.submissionPdfUrl);
+  const filteredParticipantSubmissions = useMemo(() => {
+    if (!submissionSearchQuery.trim()) return participantSubmissions;
+    return participantSubmissions.filter((submission) =>
+      submissionMatchesSearch(submissionSearchQuery, submission)
+    );
+  }, [participantSubmissions, submissionSearchQuery]);
 
   return (
     <div className="space-y-8" id="overview">
@@ -126,18 +136,29 @@ export function ParticipantDashboard({
             <p className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
               Edit your submission
             </p>
-            <Select value={activeSubmissionId} onValueChange={onSelectSubmission}>
-              <SelectTrigger className="max-w-lg">
-                <SelectValue placeholder="Select submission" />
-              </SelectTrigger>
-              <SelectContent>
-                {participantSubmissions.map((submission) => (
-                  <SelectItem key={submission.id} value={submission.id}>
-                    {submission.title?.trim() || `Untitled submission (${submission.id.slice(0, 8)})`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SubmissionSearchInput
+              value={submissionSearchQuery}
+              onChange={setSubmissionSearchQuery}
+              placeholder="Search your submissions..."
+              className="mb-3 max-w-lg"
+            />
+            {filteredParticipantSubmissions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No submissions match your search.</p>
+            ) : (
+              <Select value={activeSubmissionId} onValueChange={onSelectSubmission}>
+                <SelectTrigger className="max-w-lg">
+                  <SelectValue placeholder="Select submission" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredParticipantSubmissions.map((submission) => (
+                    <SelectItem key={submission.id} value={submission.id}>
+                      {submission.title?.trim() || `Untitled submission (${submission.id.slice(0, 8)})`}
+                      {submission.team_name?.trim() ? ` — ${submission.team_name.trim()}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         ) : null}
       </section>
