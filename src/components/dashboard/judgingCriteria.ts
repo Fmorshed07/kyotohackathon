@@ -3,36 +3,46 @@ export const JUDGING_CRITERIA = [
     id: "social_impact",
     title: "Social Impact & Problem Fit",
     weight: 25,
-    description:
-      "Problem clarity, real-world relevance, and meaningful societal or industry impact.",
+    questions: [
+      "Is the problem clearly defined and relevant to real-world challenges?",
+      "Does the solution create meaningful impact for society, communities, or industries?",
+    ],
   },
   {
     id: "innovation",
     title: "Innovation & Idea Quality",
     weight: 20,
-    description:
-      "Creativity, differentiation from existing solutions, and novelty of the concept.",
+    questions: [
+      "Is the idea creative and different from existing solutions?",
+      "Does the project present a novel way of using AI to solve the problem?",
+    ],
   },
   {
     id: "implementation",
     title: "Technical Implementation",
     weight: 20,
-    description:
-      "Prototype functionality plus logical, feasible system design and execution quality.",
+    questions: [
+      "Does the team demonstrate a functional prototype or technical concept?",
+      "Is the system design logical and feasible?",
+    ],
   },
   {
-    id: "ai_usage",
-    title: "Use of AI Tools",
+    id: "investment_scalability",
+    title: "Investment Potential & Scalability",
     weight: 20,
-    description:
-      "Meaningful AI integration and effective use of tools like Alibaba Cloud, Lovable, n8n, or similar.",
+    questions: [
+      "Does the solution have the potential to become a scalable product, startup, or business?",
+      "Is the project venture backable and attractive for future investment?",
+    ],
   },
   {
     id: "demo",
     title: "Demo & Presentation",
     weight: 15,
-    description:
-      "Clear communication of problem, solution, and impact with an effective demo of core features.",
+    questions: [
+      "Is the problem, solution, and impact clearly communicated?",
+      "Does the demo effectively showcase the core functionality of the project?",
+    ],
   },
 ] as const;
 
@@ -48,4 +58,3 @@ export const calculateTotalFromCriteria = (criteriaScores: CriteriaScores) =>
     const score = criteriaScores?.[criterion.id];
     return sum + (typeof score === "number" ? clampCriterionScore(score, criterion.weight) : 0);
   }, 0);
-

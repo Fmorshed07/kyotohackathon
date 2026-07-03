@@ -9,7 +9,7 @@ import {
   type AdminSubmissionRow,
   type AdminUser,
 } from "@/components/dashboard/AdminDashboard";
-import { fetchSubmissionsForHackathon, HACKATHON_STORAGE_KEYS, PORTAL_HACKATHONS } from "@/lib/hackathons";
+import { fetchSubmissionsForHackathon, filterUsersForHackathon, getUserHackathonId, HACKATHON_STORAGE_KEYS, PORTAL_HACKATHONS } from "@/lib/hackathons";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import type { JudgeApprovalStatus, PortalRole, Submission } from "@/types/portal";
 
@@ -78,6 +78,7 @@ export default function AdminDashboardPage() {
               email: data.email,
               role,
               judgeApprovalStatus,
+              hackathonId: getUserHackathonId({ hackathon_id: data.hackathon_id }),
             };
           })
           .filter((user): user is AdminUser => user !== null);
@@ -120,14 +121,24 @@ export default function AdminDashboardPage() {
     return userEmailLookup[identifier] ?? userEmailLookup[normalizedIdentifier] ?? null;
   };
 
-  const participantById = users
+  const hackathonUsers = useMemo(
+    () =>
+      filterUsersForHackathon(
+        users.map((user) => ({ ...user, hackathon_id: user.hackathonId })),
+        selectedHackathonId,
+        submissions
+      ),
+    [users, selectedHackathonId, submissions]
+  );
+
+  const participantById = hackathonUsers
     .filter((user) => user.role === "participant")
     .reduce<Record<string, AdminUser>>((acc, user) => {
       acc[user.id] = user;
       return acc;
     }, {});
 
-  const judgeById = users
+  const judgeById = hackathonUsers
     .filter((user) => isStaffRole(user.role))
     .reduce<Record<string, AdminUser>>((acc, user) => {
       acc[user.id] = user;
@@ -193,7 +204,7 @@ export default function AdminDashboardPage() {
           const right = b.averageScore ?? -1;
           return right - left;
         }),
-    [submissions, users, userEmailLookup]
+    [submissions, hackathonUsers, userEmailLookup]
   );
 
   const scoredRows = adminSubmissionRows.filter((row) => row.averageScore != null);
@@ -388,7 +399,7 @@ export default function AdminDashboardPage() {
     >
       <AdminDashboard
         selectedHackathon={selectedHackathon}
-        users={users}
+        users={hackathonUsers}
         isLoadingUsers={isLoadingUsers}
         submissions={adminSubmissionRows}
         isLoadingSubmissions={isLoadingSubmissions}

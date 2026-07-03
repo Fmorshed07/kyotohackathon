@@ -104,7 +104,7 @@ const CRITERION_ACCENT_STYLES: Record<JudgingCriterionId, CriterionAccentStyle> 
     inactiveButton: "border-emerald-500/35 bg-background hover:border-emerald-400/55 hover:bg-emerald-500/10",
     input: "border-emerald-500/35 focus-visible:ring-emerald-500/40",
   },
-  ai_usage: {
+  investment_scalability: {
     card: "border-amber-500/35 bg-amber-500/5",
     pill: "border-amber-400/40 bg-amber-500/15 text-amber-200",
     activeButton: "border-amber-400 bg-amber-500 text-amber-950",
@@ -491,16 +491,16 @@ export function JudgeDashboard({
         id="submissions"
         aria-labelledby="scoring-heading"
       >
-        <div className="border-b border-border/40 px-6 py-6 sm:px-8 sm:py-7">
+        <div className="border-b border-border/40 px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2
                 id="scoring-heading"
-                className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+                className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl md:text-3xl"
               >
                 Submissions & live scoring
               </h2>
-              <p className="mt-2 text-base text-muted-foreground">
+              <p className="mt-2 text-sm text-muted-foreground sm:text-base">
                 Score projects by weighted criteria, then save total points and notes.
               </p>
             </div>
@@ -509,7 +509,7 @@ export function JudgeDashboard({
             </span>
           </div>
         </div>
-        <div className="p-5 sm:p-8">
+        <div className="p-4 sm:p-5 md:p-8">
           {isLoadingSubmissions ? (
             <p className="text-sm text-muted-foreground">
               Loading submissions…
@@ -535,7 +535,7 @@ export function JudgeDashboard({
                   return (
                     <article
                       key={submission.id}
-                      className={`space-y-5 rounded-2xl border p-5 ${ideaAccent.panel}`}
+                      className={`space-y-5 rounded-2xl border p-4 sm:p-5 ${ideaAccent.panel}`}
                     >
                       <div className="space-y-2">
                         <span
@@ -593,27 +593,40 @@ export function JudgeDashboard({
                           return (
                             <div
                               key={criterion.id}
-                              className={`rounded-xl border p-3 ${criterionAccent.card}`}
+                              className={`rounded-xl border p-3.5 sm:p-4 ${criterionAccent.card}`}
                             >
-                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-sm font-semibold text-foreground">{criterion.title}</p>
+                              <div className="mb-2 flex items-start justify-between gap-2">
+                                <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">
+                                  {criterion.title}
+                                </p>
                                 <span
-                                  className={`rounded-full border px-2.5 py-0.5 text-sm font-medium ${criterionAccent.pill}`}
+                                  className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium sm:text-sm ${criterionAccent.pill}`}
                                 >
                                   {activeScore ?? 0}/{criterion.weight}
                                 </span>
                               </div>
-                              <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
-                                {criterion.description}
-                              </p>
-                              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                              <ul className="mb-3 space-y-2">
+                                {criterion.questions.map((question) => (
+                                  <li
+                                    key={question}
+                                    className="flex gap-2 text-xs leading-relaxed text-muted-foreground sm:text-sm"
+                                  >
+                                    <span
+                                      className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/60"
+                                      aria-hidden
+                                    />
+                                    <span className="min-w-0 flex-1">{question}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                              <div className="mb-2 grid grid-cols-3 gap-1.5">
                                 {scoreStops.map((value) => {
                                   const isActive = activeScore === value;
                                   return (
                                     <button
                                       key={`${criterion.id}-${value}`}
                                       type="button"
-                                      className={`h-9 min-w-12 rounded-md border px-2 text-sm font-semibold transition ${
+                                      className={`h-10 w-full rounded-md border text-sm font-semibold transition sm:h-9 sm:min-w-12 sm:w-auto ${
                                         isActive
                                           ? `${criterionAccent.activeButton} shadow-sm`
                                           : criterionAccent.inactiveButton
@@ -627,11 +640,12 @@ export function JudgeDashboard({
                                   );
                                 })}
                               </div>
-                              <div className="flex justify-end">
+                              <div className="flex justify-stretch sm:justify-end">
                                 <Input
                                   type="number"
                                   min={0}
                                   max={criterion.weight}
+                                  inputMode="numeric"
                                   value={activeScore ?? ""}
                                   onChange={(e) => {
                                     const raw = e.target.value.trim();
@@ -647,7 +661,7 @@ export function JudgeDashboard({
                                       clampCriterionScore(parsed, criterion.weight)
                                     );
                                   }}
-                                  className={`h-9 w-28 text-right text-sm ${criterionAccent.input}`}
+                                  className={`h-10 w-full text-base sm:h-9 sm:w-28 sm:text-right sm:text-sm ${criterionAccent.input}`}
                                 />
                               </div>
                             </div>
@@ -790,9 +804,16 @@ export function JudgeDashboard({
                                         {activeScore ?? 0}/{criterion.weight}
                                       </span>
                                     </div>
-                                    <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
-                                      {criterion.description}
-                                    </p>
+                                    <ul className="mb-3 space-y-1.5">
+                                      {criterion.questions.map((question) => (
+                                        <li
+                                          key={question}
+                                          className="text-sm leading-relaxed text-muted-foreground"
+                                        >
+                                          {question}
+                                        </li>
+                                      ))}
+                                    </ul>
                                     <div className="mb-2 flex flex-wrap items-center gap-1.5">
                                       {scoreStops.map((value) => {
                                         const isActive = activeScore === value;

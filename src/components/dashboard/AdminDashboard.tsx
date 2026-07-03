@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/select";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
-import type { PortalHackathon } from "@/lib/hackathons";
+import type { PortalHackathon, HackathonId } from "@/lib/hackathons";
+import { getHackathonById } from "@/lib/hackathons";
 import type { JudgeApprovalStatus, PortalRole } from "@/types/portal";
 
 export type AdminUser = {
@@ -27,6 +28,7 @@ export type AdminUser = {
   email: string;
   role: PortalRole;
   judgeApprovalStatus?: JudgeApprovalStatus;
+  hackathonId?: HackathonId | null;
 };
 
 export type AdminSubmissionRow = {
@@ -103,6 +105,7 @@ function UserManagementTable({
   users,
   title,
   description,
+  emptyMessage,
   sectionId,
   savingUserId,
   pendingRoles,
@@ -113,6 +116,7 @@ function UserManagementTable({
   users: AdminUser[];
   title: string;
   description: string;
+  emptyMessage: string;
   sectionId: string;
   savingUserId: string | null;
   pendingRoles: Record<string, PortalRole>;
@@ -131,7 +135,7 @@ function UserManagementTable({
       <div className="p-4 sm:p-6">
         {users.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-12 text-center text-sm text-muted-foreground">
-            No users found in this group.
+            {emptyMessage}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-border/40">
@@ -139,6 +143,9 @@ function UserManagementTable({
               <TableHeader>
                 <TableRow className="border-border/50 hover:bg-transparent">
                   <TableHead className="text-xs uppercase tracking-[0.22em]">Email</TableHead>
+                  <TableHead className="w-[110px] text-xs uppercase tracking-[0.22em]">
+                    Event
+                  </TableHead>
                   <TableHead className="w-[140px] text-xs uppercase tracking-[0.22em]">
                     Current Role
                   </TableHead>
@@ -161,6 +168,19 @@ function UserManagementTable({
                   return (
                     <TableRow key={user.id} className="border-border/40">
                       <TableCell className="text-sm">{user.email}</TableCell>
+                      <TableCell>
+                        {user.role === "admin" ? (
+                          <Badge variant="outline" className="text-[0.65rem] uppercase tracking-[0.12em]">
+                            All events
+                          </Badge>
+                        ) : user.hackathonId ? (
+                          <Badge variant="secondary" className="text-[0.65rem] uppercase tracking-[0.12em]">
+                            {getHackathonById(user.hackathonId).shortName}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={roleBadgeVariant[selectedRole]} className="uppercase tracking-[0.14em]">
                           {user.role}
@@ -259,6 +279,17 @@ export function AdminDashboard({
     .map((entry) => entry.title || entry.participantEmail || "Untitled Project")
     .join(", ");
 
+  useEffect(() => {
+    setNewSubmission({
+      participantId: "",
+      title: "",
+      shortDescription: "",
+      projectUrl: "",
+      submissionPdfUrl: "",
+      demoVideoUrl: "",
+    });
+  }, [selectedHackathon.id]);
+
   return (
     <div className="space-y-8" id="overview">
       <HackathonContextBanner hackathon={selectedHackathon} role="admin" />
@@ -271,7 +302,7 @@ export function AdminDashboard({
               Admin overview
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Manage users globally and review submissions for {selectedHackathon.shortName}.
+              Users and submissions scoped to {selectedHackathon.name}.
             </p>
           </div>
           <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-auto lg:gap-4">
@@ -602,8 +633,9 @@ export function AdminDashboard({
         <>
           <UserManagementTable
             users={users}
-            title="All users"
-            description="Complete account list across participant, judge, and admin roles."
+            title={`All users · ${selectedHackathon.shortName}`}
+            description={`Accounts linked to ${selectedHackathon.name} via signup, submissions, or judging activity.`}
+            emptyMessage={`No users linked to ${selectedHackathon.name} yet.`}
             sectionId="manage-all-users"
             savingUserId={savingUserId}
             pendingRoles={pendingRoles}
@@ -613,8 +645,9 @@ export function AdminDashboard({
           />
           <UserManagementTable
             users={participants}
-            title="Manage participants"
-            description="Review participant accounts and change roles when needed."
+            title={`Participants · ${selectedHackathon.shortName}`}
+            description={`Participant accounts for ${selectedHackathon.name}.`}
+            emptyMessage={`No participants for ${selectedHackathon.name} yet.`}
             sectionId="manage-participants"
             savingUserId={savingUserId}
             pendingRoles={pendingRoles}
@@ -624,8 +657,9 @@ export function AdminDashboard({
           />
           <UserManagementTable
             users={staff}
-            title="Manage mentors & judges"
-            description="Review mentor and judge accounts and update access permissions."
+            title={`Mentors & judges · ${selectedHackathon.shortName}`}
+            description={`Mentor and judge accounts for ${selectedHackathon.name}.`}
+            emptyMessage={`No mentors or judges for ${selectedHackathon.name} yet.`}
             sectionId="manage-judges"
             savingUserId={savingUserId}
             pendingRoles={pendingRoles}

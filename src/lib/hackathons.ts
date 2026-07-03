@@ -121,3 +121,52 @@ export const HACKATHON_STORAGE_KEYS = {
   admin: "portal_selected_hackathon_admin",
   judge: "portal_selected_hackathon_judge",
 } as const;
+
+export type HackathonUserRef = {
+  id: string;
+  role: string;
+  hackathon_id?: string | null;
+};
+
+export const getUserHackathonId = (
+  user: Pick<HackathonUserRef, "hackathon_id">
+): HackathonId => {
+  if (user.hackathon_id && isHackathonId(user.hackathon_id)) {
+    return user.hackathon_id;
+  }
+  return LEGACY_HACKATHON_ID;
+};
+
+export const filterUsersForHackathon = <T extends HackathonUserRef>(
+  users: T[],
+  hackathonId: HackathonId,
+  submissions: Submission[]
+): T[] => {
+  const hackathonSubmissions = filterSubmissionsByHackathon(submissions, hackathonId);
+  const participantIds = new Set(
+    hackathonSubmissions.map((submission) => submission.user_id).filter(Boolean)
+  );
+  const judgeIds = new Set(
+    hackathonSubmissions.flatMap((submission) => Object.keys(submission.judge_scores ?? {}))
+  );
+
+  return users.filter((user) => {
+        if (user.role === "admin") {
+      return true;
+    }
+
+    if (getUserHackathonId(user) === hackathonId) {
+      return true;
+    }
+
+    if (participantIds.has(user.id)) {
+      return true;
+    }
+
+    if (judgeIds.has(user.id)) {
+      return true;
+    }
+
+    return false;
+  });
+};

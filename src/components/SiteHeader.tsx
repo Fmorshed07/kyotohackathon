@@ -14,7 +14,7 @@ const navSections: { title: string; links: NavLink[] }[] = [
     title: "Event",
     links: [
       { label: "About", href: "#about" },
-      { label: "Agentic AI", href: "#why-agentic-ai" },
+      { label: "Judging", href: "#judging-criteria" },
       { label: "Challenges", href: "#challenges" },
       { label: "Timeline", href: "#timeline" },
     ],

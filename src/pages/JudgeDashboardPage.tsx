@@ -6,6 +6,11 @@ import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { JudgeDashboard } from "@/components/dashboard/JudgeDashboard";
 import { fetchSubmissionsForHackathon, getHackathonById, SITE_HACKATHON_ID } from "@/lib/hackathons";
+import {
+  buildJudgeScoreFirestoreUpdate,
+  getJudgeTotalScoreForJudge,
+  mapSubmissionForJudge,
+} from "@/lib/judgeSubmissionScores";
 import type { Submission } from "@/types/portal";
 import {
   JUDGING_CRITERIA,
@@ -23,27 +28,7 @@ export default function JudgeDashboardPage() {
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [judgeMessage, setJudgeMessage] = useState<string | null>(null);
 
-  const getCurrentJudgeCriteriaScores = (submission: Submission) => {
-    if (!sessionUser) return submission.judge_criteria_scores ?? null;
-    const criteriaFromMap = submission.judge_criteria_scores_by_judge?.[sessionUser.id];
-    if (criteriaFromMap && typeof criteriaFromMap === "object") {
-      return criteriaFromMap;
-    }
-    return submission.judge_criteria_scores ?? null;
-  };
-
-  const getCurrentJudgeScore = (submission: Submission) => {
-    const criteriaScores = getCurrentJudgeCriteriaScores(submission);
-    if (criteriaScores) {
-      return calculateTotalFromCriteria(criteriaScores);
-    }
-    if (!sessionUser) return submission.judge_score ?? null;
-    const scoreFromMap = submission.judge_scores?.[sessionUser.id];
-    if (typeof scoreFromMap === "number") {
-      return scoreFromMap;
-    }
-    return submission.judge_score ?? null;
-  };
+  const judgeId = sessionUser?.id ?? "";
 
   useEffect(() => {
     if (!sessionUser || (sessionUser.role !== "judge" && sessionUser.role !== "mentor")) return;
@@ -52,26 +37,15 @@ export default function JudgeDashboardPage() {
       setIsLoadingSubmissions(true);
       try {
         const submissions = await fetchSubmissionsForHackathon(db, SITE_HACKATHON_ID);
-        const mappedSubmissions: Submission[] = submissions.map((data) => {
-          const judgeScore = sessionUser ? data.judge_scores?.[sessionUser.id] : undefined;
-          const judgeNotes = sessionUser ? data.judge_notes_by_judge?.[sessionUser.id] : undefined;
-          const judgeCriteriaScores = sessionUser
-            ? data.judge_criteria_scores_by_judge?.[sessionUser.id]
-            : undefined;
-          const criteriaScores = judgeCriteriaScores ?? data.judge_criteria_scores ?? null;
-          return {
-            id: data.id,
-            ...data,
-            judge_score:
-              criteriaScores && typeof criteriaScores === "object"
-                ? calculateTotalFromCriteria(criteriaScores)
-                : typeof judgeScore === "number"
-                  ? judgeScore
-                  : data.judge_score,
-            judge_notes: typeof judgeNotes === "string" ? judgeNotes : data.judge_notes,
-            judge_criteria_scores: criteriaScores,
-          };
-        });
+        const mappedSubmissions: Submission[] = submissions.map((data) =>
+          mapSubmissionForJudge(
+            {
+              id: data.id,
+              ...data,
+            },
+            sessionUser.id
+          )
+        );
         setJudgeSubmissions(mappedSubmissions);
       } finally {
         setIsLoadingSubmissions(false);
@@ -84,32 +58,41 @@ export default function JudgeDashboardPage() {
   const filteredJudgeSubmissions = judgeSubmissions;
 
   const judgeSummary = useMemo(() => {
-    if (!filteredJudgeSubmissions.length) {
+    if (!judgeId || !filteredJudgeSubmissions.length) {
       return { total: 0, scored: 0, averageScore: null as number | null };
     }
-    const scoredSubmissions = filteredJudgeSubmissions.filter((s) => getCurrentJudgeScore(s) !== null);
+    const scoredSubmissions = filteredJudgeSubmissions.filter(
+      (submission) => getJudgeTotalScoreForJudge(submission, judgeId) !== null
+    );
     const scoredCount = scoredSubmissions.length;
     const averageScore =
       scoredCount === 0
         ? null
-        : scoredSubmissions.reduce((sum, s) => sum + (getCurrentJudgeScore(s) ?? 0), 0) / scoredCount;
+        : scoredSubmissions.reduce(
+            (sum, submission) => sum + (getJudgeTotalScoreForJudge(submission, judgeId) ?? 0),
+            0
+          ) / scoredCount;
     return {
       total: filteredJudgeSubmissions.length,
       scored: scoredCount,
       averageScore,
     };
-  }, [filteredJudgeSubmissions, sessionUser]);
+  }, [filteredJudgeSubmissions, judgeId]);
 
   const handleJudgeNotesChange = (id: string, value: string) => {
+    if (!sessionUser) return;
     setJudgeSubmissions((current) =>
-      current.map((s) =>
-        s.id === id
-          ? {
-              ...s,
-              judge_notes: value,
-            }
-          : s
-      )
+      current.map((submission) => {
+        if (submission.id !== id) return submission;
+        return {
+          ...submission,
+          judge_notes: value,
+          judge_notes_by_judge: {
+            ...(submission.judge_notes_by_judge ?? {}),
+            [sessionUser.id]: value,
+          },
+        };
+      })
     );
   };
 
@@ -118,6 +101,7 @@ export default function JudgeDashboardPage() {
     criterionId: JudgingCriterionId,
     value: number | null
   ) => {
+    if (!sessionUser) return;
     setJudgeSubmissions((current) =>
       current.map((submission) => {
         if (submission.id !== id) return submission;
@@ -136,6 +120,14 @@ export default function JudgeDashboardPage() {
           ...submission,
           judge_criteria_scores: currentCriteria,
           judge_score: totalScore,
+          judge_scores: {
+            ...(submission.judge_scores ?? {}),
+            [sessionUser.id]: totalScore,
+          },
+          judge_criteria_scores_by_judge: {
+            ...(submission.judge_criteria_scores_by_judge ?? {}),
+            [sessionUser.id]: currentCriteria,
+          },
         };
       })
     );
@@ -154,25 +146,13 @@ export default function JudgeDashboardPage() {
             ? submission.judge_score
             : null;
       const notes = submission.judge_notes ?? "";
+
       await setDoc(
         submissionRef,
-        {
-          judge_score: score,
-          judge_notes: notes,
-          judge_id: sessionUser.id,
-          judge_criteria_scores: criteriaScores,
-          judge_scores: {
-            [sessionUser.id]: score,
-          },
-          judge_notes_by_judge: {
-            [sessionUser.id]: notes,
-          },
-          judge_criteria_scores_by_judge: {
-            [sessionUser.id]: criteriaScores,
-          },
-        },
+        buildJudgeScoreFirestoreUpdate(sessionUser.id, score, notes, criteriaScores),
         { merge: true }
       );
+
       setJudgeSubmissions((current) =>
         current.map((item) =>
           item.id === submission.id
