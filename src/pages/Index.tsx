@@ -14,6 +14,7 @@ import TimelineSection from "@/components/sections/TimelineSection";
 import VolunteerSection from "@/components/sections/VolunteerSection";
 import PartnerWithSection from "@/components/sections/PartnerWithSection";
 import OrganizersPartnersSection from "@/components/sections/OrganizersPartnersSection";
+import CommunitySection from "@/components/sections/CommunitySection";
 import FinalCTASection from "@/components/sections/FinalCTASection";
 
 const Index = () => {
@@ -48,6 +49,7 @@ const Index = () => {
           <VolunteerSection />
           <PartnerWithSection />
           <OrganizersPartnersSection />
+          <CommunitySection />
           <FinalCTASection />
         </main>
       </motion.div>

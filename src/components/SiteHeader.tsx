@@ -25,14 +25,6 @@ const navSections: { title: string; links: NavLink[] }[] = [
       { label: "Who Should Join", href: "#participants" },
       { label: "Experience", href: "#experience" },
       { label: "Why Kyoto", href: "#why-kyoto" },
-      { label: "Volunteer", href: "#volunteer" },
-    ],
-  },
-  {
-    title: "Partners",
-    links: [
-      { label: "Partnerships", href: "#partnerships" },
-      { label: "Organizers", href: "#organizers" },
     ],
   },
 ];
