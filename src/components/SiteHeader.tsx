@@ -71,6 +71,10 @@ const SiteHeader = () => {
       // so they work reliably on mobile and close the sheet.
       if (!href.startsWith("#")) {
         closeMobileNav();
+        if (href === "/" && location.pathname === "/") {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
         navigate(href);
         return;
       }
@@ -111,9 +115,9 @@ const SiteHeader = () => {
   return (
     <>
       <header className="fixed top-0 z-40 w-full border-b border-white/10 bg-[hsl(248_45%_8%_/_0.75)] backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:px-6 lg:gap-3 lg:px-8">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 lg:gap-3 lg:px-8">
         {/* Left: logo */}
-        <div className="flex shrink-0 items-center">
+        <div className="flex min-w-0 shrink-0 items-center">
           <a
             href="/"
             className="font-nav text-[13px] font-medium tracking-[0.2em] text-white/90 transition-colors hover:text-primary"
@@ -154,7 +158,7 @@ const SiteHeader = () => {
         </nav>
 
         {/* Right: actions */}
-        <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center justify-end gap-1.5 sm:gap-2 md:gap-3">
           {sessionUser ? (
             <>
               <Link
@@ -183,7 +187,7 @@ const SiteHeader = () => {
               to="/signin"
               className={cn(
                 authButtonClass,
-                "border border-white/20 text-white/90 hover:bg-white/10 hover:text-primary",
+                "border border-white/20 px-2.5 text-white/90 hover:bg-white/10 hover:text-primary sm:px-3.5",
               )}
             >
               Log in
@@ -247,6 +251,17 @@ const SiteHeader = () => {
             </div>
 
             <div className="relative flex flex-col gap-6 pt-6 pb-6" aria-label="Mobile navigation">
+              <button
+                type="button"
+                onClick={() => handleMobileNavClick("/")}
+                className={cn(
+                  "font-nav inline-flex items-center rounded-md py-2.5 pl-3 pr-4 text-left text-[13px] font-medium tracking-[0.1em]",
+                  "text-foreground/85 transition-colors hover:bg-primary/10 hover:text-primary",
+                )}
+              >
+                Home
+              </button>
+
               {navSections.map((section) => (
                 <nav key={section.title} className="flex flex-col gap-2.5" aria-label={section.title}>
                   <span className="font-nav text-[11px] font-medium tracking-[0.18em] text-muted-foreground">
@@ -269,6 +284,13 @@ const SiteHeader = () => {
                   </div>
                 </nav>
               ))}
+
+              <div className="border-t border-border/40 pt-4 md:hidden">
+                <span className="font-nav mb-2 block text-[11px] font-medium tracking-[0.18em] text-muted-foreground">
+                  Language
+                </span>
+                <GoogleTranslate />
+              </div>
 
               <div className="pt-2">
                 {sessionUser ? (

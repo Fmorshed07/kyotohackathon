@@ -183,8 +183,6 @@
   .dash-content {
     font-family: 'Inter', system-ui, sans-serif;
     @apply text-[15px] leading-relaxed sm:text-base md:text-[17px] lg:text-lg;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
   }
 
   .dash-content [id] {

@@ -117,11 +117,20 @@ function DashboardNavLink({
   children: React.ReactNode;
   onNavigate: () => void;
 }) {
+  const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!href.startsWith("#")) return;
+
+    event.preventDefault();
+    const target = document.getElementById(href.slice(1));
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    onNavigate();
+  };
+
   return (
     <a
       href={href}
       className="flex w-full items-center gap-2"
-      onClick={onNavigate}
+      onClick={handleClick}
     >
       {children}
     </a>
@@ -351,8 +360,8 @@ function DashboardLayoutContent({
           </div>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="dash-ambient min-h-svh min-w-0">
-        <header className="dash-mobile-header sticky top-0 z-30 flex min-h-14 flex-col gap-3 border-b border-white/10 bg-background/90 px-3 py-3 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75 sm:px-4 md:px-6">
+      <SidebarInset className="dash-ambient min-h-0 min-w-0 flex-1">
+        <header className="dash-mobile-header sticky top-0 z-30 flex min-h-14 shrink-0 flex-col gap-3 border-b border-white/10 bg-background/90 px-3 py-3 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75 sm:px-4 md:px-6">
           <div className="flex items-start gap-3">
             <MobileMenuTrigger />
             <div className="min-w-0 flex-1">
@@ -385,7 +394,7 @@ function DashboardLayoutContent({
               />
             )}
         </header>
-        <div className="dash-content min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-4 sm:px-5 sm:py-5 md:px-8 md:py-8">
+        <div className="dash-content px-3 py-4 sm:px-5 sm:py-5 md:px-8 md:py-8">
           <div className="mx-auto w-full max-w-[1400px] space-y-6 sm:space-y-8 md:space-y-10">
             {children}
           </div>
@@ -397,7 +406,7 @@ function DashboardLayoutContent({
 
 export function DashboardLayout(props: DashboardLayoutProps) {
   return (
-    <SidebarProvider>
+    <SidebarProvider className="min-h-svh h-auto">
       <DashboardLayoutContent {...props} />
     </SidebarProvider>
   );
