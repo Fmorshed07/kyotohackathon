@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
@@ -10,6 +10,7 @@ import { fetchSubmissionsForHackathon, getHackathonById, SITE_HACKATHON_ID } fro
 import { canAccessStaffDashboard, isStaffRole } from "@/lib/portalRoutes";
 import { buildJudgeStatistics } from "@/lib/judgingStatistics";
 import {
+  areAllCriteriaScored,
   buildJudgeScoreFirestoreUpdate,
   mapSubmissionForJudge,
   sanitizeCriteriaScores,
@@ -32,6 +33,11 @@ export default function JudgeDashboardPage() {
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [judgeMessage, setJudgeMessage] = useState<string | null>(null);
   const [savingSubmissionId, setSavingSubmissionId] = useState<string | null>(null);
+  const judgeSubmissionsRef = useRef(judgeSubmissions);
+
+  useEffect(() => {
+    judgeSubmissionsRef.current = judgeSubmissions;
+  }, [judgeSubmissions]);
 
   const judgeId = sessionUser?.id ?? "";
 
@@ -146,54 +152,70 @@ export default function JudgeDashboardPage() {
     async (submissionId: string) => {
       if (!sessionUser) return;
 
-      const submission = judgeSubmissions.find((item) => item.id === submissionId);
+      const submission = judgeSubmissionsRef.current.find((item) => item.id === submissionId);
       if (!submission) {
         setJudgeMessage("Could not find this submission. Please refresh and try again.");
         return;
       }
 
+      const criteriaScores = submission.judge_criteria_scores ?? {};
+      const cleanedCriteriaScores = sanitizeCriteriaScores(criteriaScores);
+
+      if (!areAllCriteriaScored(criteriaScores, judgingCriteria)) {
+        setJudgeMessage("Score every criterion before saving.");
+        return;
+      }
+
+      const score = calculateTotalFromCriteria(cleanedCriteriaScores, judgingCriteria);
+      const notes = submission.judge_notes ?? "";
+
       setJudgeMessage(null);
       setSavingSubmissionId(submissionId);
       try {
         const submissionRef = doc(db, "submissions", submission.id);
-        const criteriaScores = submission.judge_criteria_scores ?? {};
-        const cleanedCriteriaScores = sanitizeCriteriaScores(criteriaScores);
-        const score =
-          Object.keys(cleanedCriteriaScores).length > 0
-            ? calculateTotalFromCriteria(cleanedCriteriaScores, judgingCriteria)
-            : typeof submission.judge_score === "number"
-              ? submission.judge_score
-              : null;
-        const notes = submission.judge_notes ?? "";
 
         await updateDoc(
           submissionRef,
-          buildJudgeScoreFirestoreUpdate(sessionUser.id, score, notes, criteriaScores)
+          buildJudgeScoreFirestoreUpdate(sessionUser.id, score, notes, cleanedCriteriaScores)
         );
 
-        setJudgeSubmissions((current) =>
-          current.map((item) =>
-            item.id === submission.id
-              ? {
-                  ...item,
-                  judge_score: score,
-                  judge_scores: {
-                    ...(item.judge_scores ?? {}),
-                    [sessionUser.id]: score,
-                  },
-                  judge_notes_by_judge: {
-                    ...(item.judge_notes_by_judge ?? {}),
-                    [sessionUser.id]: notes,
-                  },
-                  judge_criteria_scores: cleanedCriteriaScores,
-                  judge_criteria_scores_by_judge: {
-                    ...(item.judge_criteria_scores_by_judge ?? {}),
-                    [sessionUser.id]: cleanedCriteriaScores,
-                  },
-                }
-              : item
-          )
-        );
+        const savedSnap = await getDoc(submissionRef);
+        if (savedSnap.exists()) {
+          const remapped = mapSubmissionForJudge(
+            { id: savedSnap.id, ...(savedSnap.data() as Omit<Submission, "id">) },
+            sessionUser.id,
+            judgingCriteria
+          );
+          setJudgeSubmissions((current) =>
+            current.map((item) => (item.id === submissionId ? remapped : item))
+          );
+        } else {
+          setJudgeSubmissions((current) =>
+            current.map((item) =>
+              item.id === submission.id
+                ? {
+                    ...item,
+                    judge_score: score,
+                    judge_notes: notes,
+                    judge_scores: {
+                      ...(item.judge_scores ?? {}),
+                      [sessionUser.id]: score,
+                    },
+                    judge_notes_by_judge: {
+                      ...(item.judge_notes_by_judge ?? {}),
+                      [sessionUser.id]: notes,
+                    },
+                    judge_criteria_scores: cleanedCriteriaScores,
+                    judge_criteria_scores_by_judge: {
+                      ...(item.judge_criteria_scores_by_judge ?? {}),
+                      [sessionUser.id]: cleanedCriteriaScores,
+                    },
+                  }
+                : item
+            )
+          );
+        }
+
         setJudgeMessage("Scores saved.");
       } catch (error: unknown) {
         const message =
@@ -205,7 +227,7 @@ export default function JudgeDashboardPage() {
         setSavingSubmissionId(null);
       }
     },
-    [sessionUser, judgeSubmissions, db, judgingCriteria]
+    [sessionUser, db, judgingCriteria]
   );
 
   if (authLoading) {

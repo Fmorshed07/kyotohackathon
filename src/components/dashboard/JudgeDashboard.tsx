@@ -391,7 +391,7 @@ export function JudgeDashboard({
                               <p className="mt-1 font-medium text-foreground">
                                 {submission.judge_criteria_scores &&
                                 typeof submission.judge_criteria_scores === "object"
-                                  ? `${calculateTotalFromCriteria(submission.judge_criteria_scores)}/100`
+                                  ? `${calculateTotalFromCriteria(submission.judge_criteria_scores, judgingCriteria)}/100`
                                   : submission.judge_score != null
                                     ? `${submission.judge_score}/100`
                                     : "Not scored yet"}

@@ -58,6 +58,7 @@ export type AdminSubmissionRow = {
     judgeEmail: string;
     score: number | null;
     notes: string | null;
+    criteriaScores?: Record<string, number | null>;
   }>;
   averageScore: number | null;
   scoredByCount: number;
@@ -708,7 +709,19 @@ export function AdminDashboard({
                                   {mark.judgeEmail}:{" "}
                                   {mark.score != null ? mark.score.toFixed(1) : "Not scored"}
                                 </p>
-                                {mark.notes ? <p className="line-clamp-2">{mark.notes}</p> : null}
+                                {mark.criteriaScores && judgingCriteria.length > 0 ? (
+                                  <div className="mt-1 space-y-0.5 pl-2">
+                                    {judgingCriteria.map((criterion) => (
+                                      <p key={`${mark.judgeId}-${criterion.id}`}>
+                                        {criterion.title}:{" "}
+                                        {typeof mark.criteriaScores?.[criterion.id] === "number"
+                                          ? `${mark.criteriaScores[criterion.id]}/${criterion.weight}`
+                                          : "—"}
+                                      </p>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {mark.notes ? <p className="mt-1 line-clamp-2">{mark.notes}</p> : null}
                               </div>
                             ))}
                           </div>

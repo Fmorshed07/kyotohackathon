@@ -74,7 +74,7 @@ export function mapSubmissionForJudge(
 }
 
 export function sanitizeCriteriaScores(
-  criteriaScores: Record<string, number | null>
+  criteriaScores: Record<string, number | null | undefined>
 ): Record<string, number> {
   return Object.fromEntries(
     Object.entries(criteriaScores).filter(
@@ -83,11 +83,18 @@ export function sanitizeCriteriaScores(
   );
 }
 
+export function areAllCriteriaScored(
+  criteriaScores: Record<string, number | null | undefined>,
+  criteria: JudgingCriterion[]
+): boolean {
+  return criteria.every((criterion) => typeof criteriaScores[criterion.id] === "number");
+}
+
 export function buildJudgeScoreFirestoreUpdate(
   judgeId: string,
   score: number | null,
   notes: string,
-  criteriaScores: Record<string, number | null>
+  criteriaScores: Record<string, number | null | undefined>
 ): Record<string, unknown> {
   const cleanedCriteriaScores = sanitizeCriteriaScores(criteriaScores);
 

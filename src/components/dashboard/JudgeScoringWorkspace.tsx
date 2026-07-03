@@ -30,9 +30,9 @@ type JudgeScoringWorkspaceProps = {
   savingSubmissionId?: string | null;
 };
 
-function getSubmissionTotal(submission: Submission) {
+function getSubmissionTotal(submission: Submission, criteria: JudgingCriterion[]) {
   if (submission.judge_criteria_scores && typeof submission.judge_criteria_scores === "object") {
-    return calculateTotalFromCriteria(submission.judge_criteria_scores);
+    return calculateTotalFromCriteria(submission.judge_criteria_scores, criteria);
   }
   return submission.judge_score ?? 0;
 }
@@ -84,7 +84,7 @@ export function JudgeScoringWorkspace({
 
   const ideaAccent = getSubmissionAccentStyle(activeSubmission);
   const teamName = activeSubmission.team_name?.trim() || "Unnamed team";
-  const totalScore = getSubmissionTotal(activeSubmission);
+  const totalScore = getSubmissionTotal(activeSubmission, judgingCriteria);
 
   const goToStep = (step: number) => {
     setCriterionStep(Math.max(0, Math.min(step, reviewStepIndex)));
@@ -291,7 +291,12 @@ export function JudgeScoringWorkspace({
             <Button
               size="lg"
               className="h-11 w-full text-sm font-semibold sm:w-auto"
-              disabled={savingSubmissionId === activeSubmission.id}
+              disabled={
+                savingSubmissionId === activeSubmission.id ||
+                judgingCriteria.some(
+                  (criterion) => typeof activeSubmission.judge_criteria_scores?.[criterion.id] !== "number"
+                )
+              }
               onClick={() => void onSave(activeSubmission.id)}
             >
               <Save className="h-4 w-4" />

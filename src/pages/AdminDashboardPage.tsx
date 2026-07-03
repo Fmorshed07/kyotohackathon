@@ -24,7 +24,7 @@ import {
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
 import { saveHackathonCriteria } from "@/lib/hackathonCriteria";
-import { buildAdminJudgingStatistics } from "@/lib/judgingStatistics";
+import { getJudgeTotalScoreForJudge } from "@/lib/judgeSubmissionScores";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { JudgeApprovalStatus, PortalRole, Submission } from "@/types/portal";
 
@@ -202,12 +202,29 @@ export default function AdminDashboardPage() {
         getUserEmail(participantId) ??
         participantById[participantId]?.email ??
         "Unknown participant";
-      const marksFromMap = Object.entries(submission.judge_scores ?? {}).map(([judgeId, score]) => ({
-        judgeId,
-        judgeEmail: getUserEmail(judgeId) ?? judgeById[judgeId]?.email ?? "Unknown judge",
-        score: typeof score === "number" ? score : null,
-        notes: submission.judge_notes_by_judge?.[judgeId] ?? null,
-      }));
+      const judgeIds = new Set<string>([
+        ...Object.keys(submission.judge_scores ?? {}),
+        ...Object.keys(submission.judge_criteria_scores_by_judge ?? {}),
+        ...(submission.judge_id ? [submission.judge_id] : []),
+      ]);
+
+      const marksFromMap = Array.from(judgeIds).map((judgeId) => {
+        const storedScore = submission.judge_scores?.[judgeId];
+        const criteriaScores = submission.judge_criteria_scores_by_judge?.[judgeId];
+        const resolvedScore =
+          typeof storedScore === "number"
+            ? storedScore
+            : getJudgeTotalScoreForJudge(submission, judgeId, judgingCriteria);
+
+        return {
+          judgeId,
+          judgeEmail: getUserEmail(judgeId) ?? judgeById[judgeId]?.email ?? "Unknown judge",
+          score: resolvedScore,
+          notes: submission.judge_notes_by_judge?.[judgeId] ?? null,
+          criteriaScores:
+            criteriaScores && typeof criteriaScores === "object" ? criteriaScores : undefined,
+        };
+      });
 
       const marks =
         marksFromMap.length > 0
@@ -252,7 +269,7 @@ export default function AdminDashboardPage() {
           const right = b.averageScore ?? -1;
           return right - left;
         }),
-    [submissions, hackathonUsers, userEmailLookup]
+    [submissions, hackathonUsers, userEmailLookup, judgingCriteria]
   );
 
   const scoredRows = adminSubmissionRows.filter((row) => row.averageScore != null);
