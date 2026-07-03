@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { ScrollRevealMotion } from "@/components/ScrollRevealMotion";
 import kyotoTemple from "@/assets/kyoto-temple.jpg";
 
 const tracks = [
@@ -87,51 +88,45 @@ const ThemeSection = () => {
         </motion.div>
 
         <div className="space-y-1">
-          {tracks.map((track, index) => {
-            const { ref, isVisible } = useScrollReveal<HTMLDivElement>({
-              threshold: 0.3,
-            });
-
-            return (
-              <motion.div
-                key={track.number}
-                ref={ref}
-                className="group relative border-t border-border py-8 transition-all duration-500"
-                initial={{ opacity: 0, x: -50 }}
-                animate={isVisible ? { opacity: 1, x: 0 } : {}}
-                transition={{ duration: 0.6, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                whileHover={{ backgroundColor: "hsl(222 47% 8% / 0.5)", x: 10 }}
-              >
-                <div className="flex items-start gap-6">
-                  <motion.span
-                    className="font-display text-sm text-primary/60 transition-colors group-hover:text-primary"
-                    whileHover={{ scale: 1.1 }}
-                  >
-                    {track.number}
-                  </motion.span>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4">
-                      <h3 className="font-display text-xl tracking-wide text-foreground transition-colors group-hover:text-primary md:text-2xl">
-                        {track.title}
-                      </h3>
-                      <span className="hidden font-display text-sm text-muted-foreground/40 md:block">
-                        {track.kanji}
-                      </span>
-                    </div>
-                    <p className="mt-2 font-body text-sm text-muted-foreground md:text-base">
-                      {track.description}
-                    </p>
+          {tracks.map((track, index) => (
+            <ScrollRevealMotion
+              key={track.number}
+              revealThreshold={0.3}
+              className="group relative border-t border-border py-8 transition-all duration-500"
+              initial={{ opacity: 0, x: -50 }}
+              visible={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ backgroundColor: "hsl(222 47% 8% / 0.5)", x: 10 }}
+            >
+              <div className="flex items-start gap-6">
+                <motion.span
+                  className="font-display text-sm text-primary/60 transition-colors group-hover:text-primary"
+                  whileHover={{ scale: 1.1 }}
+                >
+                  {track.number}
+                </motion.span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-4">
+                    <h3 className="font-display text-xl tracking-wide text-foreground transition-colors group-hover:text-primary md:text-2xl">
+                      {track.title}
+                    </h3>
+                    <span className="hidden font-display text-sm text-muted-foreground/40 md:block">
+                      {track.kanji}
+                    </span>
                   </div>
-                  <motion.div
-                    className="hidden h-8 w-8 items-center justify-center rounded-full border border-primary/30 text-primary/50 transition-all group-hover:border-primary group-hover:text-primary md:flex"
-                    whileHover={{ scale: 1.2, rotate: 45 }}
-                  >
-                    →
-                  </motion.div>
+                  <p className="mt-2 font-body text-sm text-muted-foreground md:text-base">
+                    {track.description}
+                  </p>
                 </div>
-              </motion.div>
-            );
-          })}
+                <motion.div
+                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-primary/30 text-primary/50 transition-all group-hover:border-primary group-hover:text-primary md:flex"
+                  whileHover={{ scale: 1.2, rotate: 45 }}
+                >
+                  →
+                </motion.div>
+              </div>
+            </ScrollRevealMotion>
+          ))}
           <div className="border-t border-border" />
         </div>
       </div>

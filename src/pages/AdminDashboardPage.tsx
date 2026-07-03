@@ -9,8 +9,18 @@ import {
   type AdminSubmissionRow,
   type AdminUser,
 } from "@/components/dashboard/AdminDashboard";
-import { fetchSubmissionsForHackathon, filterUsersForHackathon, getUserHackathonId, HACKATHON_STORAGE_KEYS, PORTAL_HACKATHONS } from "@/lib/hackathons";
+import {
+  fetchSubmissionsForHackathon,
+  filterUsersForHackathon,
+  getUserHackathonId,
+  HACKATHON_STORAGE_KEYS,
+  PORTAL_HACKATHONS,
+} from "@/lib/hackathons";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
+import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
+import { saveHackathonCriteria } from "@/lib/hackathonCriteria";
+import { buildAdminJudgingStatistics } from "@/lib/judgingStatistics";
+import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { JudgeApprovalStatus, PortalRole, Submission } from "@/types/portal";
 
 const normalizePortalRole = (value: unknown): PortalRole | undefined => {
@@ -39,6 +49,8 @@ export default function AdminDashboardPage() {
   const { selectedHackathonId, selectedHackathon, setSelectedHackathonId } = useHackathonSelection(
     HACKATHON_STORAGE_KEYS.admin
   );
+  const { criteria: judgingCriteria, isLoading: isLoadingCriteria, setCriteria: setJudgingCriteria } =
+    useHackathonCriteria(selectedHackathonId);
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [userEmailLookup, setUserEmailLookup] = useState<Record<string, string>>({});
@@ -50,6 +62,7 @@ export default function AdminDashboardPage() {
   const [pendingRoles, setPendingRoles] = useState<Record<string, PortalRole>>({});
   const [isCreatingSubmission, setIsCreatingSubmission] = useState(false);
   const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
+  const [isSavingCriteria, setIsSavingCriteria] = useState(false);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -214,11 +227,6 @@ export default function AdminDashboardPage() {
     topScore == null
       ? []
       : scoredRows.filter((row) => row.averageScore != null && row.averageScore === topScore);
-  const allScores = adminSubmissionRows.flatMap((row) =>
-    row.judgeMarks
-      .map((mark) => mark.score)
-      .filter((score): score is number => typeof score === "number")
-  );
   const activeJudgeIds = new Set(
     adminSubmissionRows.flatMap((row) =>
       row.judgeMarks
@@ -226,16 +234,19 @@ export default function AdminDashboardPage() {
         .map((mark) => mark.judgeId)
     )
   );
-  const analytics = {
-    totalSubmissions: adminSubmissionRows.length,
-    scoredSubmissions: scoredRows.length,
-    unscoredSubmissions: adminSubmissionRows.length - scoredRows.length,
-    averageScore:
-      allScores.length > 0
-        ? allScores.reduce((total, score) => total + score, 0) / allScores.length
-        : null,
-    activeJudgeCount: activeJudgeIds.size,
-  };
+  const totalJudgeMarks = adminSubmissionRows.reduce(
+    (total, row) => total + row.judgeMarks.filter((mark) => typeof mark.score === "number").length,
+    0
+  );
+  const registeredJudgeCount = hackathonUsers.filter((user) => isStaffRole(user.role)).length;
+  const analytics = buildAdminJudgingStatistics(
+    submissions,
+    adminSubmissionRows.map((row) => row.averageScore),
+    activeJudgeIds.size,
+    registeredJudgeCount,
+    totalJudgeMarks,
+    judgingCriteria
+  );
 
   const handleRoleChange = (userId: string, role: PortalRole) => {
     setPendingRoles((current) => ({ ...current, [userId]: role }));
@@ -362,6 +373,25 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleSaveCriteria = async (criteria: JudgingCriterion[]) => {
+    setMessage(null);
+    setIsSavingCriteria(true);
+    try {
+      await saveHackathonCriteria(db, selectedHackathonId, criteria);
+      setJudgingCriteria(criteria);
+      setMessage(`Marking criteria updated for ${selectedHackathon.name}.`);
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to save marking criteria.";
+      setMessage(text);
+      throw error;
+    } finally {
+      setIsSavingCriteria(false);
+    }
+  };
+
   const handleDeleteSubmission = async (submissionId: string) => {
     setMessage(null);
     setDeletingSubmissionId(submissionId);
@@ -399,6 +429,10 @@ export default function AdminDashboardPage() {
     >
       <AdminDashboard
         selectedHackathon={selectedHackathon}
+        judgingCriteria={judgingCriteria}
+        isLoadingCriteria={isLoadingCriteria}
+        isSavingCriteria={isSavingCriteria}
+        onSaveCriteria={handleSaveCriteria}
         users={hackathonUsers}
         isLoadingUsers={isLoadingUsers}
         submissions={adminSubmissionRows}

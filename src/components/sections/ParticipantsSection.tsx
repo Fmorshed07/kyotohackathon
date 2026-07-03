@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { ScrollRevealMotion } from "@/components/ScrollRevealMotion";
 import kyotoNeonAlley from "@/assets/kyoto-neon-alley.jpg";
 
 const participants = [
@@ -83,52 +84,46 @@ const ParticipantsSection = () => {
         </motion.div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          {participants.map((participant, index) => {
-            const { ref, isVisible } = useScrollReveal<HTMLDivElement>({
-              threshold: 0.3,
-            });
-
-            return (
-              <motion.div
-                key={participant.title}
-                ref={ref}
-                className="group relative overflow-hidden rounded-xl border border-border bg-card/30 p-8 backdrop-blur-sm transition-all duration-500"
-                initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                animate={isVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
-                transition={{ duration: 0.6, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                whileHover={{
-                  borderColor: "hsl(185 100% 50% / 0.3)",
-                  backgroundColor: "hsl(222 47% 8% / 0.8)",
-                }}
-              >
-                <motion.div className="mb-4 flex items-center gap-4" whileHover={{ x: 5 }}>
-                  <motion.span
-                    className="text-2xl text-primary/50 transition-colors group-hover:text-primary"
-                    whileHover={{ rotate: 180, scale: 1.2 }}
-                    transition={{ duration: 0.4 }}
-                  >
-                    {participant.icon}
-                  </motion.span>
-                  <span className="text-xs text-muted-foreground/40">{participant.kanji}</span>
-                </motion.div>
-
-                <h3 className="font-display text-xl tracking-wide text-foreground transition-colors group-hover:text-primary">
-                  {participant.title}
-                </h3>
-                <p className="mt-2 font-body text-sm text-muted-foreground">
-                  {participant.description}
-                </p>
-
-                <motion.div
-                  className="absolute inset-0 -z-10 opacity-0 transition-opacity group-hover:opacity-100"
-                  style={{
-                    background:
-                      "radial-gradient(circle at 50% 50%, hsl(185 100% 50% / 0.05) 0%, transparent 70%)",
-                  }}
-                />
+          {participants.map((participant, index) => (
+            <ScrollRevealMotion
+              key={participant.title}
+              revealThreshold={0.3}
+              className="group relative overflow-hidden rounded-xl border border-border bg-card/30 p-8 backdrop-blur-sm transition-all duration-500"
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              visible={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.6, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{
+                borderColor: "hsl(185 100% 50% / 0.3)",
+                backgroundColor: "hsl(222 47% 8% / 0.8)",
+              }}
+            >
+              <motion.div className="mb-4 flex items-center gap-4" whileHover={{ x: 5 }}>
+                <motion.span
+                  className="text-2xl text-primary/50 transition-colors group-hover:text-primary"
+                  whileHover={{ rotate: 180, scale: 1.2 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  {participant.icon}
+                </motion.span>
+                <span className="text-xs text-muted-foreground/40">{participant.kanji}</span>
               </motion.div>
-            );
-          })}
+
+              <h3 className="font-display text-xl tracking-wide text-foreground transition-colors group-hover:text-primary">
+                {participant.title}
+              </h3>
+              <p className="mt-2 font-body text-sm text-muted-foreground">
+                {participant.description}
+              </p>
+
+              <motion.div
+                className="absolute inset-0 -z-10 opacity-0 transition-opacity group-hover:opacity-100"
+                style={{
+                  background:
+                    "radial-gradient(circle at 50% 50%, hsl(185 100% 50% / 0.05) 0%, transparent 70%)",
+                }}
+              />
+            </ScrollRevealMotion>
+          ))}
         </div>
       </div>
     </section>

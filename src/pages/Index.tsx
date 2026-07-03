@@ -31,7 +31,8 @@ const Index = () => {
       <motion.div
         initial={false}
         animate={{ opacity: isLoading ? 0 : 1 }}
-        transition={{ duration: 0.6, delay: 0 }}
+        transition={{ duration: 0.6 }}
+        aria-hidden={isLoading}
       >
         <AnimatedBackground />
 

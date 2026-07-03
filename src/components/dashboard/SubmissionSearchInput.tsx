@@ -29,7 +29,7 @@ export function SubmissionSearchInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="pl-9"
+        className="min-h-11 w-full pl-9 text-base"
         aria-label={placeholder}
       />
     </div>

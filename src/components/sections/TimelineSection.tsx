@@ -22,7 +22,68 @@ const milestones = [
   { title: "Final Judging", time: "19:30 - 20:00", kanji: "最終審査" },
   { title: "Award Ceremony", time: "20:00 - 20:30", kanji: "表彰式" },
   { title: "Networking & Closing", time: "20:30 - 21:00", kanji: "交流・閉会" },
-];
+] as const;
+
+type Milestone = (typeof milestones)[number];
+
+function TimelineMilestone({ milestone, index }: { milestone: Milestone; index: number }) {
+  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.5 });
+  const isEven = index % 2 === 0;
+
+  return (
+    <motion.div
+      ref={ref}
+      className="relative flex items-center"
+      initial={{ opacity: 0, x: isEven ? -50 : 50 }}
+      animate={isVisible ? { opacity: 1, x: 0 } : {}}
+      transition={{ duration: 0.6, delay: index * 0.15, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <motion.div
+        className="absolute left-4 z-10 md:left-1/2 md:-translate-x-1/2"
+        initial={{ scale: 0 }}
+        animate={isVisible ? { scale: 1 } : {}}
+        transition={{ duration: 0.4, delay: index * 0.15 + 0.2 }}
+      >
+        <motion.div
+          className="h-4 w-4 rounded-full border-2 border-primary bg-background"
+          animate={
+            isVisible
+              ? {
+                  boxShadow: [
+                    "0 0 0px hsl(185 100% 50% / 0)",
+                    "0 0 20px hsl(185 100% 50% / 0.5)",
+                    "0 0 0px hsl(185 100% 50% / 0)",
+                  ],
+                }
+              : {}
+          }
+          transition={{ duration: 2, repeat: Infinity, delay: index * 0.3 }}
+        />
+      </motion.div>
+
+      <div
+        className={`ml-12 md:ml-0 ${
+          isEven
+            ? "md:mr-auto md:w-1/2 md:pr-20 md:text-right"
+            : "md:ml-auto md:w-1/2 md:pl-20 md:text-left"
+        }`}
+      >
+        <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-display text-xs tracking-[0.2em] text-primary">
+          {milestone.time}
+        </span>
+        <h3 className="mt-3 font-display text-xl tracking-wide text-foreground md:text-2xl">
+          {milestone.title}
+        </h3>
+        {"note" in milestone && milestone.note ? (
+          <p className="mt-2 text-sm text-secondary">{milestone.note}</p>
+        ) : null}
+        <div className="mt-2 flex items-center gap-3 md:justify-end">
+          <span className="text-xs text-muted-foreground/60">{milestone.kanji}</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 const TimelineSection = () => {
   const { ref: headerRef, isVisible: headerVisible } = useScrollReveal<HTMLDivElement>({
@@ -157,67 +218,13 @@ const TimelineSection = () => {
 
           {/* Milestones */}
           <div className="space-y-16">
-            {milestones.map((milestone, index) => {
-              const { ref, isVisible } = useScrollReveal<HTMLDivElement>({
-                threshold: 0.5,
-              });
-              const isEven = index % 2 === 0;
-
-              return (
-                <motion.div
-                  key={`${milestone.title}-${milestone.time}`}
-                  ref={ref}
-                  className="relative flex items-center"
-                  initial={{ opacity: 0, x: isEven ? -50 : 50 }}
-                  animate={isVisible ? { opacity: 1, x: 0 } : {}}
-                  transition={{ duration: 0.6, delay: index * 0.15, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  {/* Dot */}
-                  <motion.div
-                    className="absolute left-4 z-10 md:left-1/2 md:-translate-x-1/2"
-                    initial={{ scale: 0 }}
-                    animate={isVisible ? { scale: 1 } : {}}
-                    transition={{ duration: 0.4, delay: index * 0.15 + 0.2 }}
-                  >
-                    <motion.div
-                      className="h-4 w-4 rounded-full border-2 border-primary bg-background"
-                      animate={isVisible ? {
-                        boxShadow: [
-                          "0 0 0px hsl(185 100% 50% / 0)",
-                          "0 0 20px hsl(185 100% 50% / 0.5)",
-                          "0 0 0px hsl(185 100% 50% / 0)",
-                        ],
-                      } : {}}
-                      transition={{ duration: 2, repeat: Infinity, delay: index * 0.3 }}
-                    />
-                  </motion.div>
-
-                  {/* Content */}
-                  <div
-                    className={`ml-12 md:ml-0 ${
-                      isEven
-                        ? "md:mr-auto md:pr-20 md:text-right md:w-1/2"
-                        : "md:ml-auto md:pl-20 md:text-left md:w-1/2"
-                    }`}
-                  >
-                    <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-display text-xs tracking-[0.2em] text-primary">
-                      {milestone.time}
-                    </span>
-                    <h3 className="mt-3 font-display text-xl tracking-wide text-foreground md:text-2xl">
-                      {milestone.title}
-                    </h3>
-                    {"note" in milestone && milestone.note ? (
-                      <p className="mt-2 text-sm text-secondary">{milestone.note}</p>
-                    ) : null}
-                    <div className="mt-2 flex items-center gap-3 md:justify-end">
-                      <span className="text-xs text-muted-foreground/60">
-                        {milestone.kanji}
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+            {milestones.map((milestone, index) => (
+              <TimelineMilestone
+                key={`${milestone.title}-${milestone.time}`}
+                milestone={milestone}
+                index={index}
+              />
+            ))}
           </div>
         </div>
       </div>

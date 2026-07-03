@@ -37,13 +37,12 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
 
   return (
     <AnimatePresence>
-      {stage < 3 && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#1A1B4B]"
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0, filter: "blur(4px)" }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
-        >
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#1A1B4B]"
+        initial={{ opacity: 1 }}
+        exit={{ opacity: 0, filter: "blur(4px)" }}
+        transition={{ duration: 0.8, ease: "easeInOut" }}
+      >
           <img
             src="/banner.png"
             alt=""
@@ -63,7 +62,6 @@ const LoadingExperience = ({ onComplete }: LoadingExperienceProps) => {
             />
           </motion.div>
         </motion.div>
-      )}
     </AnimatePresence>
   );
 };

@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { FileText, LayoutDashboard, Link2, Rocket, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Select,
@@ -100,40 +101,44 @@ export function ParticipantDashboard({
 
   return (
     <div className="space-y-8" id="overview">
-      <section className={`${sectionClass} p-4 sm:p-6`} aria-label="Participant overview">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]">
-              Submission overview
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Keep your project details up to date before judging starts.
-            </p>
+      <section className={`${sectionClass}`} aria-label="Participant overview">
+        <div className="dash-stack-header flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="dash-icon-chip" aria-hidden>
+              <LayoutDashboard className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Overview</p>
+              <h2 className="dash-title">Submission overview</h2>
+              <p className="dash-subtitle">
+                Keep your project details up to date before judging starts.
+              </p>
+            </div>
           </div>
-          <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-auto lg:gap-4">
-            <div className="rounded-xl border border-primary/30 bg-gradient-to-b from-primary/10 to-transparent px-5 py-3 text-center">
-              <p className="font-display text-2xl font-semibold tabular-nums text-primary">
+          <div className="dash-stat-grid grid w-full gap-2 sm:grid-cols-3 sm:gap-3 lg:w-auto lg:gap-4">
+            <div className="dash-stat-tile dash-stat-tile--highlight">
+              <p className="dash-stat-value">
                 {participantForm.title.trim() ? "1" : "0"}
               </p>
-              <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">Project title</p>
+              <p className="dash-stat-label">Project title</p>
             </div>
-            <div className="rounded-xl border border-border/50 bg-muted/20 px-5 py-3 text-center">
-              <p className="font-display text-2xl font-semibold tabular-nums text-primary">
+            <div className="dash-stat-tile">
+              <p className="dash-stat-value">
                 {participantForm.projectUrl.trim() ? "1" : "0"}
               </p>
-              <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">Project link</p>
+              <p className="dash-stat-label">Project link</p>
             </div>
-            <div className="rounded-xl border border-border/50 bg-muted/20 px-5 py-3 text-center">
-              <p className="font-display text-2xl font-semibold tabular-nums text-primary">
+            <div className="dash-stat-tile sm:col-span-1 col-span-2">
+              <p className="dash-stat-value">
                 {participantForm.submissionPdfUrl.trim() && participantForm.demoVideoUrl.trim() ? "100%" : "50%"}
               </p>
-              <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">Media ready</p>
+              <p className="dash-stat-label">Media ready</p>
             </div>
           </div>
         </div>
         {participantSubmissions.length > 1 && activeSubmissionId ? (
-          <div className="mt-5 border-t border-border/40 pt-4">
-            <p className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="mt-5 border-t border-white/10 pt-4">
+            <p className="dash-eyebrow mb-2">
               Edit your submission
             </p>
             <SubmissionSearchInput
@@ -165,25 +170,26 @@ export function ParticipantDashboard({
 
       {/* Overview / Project details */}
       <section
-        className={`${sectionClass} p-4 sm:p-6`}
+        className={`${sectionClass}`}
         id="my-project"
         aria-labelledby="project-details-heading"
       >
-        <div className="mb-6 border-b border-border/40 pb-4">
-          <h2
-            id="project-details-heading"
-            className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]"
-          >
-            Project details
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Title, link, and short description.
-          </p>
+        <div className="mb-6 flex items-start gap-3 border-b border-white/10 pb-4">
+          <span className="dash-icon-chip" aria-hidden>
+            <FileText className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Step 1</p>
+            <h2 id="project-details-heading" className="dash-title">
+              Project details
+            </h2>
+            <p className="dash-subtitle">Title, link, and short description.</p>
+          </div>
         </div>
         <div className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+              <label className="dash-field-label">
                 Project Title
               </label>
               <Input
@@ -195,7 +201,7 @@ export function ParticipantDashboard({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+              <label className="dash-field-label">
                 Project URL
               </label>
               <Input
@@ -208,7 +214,7 @@ export function ParticipantDashboard({
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+            <label className="dash-field-label">
               Short Description
             </label>
               <Textarea
@@ -225,23 +231,24 @@ export function ParticipantDashboard({
 
       {/* Team details */}
       <section
-        className={`${sectionClass} p-4 sm:p-6`}
+        className={`${sectionClass}`}
         aria-labelledby="team-details-heading"
       >
-        <div className="mb-6 border-b border-border/40 pb-4">
-          <h2
-            id="team-details-heading"
-            className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]"
-          >
-            Team details
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Add your team name and all member names.
-          </p>
+        <div className="mb-6 flex items-start gap-3 border-b border-white/10 pb-4">
+          <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+            <Users className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Step 2</p>
+            <h2 id="team-details-heading" className="dash-title">
+              Team details
+            </h2>
+            <p className="dash-subtitle">Add your team name and all member names.</p>
+          </div>
         </div>
         <div className="space-y-5">
           <div className="space-y-2">
-            <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+            <label className="dash-field-label">
               Team Name
             </label>
             <Input
@@ -253,7 +260,7 @@ export function ParticipantDashboard({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+            <label className="dash-field-label">
               Member Names
             </label>
             <Textarea
@@ -270,23 +277,24 @@ export function ParticipantDashboard({
 
       {/* Links & media */}
       <section
-        className={`${sectionClass} p-4 sm:p-6`}
+        className={`${sectionClass}`}
         aria-labelledby="links-media-heading"
       >
-        <div className="mb-6 border-b border-border/40 pb-4">
-          <h2
-            id="links-media-heading"
-            className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]"
-          >
-            Links & media
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            PDF and demo video URLs; previews appear below.
-          </p>
+        <div className="mb-6 flex items-start gap-3 border-b border-white/10 pb-4">
+          <span className="dash-icon-chip dash-icon-chip--sunset" aria-hidden>
+            <Link2 className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Step 3</p>
+            <h2 id="links-media-heading" className="dash-title">
+              Links & media
+            </h2>
+            <p className="dash-subtitle">PDF and demo video URLs; previews appear below.</p>
+          </div>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-2">
-            <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+            <label className="dash-field-label">
               Submission PDF URL
             </label>
               <Input
@@ -297,11 +305,11 @@ export function ParticipantDashboard({
               placeholder="Link to your PDF (Drive, Notion, etc.)"
             />
             {participantForm.submissionPdfUrl && (
-              <div className="mt-3 rounded-lg border border-border/50 bg-muted/40 p-3">
-                <p className="mb-2 text-[0.7rem] uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="mt-3 rounded-xl border border-white/10 bg-muted/25 p-3">
+                <p className="dash-eyebrow mb-2">
                   PDF Preview
                 </p>
-                <div className="aspect-[4/3] max-h-48 overflow-hidden rounded-md border border-border/40 bg-background/60">
+                <div className="aspect-[4/3] max-h-48 overflow-hidden rounded-lg border border-white/10 bg-background/60">
                   <iframe
                     title="Submission PDF preview"
                     src={pdfPreviewUrl}
@@ -322,7 +330,7 @@ export function ParticipantDashboard({
             )}
           </div>
           <div className="space-y-2">
-            <label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+            <label className="dash-field-label">
               Demo Video URL
             </label>
               <Input
@@ -333,11 +341,11 @@ export function ParticipantDashboard({
               placeholder="https://youtu.be/..."
             />
             {participantForm.demoVideoUrl && (
-              <div className="mt-3 rounded-lg border border-border/50 bg-muted/40 p-3">
-                <p className="mb-2 text-[0.7rem] uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="mt-3 rounded-xl border border-white/10 bg-muted/25 p-3">
+                <p className="dash-eyebrow mb-2">
                   Video Preview
                 </p>
-                <div className="aspect-video max-h-48 overflow-hidden rounded-md border border-border/40 bg-background/60">
+                <div className="aspect-video max-h-48 overflow-hidden rounded-lg border border-white/10 bg-background/60">
                   <iframe
                     title="Demo video preview"
                     src={participantForm.demoVideoUrl}
@@ -353,30 +361,35 @@ export function ParticipantDashboard({
       </section>
 
       {/* Save submission */}
-      <section className={`${sectionClass} p-4 sm:p-6`} aria-labelledby="submit-heading">
+      <section className={`${sectionClass}`} aria-labelledby="submit-heading">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2
-              id="submit-heading"
-              className="font-display text-xs uppercase tracking-[0.16em] text-foreground sm:text-sm sm:tracking-[0.28em]"
-            >
-              Save submission
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              You can update until organisers lock changes. Ensure all links are accessible.
-            </p>
+          <div className="flex items-start gap-3">
+            <span className="dash-icon-chip" aria-hidden>
+              <Rocket className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Final step</p>
+              <h2 id="submit-heading" className="dash-title">
+                Save submission
+              </h2>
+              <p className="dash-subtitle">
+                You can update until organisers lock changes. Ensure all links are accessible.
+              </p>
+            </div>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">
             {submissionMessage && (
-              <p className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
+              <p className="dash-message">
                 {submissionMessage}
               </p>
             )}
             <Button
               onClick={onSave}
               disabled={isSubmittingProject}
-              className="w-full uppercase tracking-[0.12em] sm:w-auto sm:tracking-[0.24em]"
+              size="lg"
+              className="w-full uppercase tracking-[0.12em] sm:w-auto sm:tracking-[0.18em]"
             >
+              <Rocket className="h-4 w-4" />
               {isSubmittingProject ? "Saving..." : "Save Submission"}
             </Button>
           </div>

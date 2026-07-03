@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { ScrollRevealMotion } from "@/components/ScrollRevealMotion";
 
 const PARTNER_EMAIL = "mailto:cognisorai@gmail.com?subject=Impact%20Kyoto%202026%20Partnership";
 
@@ -70,29 +71,23 @@ const PartnerWithSection = () => {
         </motion.div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {partnershipTypes.map((type, index) => {
-            const { ref: cardRef, isVisible: cardVisible } = useScrollReveal<HTMLDivElement>({
-              threshold: 0.3,
-            });
-
-            return (
-              <motion.div
-                key={type.title}
-                ref={cardRef}
-                className="rounded-xl border border-border bg-card/30 p-6 backdrop-blur-sm transition-all duration-300 hover:border-primary/30"
-                initial={{ opacity: 0, y: 30 }}
-                animate={cardVisible ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.5, delay: index * 0.08 }}
-              >
-                <h3 className="font-display text-lg tracking-wide text-foreground md:text-xl">
-                  {type.title}
-                </h3>
-                <p className="mt-3 font-body text-sm text-muted-foreground md:text-base">
-                  {type.description}
-                </p>
-              </motion.div>
-            );
-          })}
+          {partnershipTypes.map((type, index) => (
+            <ScrollRevealMotion
+              key={type.title}
+              revealThreshold={0.3}
+              className="rounded-xl border border-border bg-card/30 p-6 backdrop-blur-sm transition-all duration-300 hover:border-primary/30"
+              initial={{ opacity: 0, y: 30 }}
+              visible={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.08 }}
+            >
+              <h3 className="font-display text-lg tracking-wide text-foreground md:text-xl">
+                {type.title}
+              </h3>
+              <p className="mt-3 font-body text-sm text-muted-foreground md:text-base">
+                {type.description}
+              </p>
+            </ScrollRevealMotion>
+          ))}
         </div>
 
         <motion.div

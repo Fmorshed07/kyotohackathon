@@ -1,6 +1,8 @@
 import {
   calculateTotalFromCriteria,
   type CriteriaScores,
+  type JudgingCriterion,
+  DEFAULT_JUDGING_CRITERIA,
 } from "@/components/dashboard/judgingCriteria";
 import type { Submission } from "@/types/portal";
 
@@ -36,11 +38,12 @@ export function getJudgeNotesForJudge(submission: Submission, judgeId: string): 
 
 export function getJudgeTotalScoreForJudge(
   submission: Submission,
-  judgeId: string
+  judgeId: string,
+  criteria: JudgingCriterion[] = DEFAULT_JUDGING_CRITERIA
 ): number | null {
   const criteriaScores = getJudgeCriteriaScoresForJudge(submission, judgeId);
   if (criteriaScores && Object.keys(criteriaScores).length > 0) {
-    return calculateTotalFromCriteria(criteriaScores);
+    return calculateTotalFromCriteria(criteriaScores, criteria);
   }
   const fromMap = submission.judge_scores?.[judgeId];
   if (typeof fromMap === "number") {
@@ -53,10 +56,14 @@ export function getJudgeTotalScoreForJudge(
 }
 
 /** Flatten this judge's scores/notes onto the submission for the judge UI. */
-export function mapSubmissionForJudge(submission: Submission, judgeId: string): Submission {
+export function mapSubmissionForJudge(
+  submission: Submission,
+  judgeId: string,
+  criteria: JudgingCriterion[] = DEFAULT_JUDGING_CRITERIA
+): Submission {
   const criteriaScores = getJudgeCriteriaScoresForJudge(submission, judgeId);
   const notes = getJudgeNotesForJudge(submission, judgeId);
-  const totalScore = getJudgeTotalScoreForJudge(submission, judgeId);
+  const totalScore = getJudgeTotalScoreForJudge(submission, judgeId, criteria);
 
   return {
     ...submission,

@@ -31,5 +31,10 @@ service cloud.firestore {
       allow update: if isSignedIn() && (request.auth.uid == resource.data.user_id || isStaff() || isAdmin());
       allow delete: if isAdmin();
     }
+
+    match /hackathon_criteria/{hackathonId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

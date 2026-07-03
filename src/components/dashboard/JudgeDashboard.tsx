@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Gavel, Save, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -13,13 +14,15 @@ import {
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
+import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
+import type { JudgeStatistics } from "@/lib/judgingStatistics";
 import type { PortalHackathon } from "@/lib/hackathons";
 import type { Submission } from "@/types/portal";
 import {
-  JUDGING_CRITERIA,
   calculateTotalFromCriteria,
   clampCriterionScore,
+  type JudgingCriterion,
   type JudgingCriterionId,
 } from "@/components/dashboard/judgingCriteria";
 
@@ -150,6 +153,7 @@ const formatSubmittedAt = (createdAt: string | null | undefined) => {
 
 export type JudgeDashboardProps = {
   selectedHackathon: PortalHackathon;
+  judgingCriteria: JudgingCriterion[];
   submissions: Submission[];
   isLoadingSubmissions: boolean;
   judgeMessage: string | null;
@@ -158,6 +162,7 @@ export type JudgeDashboardProps = {
     scored: number;
     averageScore: number | null;
   };
+  statistics: JudgeStatistics | null;
   onCriterionScoreChange: (
     id: string,
     criterionId: JudgingCriterionId,
@@ -169,10 +174,12 @@ export type JudgeDashboardProps = {
 
 export function JudgeDashboard({
   selectedHackathon,
+  judgingCriteria,
   submissions,
   isLoadingSubmissions,
   judgeMessage,
   summary,
+  statistics,
   onCriterionScoreChange,
   onNotesChange,
   onSave,
@@ -236,49 +243,53 @@ export function JudgeDashboard({
       <HackathonContextBanner hackathon={selectedHackathon} role="judge" />
 
       {/* Overview */}
-      <section className={`${sectionClass} p-4 sm:p-6`} aria-label="Judge overview">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              Overview
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Track submissions and scoring progress for {selectedHackathon.name}.
-            </p>
+      <section className={`${sectionClass}`} aria-label="Judge overview">
+        <div className="dash-stack-header flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+              <Gavel className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Judge panel</p>
+              <h2 className="dash-title">Overview</h2>
+              <p className="dash-subtitle">
+                Track submissions and scoring progress for {selectedHackathon.name}.
+              </p>
+            </div>
           </div>
-          <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-auto lg:gap-4">
-            <div className="rounded-xl border border-primary/30 bg-gradient-to-b from-primary/10 to-transparent px-5 py-3 text-center">
-              <p className="font-display text-2xl font-semibold tabular-nums text-primary">
+          <div className="dash-stat-grid grid w-full gap-2 sm:grid-cols-3 sm:gap-3 lg:w-auto lg:gap-4">
+            <div className="dash-stat-tile dash-stat-tile--highlight">
+              <p className="dash-stat-value">
                 {isLoadingSubmissions ? "—" : summary.total}
               </p>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="dash-stat-label">
                 Submissions
               </p>
             </div>
-            <div className="rounded-xl border border-border/50 bg-muted/20 px-5 py-3 text-center">
-              <p className="font-display text-2xl font-semibold tabular-nums text-primary">
+            <div className="dash-stat-tile">
+              <p className="dash-stat-value">
                 {isLoadingSubmissions ? "—" : summary.scored}
               </p>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="dash-stat-label">
                 Scored
               </p>
             </div>
-            <div className="rounded-xl border border-border/50 bg-muted/20 px-5 py-3 text-center">
-              <p className="font-display text-2xl font-semibold tabular-nums text-primary">
+            <div className="dash-stat-tile sm:col-span-1 col-span-2">
+              <p className="dash-stat-value">
                 {isLoadingSubmissions
                   ? "—"
                   : summary.averageScore != null
                     ? summary.averageScore.toFixed(1)
                     : "—"}
               </p>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="dash-stat-label">
                 Avg Score
               </p>
             </div>
           </div>
         </div>
         {judgeMessage && (
-          <p className="mt-4 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+          <p className="dash-message mt-4">
             {judgeMessage}
           </p>
         )}
@@ -297,23 +308,61 @@ export function JudgeDashboard({
             ) : null}
           </div>
         ) : null}
+        {statistics ? (
+          <div className="mt-6 border-t border-white/10 pt-6">
+            <JudgingStatsPanel
+              isLoading={isLoadingSubmissions}
+              completionRate={statistics.completionRate}
+              criterionAverages={statistics.criterionAverages}
+              title="Your judging statistics"
+              description={`Personal scoring progress for ${selectedHackathon.name}.`}
+              stats={[
+                { label: "Teams", value: String(statistics.teamsCount) },
+                { label: "Pending", value: String(statistics.pendingSubmissions) },
+                {
+                  label: "Completion",
+                  value:
+                    statistics.completionRate != null
+                      ? `${statistics.completionRate.toFixed(0)}%`
+                      : "—",
+                  highlight: true,
+                },
+                {
+                  label: "Highest",
+                  value: statistics.highestScore != null ? statistics.highestScore.toFixed(1) : "—",
+                },
+                {
+                  label: "Lowest",
+                  value: statistics.lowestScore != null ? statistics.lowestScore.toFixed(1) : "—",
+                },
+                { label: "Notes added", value: String(statistics.notesCount) },
+              ]}
+            />
+          </div>
+        ) : null}
       </section>
 
-      <section className={`${sectionClass} p-4 sm:p-6`} id="teams" aria-label="Teams">
-        <div className="mb-5 border-b border-border/40 pb-4">
-          <h2 className="text-lg font-semibold text-foreground">Teams</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Team names are listed separately for quick review before scoring.
-          </p>
+      <section className={`${sectionClass}`} id="teams" aria-label="Teams">
+        <div className="mb-5 flex items-start gap-3 border-b border-white/10 pb-4">
+          <span className="dash-icon-chip" aria-hidden>
+            <Users className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Roster</p>
+            <h2 className="dash-title">Teams</h2>
+            <p className="dash-subtitle">
+              Team names are listed separately for quick review before scoring.
+            </p>
+          </div>
         </div>
         {isLoadingSubmissions ? (
           <p className="text-sm text-muted-foreground">Loading teams…</p>
         ) : teams.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-10 text-center text-sm text-muted-foreground">
+          <p className="dash-empty">
             No teams available yet for {selectedHackathon.name}.
           </p>
         ) : filteredTeams.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-10 text-center text-sm text-muted-foreground">
+          <p className="dash-empty">
             No teams match your search.
           </p>
         ) : (
@@ -491,20 +540,24 @@ export function JudgeDashboard({
         id="submissions"
         aria-labelledby="scoring-heading"
       >
-        <div className="border-b border-border/40 px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-7">
+        <div className="border-b border-white/10 px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
+              <p className="dash-eyebrow">Live scoring</p>
               <h2
                 id="scoring-heading"
-                className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl md:text-3xl"
+                className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl md:text-3xl"
               >
-                Submissions & live scoring
+                <span className="bg-gradient-to-r from-foreground via-primary to-secondary bg-clip-text text-transparent">
+                  Submissions & live scoring
+                </span>
               </h2>
               <p className="mt-2 text-sm text-muted-foreground sm:text-base">
                 Score projects by weighted criteria, then save total points and notes.
               </p>
             </div>
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 font-display text-xs font-semibold uppercase tracking-[0.14em] text-primary shadow-[0_0_16px_-6px_hsl(199_89%_68%/0.5)]">
+              <Gavel className="h-3.5 w-3.5" aria-hidden />
               Judge panel
             </span>
           </div>
@@ -515,11 +568,11 @@ export function JudgeDashboard({
               Loading submissions…
             </p>
           ) : submissions.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-12 text-center text-sm text-muted-foreground">
+            <p className="dash-empty">
               No submissions yet. Scores will appear here as teams submit.
             </p>
           ) : filteredSubmissions.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-12 text-center text-sm text-muted-foreground">
+            <p className="dash-empty">
               No submissions match your search.
             </p>
           ) : (
@@ -585,7 +638,7 @@ export function JudgeDashboard({
                       </div>
 
                       <div className="space-y-3">
-                        {JUDGING_CRITERIA.map((criterion) => {
+                        {judgingCriteria.map((criterion) => {
                           const scoreStops =
                             scoreButtonStopsByWeight[criterion.weight] ?? [0, criterion.weight];
                           const activeScore = submission.judge_criteria_scores?.[criterion.id] ?? null;
@@ -626,7 +679,7 @@ export function JudgeDashboard({
                                     <button
                                       key={`${criterion.id}-${value}`}
                                       type="button"
-                                      className={`h-10 w-full rounded-md border text-sm font-semibold transition sm:h-9 sm:min-w-12 sm:w-auto ${
+                                      className={`min-h-11 w-full rounded-md border text-sm font-semibold transition active:scale-[0.97] sm:h-9 sm:min-h-0 sm:min-w-12 sm:w-auto ${
                                         isActive
                                           ? `${criterionAccent.activeButton} shadow-sm`
                                           : criterionAccent.inactiveButton
@@ -667,9 +720,9 @@ export function JudgeDashboard({
                             </div>
                           );
                         })}
-                        <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
-                          <p className="text-sm font-medium text-primary/90">Total score</p>
-                          <p className="font-display text-xl font-semibold tabular-nums text-primary">
+                        <div className="flex items-center justify-between rounded-xl border border-primary/35 bg-gradient-to-r from-primary/15 to-secondary/10 px-4 py-3 shadow-[0_0_20px_-8px_hsl(199_89%_68%/0.4)]">
+                          <p className="font-display text-sm font-semibold text-primary/90">Total score</p>
+                          <p className="font-mono text-xl font-bold tabular-nums text-primary">
                             {totalScore}/100
                           </p>
                         </div>
@@ -692,6 +745,7 @@ export function JudgeDashboard({
                         className="h-10 w-full text-sm font-semibold"
                         onClick={() => onSave(submission)}
                       >
+                        <Save className="h-4 w-4" />
                         Save
                       </Button>
                     </article>
@@ -699,23 +753,23 @@ export function JudgeDashboard({
                 })}
               </div>
 
-              <div className="hidden rounded-2xl border border-border/40 bg-card/80 md:block">
+              <div className="hidden rounded-2xl border border-white/10 bg-card/80 md:block">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-border/50 hover:bg-transparent">
-                      <TableHead className="w-[240px] text-sm font-semibold">
+                    <TableRow className="border-white/10 bg-muted/15 hover:bg-muted/15">
+                      <TableHead className="dash-table-head w-[240px]">
                         Project
                       </TableHead>
-                      <TableHead className="text-sm font-semibold">
+                      <TableHead className="dash-table-head">
                         Links
                       </TableHead>
-                      <TableHead className="min-w-[520px] text-sm font-semibold">
+                      <TableHead className="dash-table-head min-w-[520px]">
                         Score
                       </TableHead>
-                      <TableHead className="min-w-[280px] text-sm font-semibold">
+                      <TableHead className="dash-table-head min-w-[280px]">
                         Judge Notes
                       </TableHead>
-                      <TableHead className="w-[120px] text-right text-sm font-semibold">
+                      <TableHead className="dash-table-head w-[120px] text-right">
                         Action
                       </TableHead>
                     </TableRow>
@@ -784,7 +838,7 @@ export function JudgeDashboard({
                           </TableCell>
                           <TableCell className="align-top">
                             <div className="space-y-3">
-                              {JUDGING_CRITERIA.map((criterion) => {
+                              {judgingCriteria.map((criterion) => {
                                 const scoreStops =
                                   scoreButtonStopsByWeight[criterion.weight] ?? [0, criterion.weight];
                                 const activeScore = submission.judge_criteria_scores?.[criterion.id] ?? null;
@@ -861,11 +915,11 @@ export function JudgeDashboard({
                                   </div>
                                 );
                               })}
-                              <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
-                                <p className="text-sm font-medium text-primary/90">
+                              <div className="flex items-center justify-between rounded-xl border border-primary/35 bg-gradient-to-r from-primary/15 to-secondary/10 px-4 py-3 shadow-[0_0_20px_-8px_hsl(199_89%_68%/0.4)]">
+                                <p className="font-display text-sm font-semibold text-primary/90">
                                   Total score
                                 </p>
-                                <p className="font-display text-xl font-semibold tabular-nums text-primary">
+                                <p className="font-mono text-xl font-bold tabular-nums text-primary">
                                   {totalScore}/100
                                 </p>
                               </div>
@@ -885,6 +939,7 @@ export function JudgeDashboard({
                               className="h-10 w-full min-w-0 px-3 text-sm font-semibold"
                               onClick={() => onSave(submission)}
                             >
+                              <Save className="h-4 w-4" />
                               Save
                             </Button>
                           </TableCell>

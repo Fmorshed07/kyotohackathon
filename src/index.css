@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -168,9 +168,287 @@
   }
 }
 
+@layer components {
+  /* ================================================
+     DASHBOARD DESIGN SYSTEM — glassy Kyoto twilight
+     ================================================ */
+
+  .dash-ambient {
+    background:
+      radial-gradient(ellipse 55% 38% at 12% -5%, hsl(270 55% 42% / 0.16), transparent),
+      radial-gradient(ellipse 48% 32% at 88% 0%, hsl(199 89% 55% / 0.12), transparent),
+      radial-gradient(ellipse 70% 45% at 50% 110%, hsl(18 85% 42% / 0.09), transparent);
+  }
+
+  .dash-content {
+    font-family: 'Inter', system-ui, sans-serif;
+    @apply text-[15px] leading-relaxed sm:text-base md:text-[17px] lg:text-lg;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dash-content [id] {
+    scroll-margin-top: 5.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .dash-content [id] {
+      scroll-margin-top: 4.5rem;
+    }
+  }
+
+  .dash-content input,
+  .dash-content textarea {
+    @apply min-h-11 text-base md:min-h-12 md:text-[17px];
+  }
+
+  .dash-content :is(.dash-card, .dash-card *) {
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+
+  .dash-sidebar {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    @apply text-[15px] md:text-base;
+  }
+
+  .dash-card {
+    @apply relative rounded-2xl border border-white/10 backdrop-blur-md;
+    background: linear-gradient(160deg, hsl(249 40% 13% / 0.92) 0%, hsl(255 42% 10% / 0.9) 100%);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.06),
+      0 24px 60px -32px hsl(250 60% 3% / 0.95);
+  }
+
+  .dash-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 1.5rem;
+    right: 1.5rem;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(199 89% 68% / 0.55),
+      hsl(270 55% 72% / 0.45),
+      transparent
+    );
+  }
+
+  .dash-eyebrow {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    @apply text-xs font-semibold uppercase tracking-[0.22em] text-primary sm:text-sm;
+    opacity: 0.9;
+  }
+
+  .dash-title {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    @apply text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl;
+  }
+
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .dash-title {
+      background: linear-gradient(120deg, hsl(210 40% 98%) 30%, hsl(199 90% 80%) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+  }
+
+  .dash-subtitle {
+    @apply mt-1 text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg;
+  }
+
+  .dash-icon-chip {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/30 text-primary sm:h-12 sm:w-12;
+    background: linear-gradient(145deg, hsl(199 89% 68% / 0.18), hsl(270 55% 72% / 0.1));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.12),
+      0 0 18px hsl(199 89% 68% / 0.15);
+  }
+
+  .dash-icon-chip svg {
+    @apply h-5 w-5 sm:h-6 sm:w-6;
+  }
+
+  .dash-icon-chip--violet {
+    @apply border-secondary/35 text-secondary;
+    background: linear-gradient(145deg, hsl(270 55% 72% / 0.2), hsl(199 89% 68% / 0.08));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.12),
+      0 0 18px hsl(270 55% 72% / 0.18);
+  }
+
+  .dash-icon-chip--sunset {
+    @apply border-accent/35 text-accent;
+    background: linear-gradient(145deg, hsl(18 95% 58% / 0.18), hsl(270 55% 72% / 0.08));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.12),
+      0 0 18px hsl(18 95% 58% / 0.16);
+  }
+
+  .dash-stat-tile {
+    @apply relative overflow-hidden rounded-xl border border-white/10 px-5 py-4 text-center transition-all duration-300 sm:px-6 sm:py-5;
+    background: linear-gradient(180deg, hsl(248 35% 17% / 0.55), hsl(250 42% 11% / 0.75));
+  }
+
+  .dash-stat-tile:hover {
+    @apply -translate-y-0.5 border-primary/40;
+    box-shadow: 0 10px 32px -14px hsl(199 89% 68% / 0.4);
+  }
+
+  .dash-stat-tile--highlight {
+    @apply border-primary/40;
+    background: linear-gradient(180deg, hsl(199 89% 68% / 0.16), hsl(250 42% 11% / 0.75));
+    box-shadow: 0 0 26px -10px hsl(199 89% 68% / 0.45);
+  }
+
+  .dash-stat-value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    @apply text-2xl font-bold tabular-nums leading-none text-primary sm:text-3xl md:text-4xl;
+  }
+
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .dash-stat-value {
+      background: linear-gradient(180deg, hsl(199 95% 82%), hsl(210 40% 98%));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+  }
+
+  .dash-stat-label {
+    @apply mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground sm:text-sm;
+  }
+
+  .dash-message {
+    @apply rounded-xl border border-primary/30 px-4 py-3 text-sm font-medium text-primary sm:text-base;
+    background: linear-gradient(90deg, hsl(199 89% 68% / 0.14), hsl(270 55% 72% / 0.08));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.06);
+  }
+
+  .dash-empty {
+    @apply rounded-xl border border-dashed border-border/60 bg-muted/10 py-12 text-center text-base text-muted-foreground sm:text-lg;
+  }
+
+  .dash-field-label {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-foreground/85 sm:text-sm;
+  }
+
+  .dash-table-head {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    @apply text-xs font-semibold uppercase tracking-[0.16em] text-primary/75 sm:text-sm;
+  }
+
+  .dash-body {
+    @apply text-base leading-relaxed text-foreground/90 sm:text-[17px] md:text-lg;
+  }
+
+  .dash-section-title {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    @apply text-xl font-bold tracking-tight text-foreground sm:text-2xl md:text-3xl;
+  }
+
+  .dash-progress-track {
+    @apply h-2.5 overflow-hidden rounded-full;
+    background: hsl(250 45% 7% / 0.9);
+    box-shadow: inset 0 1px 3px hsl(250 60% 3% / 0.8);
+  }
+
+  .dash-progress-fill {
+    @apply h-full rounded-full transition-all duration-700;
+    background: linear-gradient(90deg, hsl(199 89% 68%), hsl(270 55% 72%), hsl(18 95% 58%));
+    background-size: 200% 100%;
+    animation: gradientShift 6s ease infinite;
+    box-shadow: 0 0 14px hsl(199 89% 68% / 0.55);
+  }
+
+  .dash-mobile-header {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  }
+
+  .dash-table-scroll {
+    @apply -mx-1 overflow-x-auto overscroll-x-contain px-1;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .dash-table-scroll::after {
+    content: "";
+    display: block;
+    height: 1px;
+  }
+
+  @media (max-width: 767px) {
+    .dash-title {
+      @apply text-xl leading-tight sm:text-2xl;
+    }
+
+    .dash-section-title {
+      @apply text-lg leading-tight sm:text-xl;
+    }
+
+    .dash-subtitle {
+      @apply text-sm;
+    }
+
+    .dash-stat-tile {
+      @apply px-3 py-3;
+    }
+
+    .dash-stat-tile:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .dash-stat-value {
+      @apply text-xl sm:text-2xl;
+    }
+
+    .dash-stat-label {
+      @apply mt-1.5 text-[0.65rem] tracking-[0.12em];
+    }
+
+    .dash-icon-chip {
+      @apply h-10 w-10;
+    }
+
+    .dash-icon-chip svg {
+      @apply h-4 w-4;
+    }
+
+    .dash-table-scroll table {
+      min-width: 36rem;
+    }
+
+    .dash-stack-header {
+      @apply flex-col items-stretch gap-4;
+    }
+
+    .dash-stack-header .dash-stat-grid {
+      @apply grid-cols-2 gap-2;
+    }
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .dash-stat-tile:hover {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+}
+
 @layer utilities {
   .font-display {
     font-family: 'Space Grotesk', system-ui, sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
   }
 
   .font-body {

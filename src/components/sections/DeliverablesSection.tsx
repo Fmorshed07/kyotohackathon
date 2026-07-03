@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { ScrollRevealMotion } from "@/components/ScrollRevealMotion";
 import kyotoAbstract from "@/assets/kyoto-abstract.jpg";
 
 const experiences = [
@@ -78,45 +79,39 @@ const DeliverablesSection = () => {
         </motion.div>
 
         <div className="space-y-4">
-          {experiences.map((item, index) => {
-            const { ref, isVisible } = useScrollReveal<HTMLDivElement>({
-              threshold: 0.5,
-            });
-
-            return (
-              <motion.div
-                key={item.title}
-                ref={ref}
-                className="group relative flex items-start gap-6 border-l-2 border-primary/30 py-5 pl-6 transition-all duration-300"
-                initial={{ opacity: 0, x: -40 }}
-                animate={isVisible ? { opacity: 1, x: 0 } : {}}
-                transition={{ duration: 0.5, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                whileHover={{
-                  borderColor: "hsl(185 100% 50%)",
-                  backgroundColor: "hsl(185 100% 50% / 0.05)",
-                  x: 10,
-                }}
+          {experiences.map((item, index) => (
+            <ScrollRevealMotion
+              key={item.title}
+              revealThreshold={0.5}
+              className="group relative flex items-start gap-6 border-l-2 border-primary/30 py-5 pl-6 transition-all duration-300"
+              initial={{ opacity: 0, x: -40 }}
+              visible={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{
+                borderColor: "hsl(185 100% 50%)",
+                backgroundColor: "hsl(185 100% 50% / 0.05)",
+                x: 10,
+              }}
+            >
+              <motion.span
+                className="font-display text-sm text-primary/60 transition-colors group-hover:text-primary"
+                whileHover={{ scale: 1.1 }}
               >
-                <motion.span
-                  className="font-display text-sm text-primary/60 transition-colors group-hover:text-primary"
-                  whileHover={{ scale: 1.1 }}
-                >
-                  {String(index + 1).padStart(2, "0")}
-                </motion.span>
-                <div className="flex-1">
-                  <span className="font-display text-xl tracking-wide text-foreground md:text-2xl">
-                    {item.title}
-                  </span>
-                  <p className="mt-2 font-body text-sm text-muted-foreground md:text-base">
-                    {item.description}
-                  </p>
-                </div>
-                <span className="hidden text-sm text-muted-foreground/40 md:block">
-                  {item.kanji}
+                {String(index + 1).padStart(2, "0")}
+              </motion.span>
+              <div className="flex-1">
+                <span className="font-display text-xl tracking-wide text-foreground md:text-2xl">
+                  {item.title}
                 </span>
-              </motion.div>
-            );
-          })}
+                <p className="mt-2 font-body text-sm text-muted-foreground md:text-base">
+                  {item.description}
+                </p>
+              </div>
+              <span className="hidden text-sm text-muted-foreground/40 md:block">
+                {item.kanji}
+              </span>
+            </ScrollRevealMotion>
+          ))}
         </div>
       </div>
     </section>

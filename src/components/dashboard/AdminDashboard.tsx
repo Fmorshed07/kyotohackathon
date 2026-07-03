@@ -1,6 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  BarChart3,
+  ClipboardList,
+  PlusCircle,
+  ShieldCheck,
+  Trash2,
+  Trophy,
+  Users,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Table,
@@ -19,8 +28,11 @@ import {
 } from "@/components/ui/select";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
+import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import type { PortalHackathon, HackathonId } from "@/lib/hackathons";
-import { getHackathonById } from "@/lib/hackathons";
+import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
+import { MarkingCriteriaSection } from "@/components/dashboard/MarkingCriteriaSection";
+import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { JudgeApprovalStatus, PortalRole } from "@/types/portal";
 
 export type AdminUser = {
@@ -59,13 +71,7 @@ export type NewSubmissionInput = {
   demoVideoUrl: string;
 };
 
-type AdminAnalytics = {
-  totalSubmissions: number;
-  scoredSubmissions: number;
-  unscoredSubmissions: number;
-  averageScore: number | null;
-  activeJudgeCount: number;
-};
+type AdminAnalytics = AdminJudgingStatistics;
 
 type WinnerResult = {
   topScore: number | null;
@@ -74,6 +80,10 @@ type WinnerResult = {
 
 type AdminDashboardProps = {
   selectedHackathon: PortalHackathon;
+  judgingCriteria: JudgingCriterion[];
+  isLoadingCriteria: boolean;
+  isSavingCriteria: boolean;
+  onSaveCriteria: (criteria: JudgingCriterion[]) => Promise<void>;
   users: AdminUser[];
   isLoadingUsers: boolean;
   submissions: AdminSubmissionRow[];
@@ -126,33 +136,37 @@ function UserManagementTable({
 }) {
   return (
     <section className={`${sectionClass} overflow-hidden p-0`} id={sectionId}>
-      <div className="border-b border-border/40 px-6 py-5">
-        <h2 className="font-display text-sm uppercase tracking-[0.28em] text-foreground">
-          {title}
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
+        <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+          <Users className="h-4 w-4" />
+        </span>
+        <div>
+          <p className="dash-eyebrow">User management</p>
+          <h2 className="dash-title">{title}</h2>
+          <p className="dash-subtitle">{description}</p>
+        </div>
       </div>
       <div className="p-4 sm:p-6">
         {users.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-12 text-center text-sm text-muted-foreground">
+          <p className="dash-empty">
             {emptyMessage}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-border/40">
+          <div className="dash-table-scroll rounded-xl border border-white/10">
             <Table>
               <TableHeader>
-                <TableRow className="border-border/50 hover:bg-transparent">
-                  <TableHead className="text-xs uppercase tracking-[0.22em]">Email</TableHead>
-                  <TableHead className="w-[110px] text-xs uppercase tracking-[0.22em]">
+                <TableRow className="border-white/10 bg-muted/15 hover:bg-muted/15">
+                  <TableHead className="dash-table-head">Email</TableHead>
+                  <TableHead className="dash-table-head w-[110px]">
                     Event
                   </TableHead>
-                  <TableHead className="w-[140px] text-xs uppercase tracking-[0.22em]">
+                  <TableHead className="dash-table-head w-[140px]">
                     Current Role
                   </TableHead>
-                  <TableHead className="w-[180px] text-xs uppercase tracking-[0.22em]">
+                  <TableHead className="dash-table-head w-[180px]">
                     Change Role
                   </TableHead>
-                  <TableHead className="w-[150px] text-xs uppercase tracking-[0.22em]">
+                  <TableHead className="dash-table-head w-[150px]">
                     Judge Access
                   </TableHead>
                   <TableHead className="w-[160px]" />
@@ -166,7 +180,7 @@ function UserManagementTable({
                     isStaffRole(user.role) && user.judgeApprovalStatus === "pending";
 
                   return (
-                    <TableRow key={user.id} className="border-border/40">
+                    <TableRow key={user.id} className="border-white/5 transition-colors hover:bg-primary/5">
                       <TableCell className="text-sm">{user.email}</TableCell>
                       <TableCell>
                         {user.role === "admin" ? (
@@ -248,6 +262,10 @@ function UserManagementTable({
 
 export function AdminDashboard({
   selectedHackathon,
+  judgingCriteria,
+  isLoadingCriteria,
+  isSavingCriteria,
+  onSaveCriteria,
   users,
   isLoadingUsers,
   submissions,
@@ -294,111 +312,142 @@ export function AdminDashboard({
     <div className="space-y-8" id="overview">
       <HackathonContextBanner hackathon={selectedHackathon} role="admin" />
 
-      <section className={`${sectionClass} relative overflow-hidden p-6`} aria-label="Admin overview">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="font-display text-sm uppercase tracking-[0.28em] text-foreground">
-              Admin overview
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Users and submissions scoped to {selectedHackathon.name}.
-            </p>
+      <section className={`${sectionClass} relative overflow-hidden`} aria-label="Admin overview">
+        <div className="dash-stack-header flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="dash-icon-chip dash-icon-chip--sunset" aria-hidden>
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Command center</p>
+              <h2 className="dash-title">Admin overview</h2>
+              <p className="dash-subtitle">
+                Users and submissions scoped to {selectedHackathon.name}.
+              </p>
+            </div>
           </div>
-          <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-auto lg:gap-4">
-            <div className="rounded-xl border border-primary/30 bg-gradient-to-b from-primary/10 to-transparent px-5 py-3 text-center">
-              <p className="font-display text-2xl font-semibold tabular-nums text-primary">
+          <div className="dash-stat-grid grid w-full gap-2 sm:grid-cols-3 sm:gap-3 lg:w-auto lg:gap-4">
+            <div className="dash-stat-tile dash-stat-tile--highlight">
+              <p className="dash-stat-value">
                 {isLoadingUsers ? "—" : participants.length}
               </p>
-              <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="dash-stat-label">
                 Participants
               </p>
             </div>
-            <div className="rounded-xl border border-border/50 bg-muted/20 px-5 py-3 text-center">
-              <p className="font-display text-2xl font-semibold tabular-nums text-primary">
+            <div className="dash-stat-tile">
+              <p className="dash-stat-value">
                 {isLoadingUsers ? "—" : staff.length}
               </p>
-              <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="dash-stat-label">
                 Judges
               </p>
             </div>
-            <div className="rounded-xl border border-border/50 bg-muted/20 px-5 py-3 text-center">
-              <p className="font-display text-2xl font-semibold tabular-nums text-primary">
+            <div className="dash-stat-tile sm:col-span-1 col-span-2">
+              <p className="dash-stat-value">
                 {isLoadingSubmissions ? "—" : analytics.totalSubmissions}
               </p>
-              <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="dash-stat-label">
                 Submissions
               </p>
             </div>
           </div>
         </div>
         {message && (
-          <p className="mt-4 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
+          <p className="dash-message mt-4">
             {message}
           </p>
         )}
       </section>
 
-      <section className={`${sectionClass} p-6`} id="analytics">
-        <div className="mb-5 border-b border-border/40 pb-4">
-          <h2 className="font-display text-sm uppercase tracking-[0.28em] text-foreground">Analytics</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Submission health and scoring progress for {selectedHackathon.name}.
-          </p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
-            <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">Scored projects</p>
-            <p className="mt-1 font-display text-2xl tabular-nums text-primary">
-              {isLoadingSubmissions ? "—" : analytics.scoredSubmissions}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
-            <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">Pending score</p>
-            <p className="mt-1 font-display text-2xl tabular-nums text-primary">
-              {isLoadingSubmissions ? "—" : analytics.unscoredSubmissions}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
-            <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">Average score</p>
-            <p className="mt-1 font-display text-2xl tabular-nums text-primary">
-              {isLoadingSubmissions
-                ? "—"
-                : analytics.averageScore != null
-                  ? analytics.averageScore.toFixed(1)
-                  : "—"}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
-            <p className="text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">Judges scored</p>
-            <p className="mt-1 font-display text-2xl tabular-nums text-primary">
-              {isLoadingSubmissions ? "—" : analytics.activeJudgeCount}
+      <MarkingCriteriaSection
+        selectedHackathon={selectedHackathon}
+        criteria={judgingCriteria}
+        isLoading={isLoadingCriteria}
+        isSaving={isSavingCriteria}
+        onSave={onSaveCriteria}
+      />
+
+      <section className={`${sectionClass}`} id="analytics">
+        <div className="mb-5 flex items-start gap-3 border-b border-white/10 pb-4">
+          <span className="dash-icon-chip" aria-hidden>
+            <BarChart3 className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Analytics</p>
+            <h2 className="dash-title">Judging statistics</h2>
+            <p className="dash-subtitle">
+              Live scoring analytics for {selectedHackathon.name}.
             </p>
           </div>
         </div>
+        <JudgingStatsPanel
+          isLoading={isLoadingSubmissions}
+          completionRate={analytics.completionRate}
+          criterionAverages={analytics.criterionAverages}
+          title="Event scoring overview"
+          description="Aggregated across all judges and submissions for this hackathon."
+          stats={[
+            { label: "Submissions", value: String(analytics.totalSubmissions), highlight: true },
+            { label: "Scored", value: String(analytics.scoredSubmissions) },
+            { label: "Pending", value: String(analytics.unscoredSubmissions) },
+            {
+              label: "Avg score",
+              value: analytics.averageScore != null ? analytics.averageScore.toFixed(1) : "—",
+            },
+            { label: "Teams", value: String(analytics.teamsCount) },
+            { label: "Judge marks", value: String(analytics.totalJudgeMarks) },
+            { label: "Judges active", value: String(analytics.activeJudgeCount) },
+            {
+              label: "Judges registered",
+              value: isLoadingUsers ? "—" : String(analytics.registeredJudgeCount),
+            },
+            {
+              label: "Top project",
+              value:
+                analytics.highestProjectScore != null
+                  ? analytics.highestProjectScore.toFixed(1)
+                  : "—",
+            },
+            {
+              label: "Lowest project",
+              value:
+                analytics.lowestProjectScore != null ? analytics.lowestProjectScore.toFixed(1) : "—",
+            },
+          ]}
+        />
       </section>
 
-      <section className={`${sectionClass} p-6`} id="winner-detection">
+      <section className={`${sectionClass}`} id="winner-detection">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="font-display text-sm uppercase tracking-[0.28em] text-foreground">
-              Winner detection
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Winner is auto-detected from the highest average score for {selectedHackathon.shortName}.
-            </p>
+          <div className="flex items-start gap-3">
+            <span className="dash-icon-chip dash-icon-chip--sunset" aria-hidden>
+              <Trophy className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Leaderboard</p>
+              <h2 className="dash-title">Winner detection</h2>
+              <p className="dash-subtitle">
+                Winner is auto-detected from the highest average score for {selectedHackathon.shortName}.
+              </p>
+            </div>
           </div>
-          <Badge variant="outline" className="uppercase tracking-[0.14em]">
+          <Badge
+            variant="outline"
+            className="border-accent/40 bg-accent/10 font-mono text-accent uppercase tracking-[0.14em]"
+          >
             {winner.topScore != null ? `Top score ${winner.topScore.toFixed(1)}` : "Awaiting scores"}
           </Badge>
         </div>
-        <div className="mt-4 rounded-xl border border-border/40 bg-muted/20 p-4">
+        <div className="mt-4 overflow-hidden rounded-xl border border-accent/25 bg-gradient-to-r from-accent/10 via-muted/15 to-transparent p-4">
           {winner.winners.length ? (
             <>
-              <p className="text-[0.7rem] uppercase tracking-[0.22em] text-muted-foreground">
+              <p className="dash-eyebrow text-accent/90">
                 {winner.winners.length > 1 ? "Tie detected" : "Current winner"}
               </p>
-              <p className="mt-1 text-sm text-foreground">{winnerNames}</p>
+              <p className="mt-1.5 font-display text-base font-bold text-foreground sm:text-lg">
+                {winnerNames}
+              </p>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
@@ -409,17 +458,22 @@ export function AdminDashboard({
       </section>
 
       <section className={`${sectionClass} overflow-hidden p-0`} id="submission-marks">
-        <div className="border-b border-border/40 px-6 py-5">
-          <h2 className="font-display text-sm uppercase tracking-[0.28em] text-foreground">
-            Participant submissions + judge marks
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Projects and judge marks for {selectedHackathon.name}.
-          </p>
+        <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
+          <span className="dash-icon-chip" aria-hidden>
+            <ClipboardList className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Submissions</p>
+            <h2 className="dash-title">Participant submissions + judge marks</h2>
+            <p className="dash-subtitle">
+              Projects and judge marks for {selectedHackathon.name}.
+            </p>
+          </div>
         </div>
         <div className="p-4 sm:p-6">
-          <div className="mb-5 rounded-xl border border-border/40 bg-muted/20 p-4">
-            <p className="text-[0.7rem] uppercase tracking-[0.22em] text-muted-foreground">
+          <div className="mb-5 rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4">
+            <p className="dash-eyebrow inline-flex items-center gap-1.5">
+              <PlusCircle className="h-3.5 w-3.5" aria-hidden />
               Add submission
             </p>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -501,6 +555,7 @@ export function AdminDashboard({
                   });
                 }}
               >
+                <PlusCircle className="h-3.5 w-3.5" />
                 {isCreatingSubmission ? "Adding..." : "Add submission"}
               </Button>
             </div>
@@ -509,33 +564,33 @@ export function AdminDashboard({
           {isLoadingSubmissions ? (
             <p className="text-sm text-muted-foreground">Loading submissions...</p>
           ) : submissions.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 py-12 text-center text-sm text-muted-foreground">
+            <p className="dash-empty">
               No participant submissions yet for {selectedHackathon.name}.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border/40">
+            <div className="dash-table-scroll rounded-xl border border-white/10">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border/50 hover:bg-transparent">
-                    <TableHead className="w-[200px] text-xs uppercase tracking-[0.22em]">
+                  <TableRow className="border-white/10 bg-muted/15 hover:bg-muted/15">
+                    <TableHead className="dash-table-head w-[200px]">
                       Participant
                     </TableHead>
-                    <TableHead className="w-[220px] text-xs uppercase tracking-[0.22em]">Project</TableHead>
-                    <TableHead className="text-xs uppercase tracking-[0.22em]">Links</TableHead>
-                    <TableHead className="min-w-[240px] text-xs uppercase tracking-[0.22em]">
+                    <TableHead className="dash-table-head w-[220px]">Project</TableHead>
+                    <TableHead className="dash-table-head">Links</TableHead>
+                    <TableHead className="dash-table-head min-w-[240px]">
                       Marks from judges
                     </TableHead>
-                    <TableHead className="w-[90px] text-right text-xs uppercase tracking-[0.22em]">
+                    <TableHead className="dash-table-head w-[90px] text-right">
                       Avg
                     </TableHead>
-                    <TableHead className="w-[110px] text-right text-xs uppercase tracking-[0.22em]">
+                    <TableHead className="dash-table-head w-[110px] text-right">
                       Action
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {submissions.map((submission) => (
-                    <TableRow key={submission.id} className="border-border/40 hover:bg-muted/20">
+                    <TableRow key={submission.id} className="border-white/5 transition-colors hover:bg-primary/5">
                       <TableCell className="align-top text-sm">{submission.participantEmail}</TableCell>
                       <TableCell className="align-top">
                         <p className="text-sm font-medium">{submission.title || "Untitled Project"}</p>
@@ -595,7 +650,7 @@ export function AdminDashboard({
                         )}
                       </TableCell>
                       <TableCell className="align-top text-right">
-                        <p className="text-sm font-medium tabular-nums">
+                        <p className="font-mono text-sm font-bold tabular-nums text-primary">
                           {submission.averageScore != null ? submission.averageScore.toFixed(1) : "—"}
                         </p>
                         <p className="text-[0.65rem] text-muted-foreground">{submission.scoredByCount} judges</p>
@@ -613,6 +668,7 @@ export function AdminDashboard({
                             await onDeleteSubmission(submission.id);
                           }}
                         >
+                          <Trash2 className="h-3 w-3" />
                           {deletingSubmissionId === submission.id ? "Removing..." : "Remove"}
                         </Button>
                       </TableCell>
@@ -626,7 +682,7 @@ export function AdminDashboard({
       </section>
 
       {isLoadingUsers ? (
-        <section className={`${sectionClass} p-6`}>
+        <section className={`${sectionClass}`}>
           <p className="text-sm text-muted-foreground">Loading users...</p>
         </section>
       ) : (

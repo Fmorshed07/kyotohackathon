@@ -1,4 +1,15 @@
-export const JUDGING_CRITERIA = [
+export type JudgingCriterion = {
+  id: string;
+  title: string;
+  weight: number;
+  questions: string[];
+};
+
+export type JudgingCriterionId = string;
+
+export type CriteriaScores = Partial<Record<JudgingCriterionId, number | null>> | null;
+
+export const DEFAULT_JUDGING_CRITERIA: JudgingCriterion[] = [
   {
     id: "social_impact",
     title: "Social Impact & Problem Fit",
@@ -44,17 +55,75 @@ export const JUDGING_CRITERIA = [
       "Does the demo effectively showcase the core functionality of the project?",
     ],
   },
-] as const;
+];
 
-export type JudgingCriterionId = (typeof JUDGING_CRITERIA)[number]["id"];
-
-export type CriteriaScores = Partial<Record<JudgingCriterionId, number | null>> | null;
+/** @deprecated Use DEFAULT_JUDGING_CRITERIA or fetchHackathonCriteria instead */
+export const JUDGING_CRITERIA = DEFAULT_JUDGING_CRITERIA;
 
 export const clampCriterionScore = (score: number, maxScore: number) =>
   Math.max(0, Math.min(maxScore, Math.round(score)));
 
-export const calculateTotalFromCriteria = (criteriaScores: CriteriaScores) =>
-  JUDGING_CRITERIA.reduce((sum, criterion) => {
+export const calculateTotalFromCriteria = (
+  criteriaScores: CriteriaScores,
+  criteria: JudgingCriterion[] = DEFAULT_JUDGING_CRITERIA
+) =>
+  criteria.reduce((sum, criterion) => {
     const score = criteriaScores?.[criterion.id];
     return sum + (typeof score === "number" ? clampCriterionScore(score, criterion.weight) : 0);
   }, 0);
+
+export const getCriteriaStats = (criteria: JudgingCriterion[]) => {
+  if (!criteria.length) {
+    return { criteriaCount: 0, totalPoints: 0, highestWeight: 0, lowestWeight: 0 };
+  }
+  const weights = criteria.map((criterion) => criterion.weight);
+  return {
+    criteriaCount: criteria.length,
+    totalPoints: weights.reduce((sum, weight) => sum + weight, 0),
+    highestWeight: Math.max(...weights),
+    lowestWeight: Math.min(...weights),
+  };
+};
+
+export const slugifyCriterionId = (title: string, existingIds: Set<string>): string => {
+  const base =
+    title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "") || "criterion";
+
+  if (!existingIds.has(base)) return base;
+
+  let index = 2;
+  while (existingIds.has(`${base}_${index}`)) {
+    index += 1;
+  }
+  return `${base}_${index}`;
+};
+
+export const normalizeJudgingCriteria = (value: unknown): JudgingCriterion[] | null => {
+  if (!Array.isArray(value)) return null;
+
+  const normalized = value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const record = entry as Record<string, unknown>;
+      const id = typeof record.id === "string" ? record.id.trim() : "";
+      const title = typeof record.title === "string" ? record.title.trim() : "";
+      const weight = typeof record.weight === "number" ? record.weight : Number(record.weight);
+      const questions = Array.isArray(record.questions)
+        ? record.questions
+            .filter((question): question is string => typeof question === "string")
+            .map((question) => question.trim())
+            .filter(Boolean)
+        : [];
+
+      if (!id || !title || !Number.isFinite(weight) || weight <= 0) return null;
+
+      return { id, title, weight: Math.round(weight), questions };
+    })
+    .filter((entry): entry is JudgingCriterion => entry !== null);
+
+  return normalized.length ? normalized : null;
+};
