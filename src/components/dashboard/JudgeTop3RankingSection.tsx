@@ -36,13 +36,18 @@ function formatSavedAt(iso: string | null): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString();
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
-function getSubmissionLabel(submission: Submission): string {
-  const title = submission.title?.trim() || "Untitled Project";
-  const team = submission.team_name?.trim() || "Unnamed team";
-  return `${title} — ${team}`;
+function getSubmissionTitle(submission: Submission): string {
+  return submission.title?.trim() || "Untitled Project";
+}
+
+function getSubmissionTeam(submission: Submission): string {
+  return submission.team_name?.trim() || "Unnamed team";
 }
 
 export function JudgeTop3RankingSection({
@@ -57,6 +62,7 @@ export function JudgeTop3RankingSection({
   const selectedIds = new Set(
     TOP3_RANK_SLOTS.map((slot) => ranks[slot]).filter(Boolean) as string[]
   );
+  const picksCount = TOP3_RANK_SLOTS.filter((slot) => ranks[slot] != null).length;
 
   const getAvailableSubmissions = (currentSlot: Top3RankSlot) => {
     const currentId = ranks[currentSlot];
@@ -66,13 +72,13 @@ export function JudgeTop3RankingSection({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+          <span className="dash-icon-chip dash-icon-chip--violet shrink-0" aria-hidden>
             <Trophy className="h-4 w-4" />
           </span>
-          <div>
+          <div className="min-w-0">
             <p className="dash-eyebrow">Final ballot</p>
             <h2 className="dash-title">Top 3 idea ranking</h2>
             <p className="dash-subtitle">
@@ -82,17 +88,17 @@ export function JudgeTop3RankingSection({
         </div>
         <span
           className={cn(
-            "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em]",
+            "inline-flex w-fit shrink-0 items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] sm:text-xs sm:tracking-[0.1em]",
             isComplete
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
               : "border-border/60 bg-muted/30 text-muted-foreground"
           )}
         >
-          {isComplete ? "Ready to save" : "3 picks required"}
+          {isComplete ? "Ready to save" : `${picksCount}/3 picks`}
         </span>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
         {TOP3_RANK_SLOTS.map((slot) => {
           const selectedId = ranks[slot];
           const selectedSubmission = submissions.find((s) => s.id === selectedId) ?? null;
@@ -105,7 +111,7 @@ export function JudgeTop3RankingSection({
             <div
               key={slot}
               className={cn(
-                "rounded-xl border p-4",
+                "rounded-xl border p-3.5 sm:p-4",
                 accent ? accent.panel : "border-border/50 bg-muted/20"
               )}
             >
@@ -127,13 +133,28 @@ export function JudgeTop3RankingSection({
                 value={selectedId ?? ""}
                 onValueChange={(value) => onRankChange(slot, value || null)}
               >
-                <SelectTrigger className="w-full bg-background/80">
+                <SelectTrigger className="h-11 w-full bg-background/80 text-base sm:h-10 sm:text-sm">
                   <SelectValue placeholder="Choose an idea…" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent
+                  position="popper"
+                  sideOffset={4}
+                  className="max-h-[min(24rem,70dvh)] w-[min(calc(100vw-2rem),var(--radix-select-trigger-width))]"
+                >
                   {available.map((submission) => (
-                    <SelectItem key={submission.id} value={submission.id}>
-                      {getSubmissionLabel(submission)}
+                    <SelectItem
+                      key={submission.id}
+                      value={submission.id}
+                      className="items-start py-2.5 pl-8 pr-3 text-sm leading-snug [&>span:first-child]:top-2.5"
+                    >
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="font-medium text-foreground">
+                          {getSubmissionTitle(submission)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {getSubmissionTeam(submission)}
+                        </span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -142,19 +163,19 @@ export function JudgeTop3RankingSection({
               {selectedSubmission ? (
                 <div className="mt-3 space-y-1">
                   <p className={cn("text-sm font-semibold", accent?.teamName ?? "text-foreground")}>
-                    {selectedSubmission.title || "Untitled Project"}
+                    {getSubmissionTitle(selectedSubmission)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {selectedSubmission.team_name?.trim() || "Unnamed team"}
+                    {getSubmissionTeam(selectedSubmission)}
                   </p>
                   {selectedSubmission.short_description ? (
-                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                    <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground sm:line-clamp-2">
                       {selectedSubmission.short_description}
                     </p>
                   ) : null}
                 </div>
               ) : (
-                <p className="mt-3 text-xs text-muted-foreground">
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
                   Select the idea you rank {slot === "first" ? "1st" : slot === "second" ? "2nd" : "3rd"}.
                 </p>
               )}
@@ -163,21 +184,23 @@ export function JudgeTop3RankingSection({
         })}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-        <p className="text-xs text-muted-foreground">
-          {savedAt
-            ? `Last saved ${formatSavedAt(savedAt) ?? savedAt}`
-            : "Your ranking has not been saved yet."}
-        </p>
-        <Button
-          size="lg"
-          className="h-11 text-sm font-semibold"
-          disabled={isSaving || !isComplete}
-          onClick={() => void onSave()}
-        >
-          <Save className="h-4 w-4" />
-          {isSaving ? "Saving…" : "Save top 3 ranking"}
-        </Button>
+      <div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 -mx-1 rounded-xl border border-white/10 bg-card/95 p-3 shadow-lg backdrop-blur-md sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:border-t sm:border-white/10 sm:pt-4">
+          <p className="text-center text-xs text-muted-foreground sm:text-left">
+            {savedAt
+              ? `Last saved ${formatSavedAt(savedAt) ?? savedAt}`
+              : "Your ranking has not been saved yet."}
+          </p>
+          <Button
+            size="lg"
+            className="h-11 w-full text-sm font-semibold sm:w-auto"
+            disabled={isSaving || !isComplete}
+            onClick={() => void onSave()}
+          >
+            <Save className="h-4 w-4" />
+            {isSaving ? "Saving…" : "Save top 3 ranking"}
+          </Button>
+        </div>
       </div>
     </div>
   );

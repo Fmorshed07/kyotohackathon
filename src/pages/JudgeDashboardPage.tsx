@@ -70,19 +70,27 @@ export default function JudgeDashboardPage() {
         );
         setJudgeSubmissions(mappedSubmissions);
 
-        const rankingRef = doc(
-          db,
-          "judge_rankings",
-          buildJudgeRankingDocId(sessionUser.id, SITE_HACKATHON_ID)
-        );
-        const rankingSnap = await getDoc(rankingRef);
-        const ranking = parseTop3RankingFromFirestore(
-          rankingSnap.exists() ? (rankingSnap.data() as Record<string, unknown>) : undefined,
-          sessionUser.id,
-          SITE_HACKATHON_ID
-        );
-        setTop3Ranks(ranking.ranks);
-        setTop3SavedAt(ranking.updated_at);
+        try {
+          const rankingRef = doc(
+            db,
+            "judge_rankings",
+            buildJudgeRankingDocId(sessionUser.id, SITE_HACKATHON_ID)
+          );
+          const rankingSnap = await getDoc(rankingRef);
+          const ranking = parseTop3RankingFromFirestore(
+            rankingSnap.exists() ? (rankingSnap.data() as Record<string, unknown>) : undefined,
+            sessionUser.id,
+            SITE_HACKATHON_ID
+          );
+          setTop3Ranks(ranking.ranks);
+          setTop3SavedAt(ranking.updated_at);
+        } catch (rankingError: unknown) {
+          const rankingMessage =
+            typeof rankingError === "object" && rankingError && "message" in rankingError
+              ? String((rankingError as { message?: string }).message)
+              : "Failed to load your top 3 ranking.";
+          setJudgeMessage(rankingMessage);
+        }
       } catch (error: unknown) {
         const message =
           typeof error === "object" && error && "message" in error

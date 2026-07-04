@@ -85,10 +85,12 @@ service cloud.firestore {
     }
 
     match /judge_rankings/{rankingId} {
-      allow get: if isSignedIn() && (
-        isAdmin()
-        || (isApprovedStaff() && resource.data.judge_id == request.auth.uid)
-      );
+      function isOwnRankingDoc() {
+        return isApprovedStaff()
+          && rankingId.matches('^' + request.auth.uid + '_.*');
+      }
+
+      allow get: if isSignedIn() && (isAdmin() || isOwnRankingDoc());
       allow list: if isAdmin();
       allow create: if isApprovedStaff()
         && request.resource.data.judge_id == request.auth.uid
