@@ -289,9 +289,9 @@ function DashboardLayoutContent({
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#winner-detection" onNavigate={closeMobileNav}>
+                        <DashboardNavLink href="#top-3-marks" onNavigate={closeMobileNav}>
                           <Trophy className={navIconClass} />
-                          <span>Winner Detection</span>
+                          <span>Top 3 Marks</span>
                         </DashboardNavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

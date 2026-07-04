@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import {
   BarChart3,
   ShieldCheck,
-  Trophy,
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -31,6 +30,7 @@ import type { AdminGrantRecord } from "@/lib/adminGrants";
 import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { MarkingCriteriaSection } from "@/components/dashboard/MarkingCriteriaSection";
 import { AdminTop3RankingPanel } from "@/components/dashboard/AdminTop3RankingPanel";
+import { AdminTop3MarksPanel } from "@/components/dashboard/AdminTop3MarksPanel";
 import { AdminJudgeMarksPanel } from "@/components/dashboard/AdminJudgeMarksPanel";
 import { AdminSubmissionsPanel } from "@/components/dashboard/AdminSubmissionsPanel";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
@@ -49,6 +49,7 @@ export type AdminSubmissionRow = {
   id: string;
   participantId: string;
   participantEmail: string;
+  teamName: string | null;
   title: string | null;
   shortDescription: string | null;
   projectUrl: string | null;
@@ -76,11 +77,6 @@ export type NewSubmissionInput = {
 
 type AdminAnalytics = AdminJudgingStatistics;
 
-type WinnerResult = {
-  topScore: number | null;
-  winners: AdminSubmissionRow[];
-};
-
 type AdminDashboardProps = {
   selectedHackathon: PortalHackathon;
   judgingCriteria: JudgingCriterion[];
@@ -92,7 +88,6 @@ type AdminDashboardProps = {
   submissions: AdminSubmissionRow[];
   isLoadingSubmissions: boolean;
   analytics: AdminAnalytics;
-  winner: WinnerResult;
   message: string | null;
   savingUserId: string | null;
   pendingRoles: Record<string, PortalRole>;
@@ -285,7 +280,6 @@ export function AdminDashboard({
   submissions,
   isLoadingSubmissions,
   analytics,
-  winner,
   message,
   savingUserId,
   pendingRoles,
@@ -315,9 +309,6 @@ export function AdminDashboard({
   });
   const participants = users.filter((user) => user.role === "participant");
   const staff = users.filter((user) => isStaffRole(user.role));
-  const winnerNames = winner.winners
-    .map((entry) => entry.title || entry.participantEmail || "Untitled Project")
-    .join(", ");
 
   useEffect(() => {
     setNewSubmission({
@@ -496,44 +487,11 @@ export function AdminDashboard({
         />
       </section>
 
-      <section className={`${sectionClass}`} id="winner-detection">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="dash-icon-chip dash-icon-chip--sunset" aria-hidden>
-              <Trophy className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="dash-eyebrow">Leaderboard</p>
-              <h2 className="dash-title">Winner detection</h2>
-              <p className="dash-subtitle">
-                Winner is auto-detected from the highest average score for {selectedHackathon.shortName}.
-              </p>
-            </div>
-          </div>
-          <Badge
-            variant="outline"
-            className="border-accent/40 bg-accent/10 font-mono text-accent uppercase tracking-[0.14em]"
-          >
-            {winner.topScore != null ? `Top score ${winner.topScore.toFixed(1)}` : "Awaiting scores"}
-          </Badge>
-        </div>
-        <div className="mt-4 overflow-hidden rounded-xl border border-accent/25 bg-gradient-to-r from-accent/10 via-muted/15 to-transparent p-4">
-          {winner.winners.length ? (
-            <>
-              <p className="dash-eyebrow text-accent/90">
-                {winner.winners.length > 1 ? "Tie detected" : "Current winner"}
-              </p>
-              <p className="mt-1.5 font-display text-base font-bold text-foreground sm:text-lg">
-                {winnerNames}
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No winner detected yet. At least one scored project is required.
-            </p>
-          )}
-        </div>
-      </section>
+      <AdminTop3MarksPanel
+        selectedHackathon={selectedHackathon}
+        submissions={submissions}
+        isLoading={isLoadingSubmissions}
+      />
 
       <AdminTop3RankingPanel
         selectedHackathon={selectedHackathon}

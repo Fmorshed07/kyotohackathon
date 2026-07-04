@@ -278,6 +278,7 @@ export default function AdminDashboardPage() {
         id: submission.id,
         participantId,
         participantEmail,
+        teamName: submission.team_name ?? null,
         title: submission.title,
         shortDescription: submission.short_description,
         projectUrl: submission.project_url,
@@ -299,13 +300,6 @@ export default function AdminDashboardPage() {
     [submissions, hackathonUsers, userEmailLookup, judgingCriteria]
   );
 
-  const scoredRows = adminSubmissionRows.filter((row) => row.averageScore != null);
-  const topScore =
-    scoredRows.length > 0 ? Math.max(...scoredRows.map((row) => row.averageScore ?? 0)) : null;
-  const winners =
-    topScore == null
-      ? []
-      : scoredRows.filter((row) => row.averageScore != null && row.averageScore === topScore);
   const activeJudgeIds = new Set(
     adminSubmissionRows.flatMap((row) =>
       row.judgeMarks
@@ -612,7 +606,6 @@ export default function AdminDashboardPage() {
         submissions={adminSubmissionRows}
         isLoadingSubmissions={isLoadingSubmissions}
         analytics={analytics}
-        winner={{ topScore, winners }}
         message={message}
         savingUserId={savingUserId}
         pendingRoles={pendingRoles}
