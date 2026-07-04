@@ -83,5 +83,20 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create, update, delete: if isAdmin();
     }
+
+    match /judge_rankings/{rankingId} {
+      allow get: if isSignedIn() && (
+        isAdmin()
+        || (isApprovedStaff() && resource.data.judge_id == request.auth.uid)
+      );
+      allow list: if isAdmin();
+      allow create: if isApprovedStaff()
+        && request.resource.data.judge_id == request.auth.uid
+        && rankingId == request.resource.data.judge_id + '_' + request.resource.data.hackathon_id;
+      allow update: if isApprovedStaff()
+        && resource.data.judge_id == request.auth.uid
+        && request.resource.data.judge_id == request.auth.uid;
+      allow delete: if isAdmin();
+    }
   }
 }

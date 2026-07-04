@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Gavel, Users } from "lucide-react";
+import { Gavel, Trophy, Users } from "lucide-react";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { JudgeScoringWorkspace } from "@/components/dashboard/JudgeScoringWorkspace";
+import { JudgeTop3RankingSection } from "@/components/dashboard/JudgeTop3RankingSection";
 import {
   getSubmissionAccentStyle,
   getTeamAccentStyle,
@@ -12,7 +13,7 @@ import {
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import type { JudgeStatistics } from "@/lib/judgingStatistics";
 import type { PortalHackathon } from "@/lib/hackathons";
-import type { Submission } from "@/types/portal";
+import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
 import {
   calculateTotalFromCriteria,
   type JudgingCriterion,
@@ -58,6 +59,11 @@ export type JudgeDashboardProps = {
   onNotesChange: (id: string, value: string) => void;
   onSave: (submissionId: string) => Promise<void>;
   savingSubmissionId?: string | null;
+  top3Ranks: JudgeTop3Ranks;
+  top3SavedAt: string | null;
+  isSavingTop3: boolean;
+  onTop3RankChange: (slot: Top3RankSlot, submissionId: string | null) => void;
+  onSaveTop3Ranking: () => Promise<void>;
 };
 
 export function JudgeDashboard({
@@ -72,6 +78,11 @@ export function JudgeDashboard({
   onNotesChange,
   onSave,
   savingSubmissionId,
+  top3Ranks,
+  top3SavedAt,
+  isSavingTop3,
+  onTop3RankChange,
+  onSaveTop3Ranking,
 }: JudgeDashboardProps) {
   const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -121,6 +132,41 @@ export function JudgeDashboard({
     filteredTeams.find((team) => team.name === selectedTeamName) ?? filteredTeams[0] ?? null;
   const activeTeamAccent = activeTeam ? getTeamAccentStyle(activeTeam.name) : null;
   const hasSearchQuery = searchQuery.trim().length > 0;
+
+  const getTeamScoringProgress = (team: TeamSummary) => {
+    const scored = team.submissions.filter((submission) => {
+      if (
+        submission.judge_criteria_scores &&
+        typeof submission.judge_criteria_scores === "object"
+      ) {
+        return judgingCriteria.every(
+          (criterion) => typeof submission.judge_criteria_scores?.[criterion.id] === "number"
+        );
+      }
+      return submission.judge_score != null;
+    }).length;
+    return { scored, total: team.submissions.length };
+  };
+
+  const overallProgress = useMemo(() => {
+    if (submissions.length === 0) return { scored: 0, total: 0, percent: 0 };
+    const scored = submissions.filter((submission) => {
+      if (
+        submission.judge_criteria_scores &&
+        typeof submission.judge_criteria_scores === "object"
+      ) {
+        return judgingCriteria.every(
+          (criterion) => typeof submission.judge_criteria_scores?.[criterion.id] === "number"
+        );
+      }
+      return submission.judge_score != null;
+    }).length;
+    return {
+      scored,
+      total: submissions.length,
+      percent: Math.round((scored / submissions.length) * 100),
+    };
+  }, [submissions, judgingCriteria]);
 
   return (
     <div className="space-y-8" id="overview">
@@ -178,19 +224,42 @@ export function JudgeDashboard({
           </p>
         )}
         {!isLoadingSubmissions && submissions.length > 0 ? (
-          <div className="mt-4 max-w-xl">
-            <SubmissionSearchInput
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search teams, projects, or members..."
-            />
-            {hasSearchQuery ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Showing {filteredTeams.length} of {teams.length} teams and{" "}
-                {filteredSubmissions.length} of {submissions.length} submissions.
-              </p>
-            ) : null}
-          </div>
+          <>
+            <div className="mt-5 rounded-xl border border-primary/25 bg-gradient-to-r from-primary/10 via-muted/10 to-transparent p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Your scoring progress
+                  </p>
+                  <p className="mt-1 font-display text-lg font-bold text-foreground">
+                    {overallProgress.scored} of {overallProgress.total} ideas scored
+                  </p>
+                </div>
+                <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-sm font-bold tabular-nums text-primary">
+                  {overallProgress.percent}%
+                </span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted/40">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
+                  style={{ width: `${overallProgress.percent}%` }}
+                />
+              </div>
+            </div>
+            <div className="mt-4 max-w-xl">
+              <SubmissionSearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search teams, projects, or members..."
+              />
+              {hasSearchQuery ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Showing {filteredTeams.length} of {teams.length} teams and{" "}
+                  {filteredSubmissions.length} of {submissions.length} submissions.
+                </p>
+              ) : null}
+            </div>
+          </>
         ) : null}
         {statistics ? (
           <div className="mt-6 border-t border-white/10 pt-6">
@@ -255,6 +324,8 @@ export function JudgeDashboard({
               {filteredTeams.map((team) => {
                 const isActive = activeTeam?.name === team.name;
                 const accentStyle = getTeamAccentStyle(team.name);
+                const progress = getTeamScoringProgress(team);
+                const isFullyScored = progress.scored === progress.total && progress.total > 0;
                 return (
                   <button
                     key={team.name}
@@ -269,15 +340,25 @@ export function JudgeDashboard({
                     <div className="flex items-start justify-between gap-3">
                       <p className={`text-base font-semibold ${accentStyle.teamName}`}>{team.name}</p>
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${accentStyle.pill}`}
+                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${
+                          isFullyScored
+                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                            : progress.scored > 0
+                              ? accentStyle.pill
+                              : "border-border/50 bg-muted/30 text-muted-foreground"
+                        }`}
                       >
-                        View details
+                        {isFullyScored
+                          ? "Done"
+                          : progress.scored > 0
+                            ? `${progress.scored}/${progress.total} scored`
+                            : "Pending"}
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {team.submissions.length}{" "}
                       {team.submissions.length === 1 ? "submission" : "submissions"}{" "}
-                      - {team.members.length} {team.members.length === 1 ? "member" : "members"}
+                      · {team.members.length} {team.members.length === 1 ? "member" : "members"}
                     </p>
                   </button>
                 );
@@ -416,6 +497,37 @@ export function JudgeDashboard({
             </div>
           </div>
         )}
+      </section>
+
+      <section
+        className={`${sectionClass} overflow-hidden border-violet-500/20 bg-gradient-to-b from-violet-500/5 via-card/95 to-card/95 p-0`}
+        id="top-3-ranking"
+        aria-label="Top 3 idea ranking"
+      >
+        <div className="border-b border-white/10 px-4 py-5 sm:px-6 sm:py-6 md:px-8">
+          <div className="flex items-center gap-2 text-violet-300">
+            <Trophy className="h-4 w-4" aria-hidden />
+            <p className="text-xs font-semibold uppercase tracking-[0.14em]">Ballot</p>
+          </div>
+        </div>
+        <div className="p-4 sm:p-6 md:p-8">
+          {isLoadingSubmissions ? (
+            <p className="text-sm text-muted-foreground">Loading submissions…</p>
+          ) : submissions.length === 0 ? (
+            <p className="dash-empty">
+              No submissions yet. Top 3 ranking will be available once teams submit.
+            </p>
+          ) : (
+            <JudgeTop3RankingSection
+              submissions={submissions}
+              ranks={top3Ranks}
+              savedAt={top3SavedAt}
+              isSaving={isSavingTop3}
+              onRankChange={onTop3RankChange}
+              onSave={onSaveTop3Ranking}
+            />
+          )}
+        </div>
       </section>
 
       {/* Submissions & scoring */}

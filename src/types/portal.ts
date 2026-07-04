@@ -22,6 +22,21 @@ export type Submission = {
   judge_criteria_scores_by_judge?: Record<string, Record<string, number | null>> | null;
 };
 
+export type Top3RankSlot = "first" | "second" | "third";
+
+export type JudgeTop3Ranks = {
+  first: string | null;
+  second: string | null;
+  third: string | null;
+};
+
+export type JudgeTop3Ranking = {
+  judge_id: string;
+  hackathon_id: string;
+  ranks: JudgeTop3Ranks;
+  updated_at: string | null;
+};
+
 export type SessionUser = {
   id: string;
   email: string;

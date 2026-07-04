@@ -229,6 +229,14 @@ function DashboardLayoutContent({
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className={menuButtonClass}>
+                        <DashboardNavLink href="#top-3-ranking" onNavigate={closeMobileNav}>
+                          <Trophy className={navIconClass} />
+                          <span>Top 3 Ranking</span>
+                        </DashboardNavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={menuButtonClass}>
                         <DashboardNavLink href="#submissions" onNavigate={closeMobileNav}>
                           <ClipboardList className={navIconClass} />
                           <span>Submissions</span>
@@ -257,9 +265,17 @@ function DashboardLayoutContent({
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className={menuButtonClass}>
+                        <DashboardNavLink href="#judge-marks" onNavigate={closeMobileNav}>
+                          <Scale className={navIconClass} />
+                          <span>Judge Marks</span>
+                        </DashboardNavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={menuButtonClass}>
                         <DashboardNavLink href="#submission-marks" onNavigate={closeMobileNav}>
                           <ClipboardList className={navIconClass} />
-                          <span>Submission Marks</span>
+                          <span>Submissions</span>
                         </DashboardNavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -276,6 +292,14 @@ function DashboardLayoutContent({
                         <DashboardNavLink href="#winner-detection" onNavigate={closeMobileNav}>
                           <Trophy className={navIconClass} />
                           <span>Winner Detection</span>
+                        </DashboardNavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={menuButtonClass}>
+                        <DashboardNavLink href="#top-3-ranking" onNavigate={closeMobileNav}>
+                          <Trophy className={navIconClass} />
+                          <span>Top 3 Ranking</span>
                         </DashboardNavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

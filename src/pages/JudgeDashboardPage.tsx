@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
@@ -15,7 +15,14 @@ import {
   mapSubmissionForJudge,
   sanitizeCriteriaScores,
 } from "@/lib/judgeSubmissionScores";
-import type { Submission } from "@/types/portal";
+import {
+  buildJudgeRankingDocId,
+  buildTop3RankingFirestorePayload,
+  createEmptyTop3Ranks,
+  parseTop3RankingFromFirestore,
+  validateTop3Ranks,
+} from "@/lib/judgeTop3Rankings";
+import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
 import {
   calculateTotalFromCriteria,
   clampCriterionScore,
@@ -33,6 +40,9 @@ export default function JudgeDashboardPage() {
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [judgeMessage, setJudgeMessage] = useState<string | null>(null);
   const [savingSubmissionId, setSavingSubmissionId] = useState<string | null>(null);
+  const [top3Ranks, setTop3Ranks] = useState<JudgeTop3Ranks>(createEmptyTop3Ranks);
+  const [top3SavedAt, setTop3SavedAt] = useState<string | null>(null);
+  const [isSavingTop3, setIsSavingTop3] = useState(false);
   const judgeSubmissionsRef = useRef(judgeSubmissions);
 
   useEffect(() => {
@@ -59,6 +69,20 @@ export default function JudgeDashboardPage() {
           )
         );
         setJudgeSubmissions(mappedSubmissions);
+
+        const rankingRef = doc(
+          db,
+          "judge_rankings",
+          buildJudgeRankingDocId(sessionUser.id, SITE_HACKATHON_ID)
+        );
+        const rankingSnap = await getDoc(rankingRef);
+        const ranking = parseTop3RankingFromFirestore(
+          rankingSnap.exists() ? (rankingSnap.data() as Record<string, unknown>) : undefined,
+          sessionUser.id,
+          SITE_HACKATHON_ID
+        );
+        setTop3Ranks(ranking.ranks);
+        setTop3SavedAt(ranking.updated_at);
       } catch (error: unknown) {
         const message =
           typeof error === "object" && error && "message" in error
@@ -230,6 +254,51 @@ export default function JudgeDashboardPage() {
     [sessionUser, db, judgingCriteria]
   );
 
+  const handleTop3RankChange = (slot: Top3RankSlot, submissionId: string | null) => {
+    setTop3Ranks((current) => ({
+      ...current,
+      [slot]: submissionId,
+    }));
+  };
+
+  const handleSaveTop3Ranking = useCallback(async () => {
+    if (!sessionUser) return;
+
+    const submissionIds = judgeSubmissionsRef.current.map((submission) => submission.id);
+    const validationError = validateTop3Ranks(top3Ranks, submissionIds);
+    if (validationError) {
+      setJudgeMessage(validationError);
+      return;
+    }
+
+    setJudgeMessage(null);
+    setIsSavingTop3(true);
+    try {
+      const rankingRef = doc(
+        db,
+        "judge_rankings",
+        buildJudgeRankingDocId(sessionUser.id, SITE_HACKATHON_ID)
+      );
+      const payload = buildTop3RankingFirestorePayload(
+        sessionUser.id,
+        SITE_HACKATHON_ID,
+        top3Ranks
+      );
+
+      await setDoc(rankingRef, payload, { merge: true });
+      setTop3SavedAt(payload.updated_at);
+      setJudgeMessage("Top 3 ranking saved.");
+    } catch (error: unknown) {
+      const message =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "An error occurred while saving your top 3 ranking.";
+      setJudgeMessage(message);
+    } finally {
+      setIsSavingTop3(false);
+    }
+  }, [sessionUser, db, top3Ranks]);
+
   if (authLoading) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
@@ -272,6 +341,11 @@ export default function JudgeDashboardPage() {
         onNotesChange={handleJudgeNotesChange}
         onSave={handleJudgeSave}
         savingSubmissionId={savingSubmissionId}
+        top3Ranks={top3Ranks}
+        top3SavedAt={top3SavedAt}
+        isSavingTop3={isSavingTop3}
+        onTop3RankChange={handleTop3RankChange}
+        onSaveTop3Ranking={handleSaveTop3Ranking}
       />
     </DashboardLayout>
   );

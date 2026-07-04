@@ -26,6 +26,10 @@ import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
 import { saveHackathonCriteria } from "@/lib/hackathonCriteria";
 import { getJudgeTotalScoreForJudge } from "@/lib/judgeSubmissionScores";
+import {
+  buildAdminTop3RankingSummary,
+  fetchJudgeRankingsForHackathon,
+} from "@/lib/judgeTop3Rankings";
 import { buildAdminJudgingStatistics } from "@/lib/judgingStatistics";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { JudgeApprovalStatus, PortalRole, Submission } from "@/types/portal";
@@ -73,6 +77,10 @@ export default function AdminDashboardPage() {
   const [adminGrantEmail, setAdminGrantEmail] = useState("");
   const [pendingAdminGrants, setPendingAdminGrants] = useState<AdminGrantRecord[]>([]);
   const [isGrantingAdmin, setIsGrantingAdmin] = useState(false);
+  const [judgeRankings, setJudgeRankings] = useState<Awaited<
+    ReturnType<typeof fetchJudgeRankingsForHackathon>
+  >>([]);
+  const [isLoadingTop3Rankings, setIsLoadingTop3Rankings] = useState(false);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -160,9 +168,26 @@ export default function AdminDashboardPage() {
       }
     };
 
+    const loadJudgeRankings = async () => {
+      setIsLoadingTop3Rankings(true);
+      try {
+        const rankings = await fetchJudgeRankingsForHackathon(db, selectedHackathonId);
+        setJudgeRankings(rankings);
+      } catch (error: unknown) {
+        const text =
+          typeof error === "object" && error && "message" in error
+            ? String((error as { message?: string }).message)
+            : "Failed to load judge top 3 rankings.";
+        setMessage(text);
+      } finally {
+        setIsLoadingTop3Rankings(false);
+      }
+    };
+
     void loadUsers();
     void loadPendingAdminGrants();
     void loadSubmissions();
+    void loadJudgeRankings();
   }, [sessionUser, db, selectedHackathonId]);
 
   const getUserEmail = (identifier: string | null | undefined) => {
@@ -300,6 +325,38 @@ export default function AdminDashboardPage() {
     registeredJudgeCount,
     totalJudgeMarks,
     judgingCriteria
+  );
+
+  const staffJudges = hackathonUsers.filter((user) => isStaffRole(user.role));
+
+  const top3SubmissionLookup = useMemo(() => {
+    const lookup = new Map<
+      string,
+      { id: string; title: string | null; team_name?: string | null; participantEmail: string }
+    >();
+    for (const submission of submissions) {
+      const participantId = submission.user_id || submission.id;
+      lookup.set(submission.id, {
+        id: submission.id,
+        title: submission.title,
+        team_name: submission.team_name,
+        participantEmail:
+          getUserEmail(participantId) ??
+          participantById[participantId]?.email ??
+          "Unknown participant",
+      });
+    }
+    return lookup;
+  }, [submissions, userEmailLookup, hackathonUsers]);
+
+  const top3RankingSummary = useMemo(
+    () =>
+      buildAdminTop3RankingSummary(
+        judgeRankings,
+        Array.from(top3SubmissionLookup.values()),
+        staffJudges.map((judge) => ({ id: judge.id, email: judge.email }))
+      ),
+    [judgeRankings, top3SubmissionLookup, staffJudges]
   );
 
   const handleRoleChange = (userId: string, role: PortalRole) => {
@@ -571,6 +628,9 @@ export default function AdminDashboardPage() {
         deletingSubmissionId={deletingSubmissionId}
         onCreateSubmission={handleCreateSubmission}
         onDeleteSubmission={handleDeleteSubmission}
+        top3RankingSummary={top3RankingSummary}
+        isLoadingTop3Rankings={isLoadingTop3Rankings}
+        top3SubmissionLookup={top3SubmissionLookup}
       />
     </DashboardLayout>
   );
