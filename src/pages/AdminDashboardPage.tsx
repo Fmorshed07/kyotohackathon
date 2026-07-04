@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { addDoc, collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
@@ -25,6 +26,7 @@ import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
 import { saveHackathonCriteria } from "@/lib/hackathonCriteria";
 import { getJudgeTotalScoreForJudge } from "@/lib/judgeSubmissionScores";
+import { buildAdminJudgingStatistics } from "@/lib/judgingStatistics";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { JudgeApprovalStatus, PortalRole, Submission } from "@/types/portal";
 
@@ -521,12 +523,16 @@ export default function AdminDashboardPage() {
     }
   };
 
-  if (authLoading || !sessionUser) {
+  if (authLoading) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Loading...</p>
       </div>
     );
+  }
+
+  if (!sessionUser || sessionUser.role !== "admin") {
+    return <Navigate to="/admin" replace />;
   }
 
   return (
