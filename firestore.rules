@@ -49,15 +49,153 @@ service cloud.firestore {
       );
     }
 
+    function isHost() {
+      return isSignedIn() && (
+        currentUserRole() == "host" || currentUserRole() == "hosts"
+      );
+    }
+
+    function isApprovedHost() {
+      return isHost()
+        && get(userDocPath()).data.hostApprovalStatus == "approved";
+    }
+
+    function hasPendingAdminGrant() {
+      return isSignedIn()
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/admin_grants/$(request.auth.token.email.lower()));
+    }
+
+    function canCreateOwnPortalAccount(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && (
+          request.resource.data.role == "participant"
+          || (
+            (request.resource.data.role == "judge" || request.resource.data.role == "mentor")
+            && request.resource.data.judgeApprovalStatus == "pending"
+          )
+          || (
+            request.resource.data.role == "host"
+            && request.resource.data.hostApprovalStatus == "pending"
+          )
+        );
+    }
+
+    function canUpdateOwnProfile(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "fullName", "avatarUrl", "coverUrl", "galleryUrls", "headline", "bio", "publicRole",
+          "experienceLevel", "organization", "location", "timezone", "languages", "lookingFor",
+          "githubUsername", "githubProfileUrl", "linkedinUrl", "portfolioUrl", "xUrl",
+          "discordHandle", "skills", "interests", "profileUpdatedAt", "onboardingCompletedAt",
+          "hackathon_id", "hackathon_ids"
+        ]);
+    }
+
+    // Participants never need admin approval. Allow self-serve claim when:
+    // - account has no role yet, or
+    // - staff signup is still pending and the user switches to participant.
+    function canClaimParticipantRole(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == "participant"
+        && (
+          !("role" in resource.data)
+          || resource.data.role == null
+          || resource.data.role == ""
+          || (
+            (resource.data.role == "judge" || resource.data.role == "mentor")
+            && resource.data.judgeApprovalStatus == "pending"
+          )
+        )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "email", "role", "hackathon_id", "hackathon_ids", "judgeApprovalStatus"
+        ]);
+    }
+
+    function ownsHostEvent(eventId) {
+      return exists(/databases/$(database)/documents/host_events/$(eventId))
+        && get(/databases/$(database)/documents/host_events/$(eventId)).data.owner_id == request.auth.uid;
+    }
+
     match /users/{userId} {
-      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow create: if (isPortalAdminAccount() && request.auth.uid == userId)
+        || (hasPendingAdminGrant() && request.auth.uid == userId)
+        || canCreateOwnPortalAccount(userId);
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow update: if isAdmin()
+        || (hasPendingAdminGrant() && request.auth.uid == userId)
+        || canUpdateOwnProfile(userId)
+        || canClaimParticipantRole(userId);
       allow delete: if isAdmin();
     }
 
+    match /host_events/{eventId} {
+      allow create: if isAdmin()
+        || (isApprovedHost() && request.resource.data.owner_id == request.auth.uid);
+      allow read: if isAdmin() || (isApprovedHost() && resource.data.owner_id == request.auth.uid);
+      allow update: if isAdmin() || (
+        isApprovedHost()
+        && resource.data.owner_id == request.auth.uid
+        && request.resource.data.owner_id == request.auth.uid
+      );
+      allow delete: if isAdmin() || (isApprovedHost() && resource.data.owner_id == request.auth.uid);
+    }
+
+    match /host_tickets/{ticketId} {
+      allow create: if isAdmin()
+        || (
+          isApprovedHost()
+          && request.resource.data.host_id == request.auth.uid
+          && ownsHostEvent(request.resource.data.event_id)
+        );
+      allow read: if isAdmin() || (
+        isApprovedHost()
+        && resource.data.host_id == request.auth.uid
+      );
+      allow update: if isAdmin() || (
+        isApprovedHost()
+        && resource.data.host_id == request.auth.uid
+        && request.resource.data.host_id == resource.data.host_id
+        && request.resource.data.event_id == resource.data.event_id
+      );
+      allow delete: if isAdmin() || (
+        isApprovedHost()
+        && resource.data.host_id == request.auth.uid
+      );
+    }
+
+    match /host_judges/{judgeId} {
+      allow create: if isAdmin()
+        || (
+          isApprovedHost()
+          && request.resource.data.host_id == request.auth.uid
+          && ownsHostEvent(request.resource.data.event_id)
+        );
+      allow read: if isAdmin() || (
+        isApprovedHost()
+        && resource.data.host_id == request.auth.uid
+      );
+      allow update: if isAdmin() || (
+        isApprovedHost()
+        && resource.data.host_id == request.auth.uid
+        && request.resource.data.host_id == resource.data.host_id
+        && request.resource.data.event_id == resource.data.event_id
+      );
+      allow delete: if isAdmin() || (
+        isApprovedHost()
+        && resource.data.host_id == request.auth.uid
+      );
+    }
+
     match /submissions/{submissionId} {
-      allow read: if isSignedIn();
+      // Private by default. Public gallery/boards use public_projects only after explicit opt-in.
+      allow read: if isAdmin()
+        || isApprovedStaff()
+        || isApprovedHost()
+        || (isSignedIn() && resource.data.user_id == request.auth.uid);
       allow create: if isSignedIn() && (request.auth.uid == request.resource.data.user_id || isAdmin());
       allow update: if isSignedIn() && (
         request.auth.uid == resource.data.user_id
@@ -67,8 +205,30 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // A minimal public copy is created only by a participant who opts their project into the gallery.
+    // This deliberately avoids publishing private submissions, judging notes, or score data.
+    match /public_projects/{projectId} {
+      allow read: if true;
+      allow create, update: if isAdmin() || (isSignedIn()
+        && request.resource.data.owner_id == request.auth.uid
+        && request.resource.data.public_preview_consent == true);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.owner_id == request.auth.uid);
+    }
+
     match /hackathon_criteria/{hackathonId} {
       allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Public pages can load only events explicitly published by an admin.
+    match /hackathons/{hackathonId} {
+      allow get: if resource.data.published == true || isAdmin();
+      allow list: if resource.data.published == true || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /hackathon_ops/{hackathonId} {
+      allow read: if isSignedIn() && (isAdmin() || isApprovedStaff());
       allow write: if isAdmin();
     }
 

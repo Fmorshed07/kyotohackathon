@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { ExternalLink, MessageCircle, Users } from "lucide-react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
-const DISCORD_URL = "https://discord.gg/N72ddx9JW";
+const DISCORD_URL = "https://discord.gg/cQEFjQDFm";
 const CREATORS_CIRCUIT_URL = "https://www.creatorscircuit.tech";
 
 const CommunitySection = () => {
@@ -77,8 +77,8 @@ const CommunitySection = () => {
             animate={isVisible ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.25 }}
           >
-            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-secondary/40 bg-secondary/10">
-              <Users className="h-6 w-6 text-secondary" aria-hidden />
+            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/40 bg-primary/10">
+              <Users className="h-6 w-6 text-primary" aria-hidden />
             </div>
             <h3 className="font-display text-2xl font-bold text-foreground">Creators Circuit</h3>
             <p className="mt-3 flex-1 font-body text-sm text-muted-foreground md:text-base">
@@ -89,7 +89,7 @@ const CommunitySection = () => {
               href={CREATORS_CIRCUIT_URL}
               target="_blank"
               rel="noreferrer"
-              className="mt-8 inline-flex min-w-[200px] items-center justify-center gap-2 self-start rounded-md border border-secondary/70 bg-secondary/20 px-6 py-3 font-display text-sm font-medium tracking-[0.15em] text-secondary transition-colors hover:bg-secondary/30"
+              className="mt-8 inline-flex min-w-[200px] items-center justify-center gap-2 self-start rounded-md border border-primary/50 bg-primary/15 px-6 py-3 font-display text-sm font-medium tracking-[0.15em] text-primary transition-colors hover:bg-primary/25"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >

@@ -1,0 +1,579 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  ExternalLink,
+  Filter,
+  LayoutGrid,
+  MapPin,
+  Search,
+  Sparkles,
+  Users,
+} from "lucide-react";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { usePortalAuth } from "@/hooks/usePortalAuth";
+import { getFirestoreDb } from "@/lib/firebaseClient";
+import {
+  buildParticipantHackathonSummaries,
+  DEFAULT_HACKATHON_ID,
+  getHackathonById,
+  getSubmissionHackathonId,
+  getUserAllowedHackathonIds,
+  isHackathonId,
+  PORTAL_HACKATHONS,
+  SITE_HACKATHON_ID,
+  submissionBelongsToHackathon,
+  type HackathonId,
+  type PortalHackathon,
+} from "@/lib/hackathons";
+import { getDashboardPathForUser } from "@/lib/portalRoutes";
+import type { Submission } from "@/types/portal";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+const DISCORD_URL = "https://discord.gg/cQEFjQDFm";
+
+type PublicProjectDoc = Omit<Submission, "id" | "user_id"> & {
+  owner_id?: string | null;
+  user_id?: string | null;
+};
+
+function mapPublicProject(id: string, data: PublicProjectDoc): Submission | null {
+  // Legacy public docs without the flag still count as opt-in (they only exist via consent write).
+  // Explicit false must never appear on boards.
+  if (data.public_preview_consent === false) return null;
+  return {
+    id,
+    ...data,
+    user_id: data.user_id ?? data.owner_id ?? "",
+    public_preview_consent: true,
+  };
+}
+
+const statusStyles: Record<PortalHackathon["status"], string> = {
+  active: "border-primary/50 bg-primary/15 text-primary",
+  upcoming: "border-white/15 bg-white/5 text-white/60",
+  past: "border-white/10 bg-transparent text-white/40",
+};
+
+const statusLabel: Record<PortalHackathon["status"], string> = {
+  active: "Live",
+  upcoming: "Upcoming",
+  past: "Past",
+};
+
+function countBuilders(memberNames: string | null | undefined) {
+  if (!memberNames?.trim()) return 1;
+  const parts = memberNames
+    .split(/[,;\n]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return Math.max(parts.length, 1);
+}
+
+function projectStatus(submission: Submission) {
+  if (submission.project_url?.trim() && submission.demo_video_url?.trim()) {
+    return { label: "Ready", className: "border-primary/40 bg-primary/10 text-primary" };
+  }
+  if (submission.project_url?.trim() || submission.submission_pdf_url?.trim()) {
+    return { label: "Submitted", className: "border-white/20 bg-white/5 text-foreground/80" };
+  }
+  return { label: "Draft", className: "border-white/10 bg-transparent text-muted-foreground" };
+}
+
+function ProjectCard({ submission, hackathon }: { submission: Submission; hackathon: PortalHackathon }) {
+  const builders = countBuilders(submission.member_names);
+  const status = projectStatus(submission);
+  const title = submission.title?.trim() || "Untitled project";
+  const team = submission.team_name?.trim() || "Solo builder";
+  const initial = (team[0] ?? "P").toUpperCase();
+  const projectUrl = submission.project_url?.trim();
+
+  return (
+    <article className="group relative flex overflow-hidden rounded-xl border border-white/[0.08] bg-card/70 transition-colors hover:border-primary/40">
+      <div
+        className="pointer-events-none absolute inset-x-10 top-0 h-px opacity-50"
+        style={{ background: "var(--flare)" }}
+        aria-hidden
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 sm:flex-row sm:items-stretch sm:gap-5 sm:p-5">
+        <div className="flex shrink-0 flex-row items-center gap-3 sm:w-28 sm:flex-col sm:items-center sm:justify-center sm:border-r sm:border-white/[0.06] sm:pr-5">
+          <span
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-primary/35 bg-primary/15 font-display text-lg font-bold text-primary"
+            aria-hidden
+          >
+            {initial}
+          </span>
+          <div className="min-w-0 text-left sm:text-center">
+            <p className="truncate font-display text-sm font-semibold text-foreground">{team}</p>
+            <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Team
+            </p>
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {hackathon.shortName}
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                status.className,
+              )}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+              {status.label}
+            </span>
+          </div>
+
+          <h3 className="mt-2 font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+            {title}
+          </h3>
+          <p className="mt-2 line-clamp-2 font-body text-sm leading-relaxed text-muted-foreground">
+            {submission.short_description?.trim() || hackathon.theme}
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Users className="h-3.5 w-3.5 text-primary/80" />
+              <span className="font-semibold text-foreground/90">{builders}</span>
+              {builders === 1 ? "Builder" : "Builders"}
+            </p>
+            {projectUrl ? (
+              <a
+                href={projectUrl.startsWith("http") ? projectUrl : `https://${projectUrl}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-primary transition-opacity hover:opacity-80"
+              >
+                Open project
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            ) : (
+              <span className="text-xs text-muted-foreground/70">No public link yet</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden w-28 shrink-0 flex-col items-center justify-center border-l border-white/[0.06] bg-white/[0.02] px-3 text-center sm:flex">
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Event</p>
+        <p className="mt-2 font-display text-sm font-semibold leading-tight text-foreground">
+          {hackathon.shortName}
+        </p>
+        <p className="mt-1 font-mono text-[10px] text-muted-foreground">{hackathon.eventDate}</p>
+      </div>
+    </article>
+  );
+}
+
+export default function HackathonBoardsPage() {
+  const { hackathonId: hackathonIdParam } = useParams();
+  const navigate = useNavigate();
+  const { sessionUser, loading: authLoading } = usePortalAuth();
+  const db = getFirestoreDb();
+
+  const selectedHackathonId: HackathonId =
+    hackathonIdParam && isHackathonId(hackathonIdParam)
+      ? hackathonIdParam
+      : DEFAULT_HACKATHON_ID;
+
+  const selectedHackathon = getHackathonById(selectedHackathonId);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [mySubmissions, setMySubmissions] = useState<Submission[]>([]);
+  const [enrolledHackathonIds, setEnrolledHackathonIds] = useState<HackathonId[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "ready" | "submitted" | "draft">("all");
+
+  useEffect(() => {
+    if (!sessionUser) return;
+
+    let cancelled = false;
+
+    const load = async () => {
+      setIsLoading(true);
+
+      const allowedIds = getUserAllowedHackathonIds({
+        hackathon_id: sessionUser.hackathonId,
+        hackathon_ids: sessionUser.hackathonIds,
+      });
+
+      // Opt-in board feed: public_projects is readable without private submission access.
+      const boardRows = await getDocs(collection(db, "public_projects"))
+        .then((snapshot) =>
+          snapshot.docs
+            .map((docSnap) => mapPublicProject(docSnap.id, docSnap.data() as PublicProjectDoc))
+            .filter((project): project is Submission => project != null)
+            .filter((project) => submissionBelongsToHackathon(project, selectedHackathonId))
+            .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")),
+        )
+        .catch(() => [] as Submission[]);
+
+      const ownRows = await getDocs(
+        query(collection(db, "submissions"), where("user_id", "==", sessionUser.id)),
+      )
+        .then(
+          (snapshot) =>
+            snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...(docSnap.data() as Omit<Submission, "id">),
+            })) as Submission[],
+        )
+        .catch(() => [] as Submission[]);
+
+      if (!cancelled) {
+        setSubmissions(boardRows);
+        setMySubmissions(ownRows);
+        setEnrolledHackathonIds(allowedIds.length > 0 ? allowedIds : []);
+        setIsLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [db, selectedHackathonId, sessionUser]);
+
+  const myHackathonSummaries = useMemo(
+    () => buildParticipantHackathonSummaries(mySubmissions, enrolledHackathonIds),
+    [enrolledHackathonIds, mySubmissions],
+  );
+
+  const boardHackathons = useMemo(() => {
+    if (sessionUser?.role === "admin" || sessionUser?.role === "host") {
+      return PORTAL_HACKATHONS;
+    }
+
+    const enrolled = new Set(enrolledHackathonIds);
+    if (sessionUser?.role === "participant") {
+      for (const submission of mySubmissions) {
+        enrolled.add(getSubmissionHackathonId(submission));
+      }
+    }
+
+    // Participants, judges, and mentors only see boards for assigned events.
+    return PORTAL_HACKATHONS.filter((hackathon) => enrolled.has(hackathon.id));
+  }, [enrolledHackathonIds, mySubmissions, sessionUser?.role]);
+
+  const ownSubmissionOnBoard = useMemo(
+    () =>
+      submissions.find(
+        (submission) =>
+          submission.user_id === sessionUser?.id &&
+          getSubmissionHackathonId(submission) === selectedHackathonId,
+      ) ?? null,
+    [selectedHackathonId, sessionUser?.id, submissions],
+  );
+
+  const filteredSubmissions = useMemo(() => {
+    const queryText = searchQuery.trim().toLowerCase();
+    return submissions.filter((submission) => {
+      const status = projectStatus(submission).label.toLowerCase();
+      if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (!queryText) return true;
+      const haystack = [
+        submission.title,
+        submission.team_name,
+        submission.member_names,
+        submission.short_description,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(queryText);
+    });
+  }, [searchQuery, statusFilter, submissions]);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Loading boards...</p>
+      </div>
+    );
+  }
+
+  if (!sessionUser) {
+    return <Navigate to="/signin" replace />;
+  }
+
+  const dashboardPath = getDashboardPathForUser(
+    sessionUser.role,
+    sessionUser.judgeApprovalStatus,
+  );
+
+  // Keep participants and staff on their assigned event boards only.
+  if (
+    (sessionUser.role === "participant" ||
+      sessionUser.role === "judge" ||
+      sessionUser.role === "mentor") &&
+    !isLoading
+  ) {
+    const canViewSelected = boardHackathons.some(
+      (hackathon) => hackathon.id === selectedHackathonId,
+    );
+    if (!canViewSelected) {
+      const fallbackId = boardHackathons[0]?.id;
+      if (fallbackId) {
+        return <Navigate to={`/boards/${fallbackId}`} replace />;
+      }
+      return <Navigate to={dashboardPath} replace />;
+    }
+  }
+
+  return (
+    <div className="dash-ambient min-h-svh bg-background text-foreground">
+      <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-black/80 backdrop-blur-xl supports-[backdrop-filter]:bg-black/70">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-3 px-3 py-3 sm:px-5 md:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 shrink-0"
+              onClick={() => navigate(dashboardPath)}
+              aria-label="Back to dashboard"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="min-w-0">
+              <p className="font-display text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-primary">
+                Hackathon boards
+              </p>
+              <h1 className="truncate font-display text-lg font-semibold tracking-tight sm:text-xl">
+                {selectedHackathon.name}
+              </h1>
+            </div>
+          </div>
+          <Button asChild variant="outline" className="hidden sm:inline-flex">
+            <Link to={dashboardPath}>
+              Dashboard
+              <ArrowUpRight className="ml-1.5 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      </header>
+
+      <div className="mx-auto grid max-w-[1400px] gap-6 px-3 py-5 sm:px-5 md:grid-cols-[240px_1fr] md:px-8 md:py-8">
+        <aside className="space-y-4 md:sticky md:top-24 md:self-start">
+          <section className="rounded-xl border border-white/[0.08] bg-card/60 p-4 backdrop-blur-md">
+            <p className="font-display text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Total
+            </p>
+            <p className="mt-2 font-display text-3xl font-semibold text-foreground">
+              {submissions.length}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Projects on this board</p>
+            {ownSubmissionOnBoard ? (
+              <p className="mt-3 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-xs text-primary">
+                Your project is on this board
+                {ownSubmissionOnBoard.title?.trim()
+                  ? `: ${ownSubmissionOnBoard.title.trim()}`
+                  : ""}
+              </p>
+            ) : null}
+          </section>
+
+          {myHackathonSummaries.length > 0 ? (
+            <section className="rounded-xl border border-primary/20 bg-primary/5 p-4 backdrop-blur-md">
+              <p className="mb-3 inline-flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                <Sparkles className="h-3.5 w-3.5" />
+                Your events
+              </p>
+              <ul className="space-y-2">
+                {myHackathonSummaries.map((summary) => {
+                  const isActive = summary.hackathon.id === selectedHackathonId;
+                  return (
+                    <li key={summary.hackathon.id}>
+                      <Link
+                        to={`/boards/${summary.hackathon.id}`}
+                        className={cn(
+                          "block rounded-lg border px-3 py-2.5 transition-colors",
+                          isActive
+                            ? "border-primary/40 bg-primary/15 text-foreground"
+                            : "border-white/10 bg-background/30 text-muted-foreground hover:border-primary/25 hover:text-foreground",
+                        )}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate font-display text-sm font-semibold text-foreground">
+                            {summary.hackathon.shortName}
+                          </span>
+                          <Badge variant="outline" className="text-[0.55rem] uppercase">
+                            {statusLabel[summary.hackathon.status]}
+                          </Badge>
+                        </span>
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          {summary.submissionCount > 0
+                            ? `${summary.submissionCount} of your submission${summary.submissionCount === 1 ? "" : "s"}`
+                            : "Registered"}
+                        </span>
+                        {summary.latestTitle ? (
+                          <span className="mt-0.5 block truncate text-[11px] text-foreground/80">
+                            {summary.latestTitle}
+                          </span>
+                        ) : null}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              {sessionUser.role === "participant" ? (
+                <Button asChild variant="ghost" size="sm" className="mt-3 w-full justify-start px-2">
+                  <Link to="/dashboard/participant">
+                    Open my workspace
+                    <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              ) : null}
+            </section>
+          ) : null}
+
+          <section className="rounded-xl border border-white/[0.08] bg-card/60 p-4 backdrop-blur-md">
+            <p className="mb-3 inline-flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Boards
+            </p>
+            <ul className="space-y-1.5">
+              {boardHackathons.map((hackathon) => {
+                const isActive = hackathon.id === selectedHackathonId;
+                return (
+                  <li key={hackathon.id}>
+                    <Link
+                      to={`/boards/${hackathon.id}`}
+                      className={cn(
+                        "flex items-start gap-2 rounded-lg border px-3 py-2.5 transition-colors",
+                        isActive
+                          ? "border-primary/35 bg-primary/10 text-foreground"
+                          : "border-transparent text-muted-foreground hover:border-white/10 hover:bg-white/[0.03] hover:text-foreground",
+                      )}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-display text-sm font-semibold">
+                          {hackathon.shortName}
+                        </span>
+                        <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          {hackathon.location}
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          "mt-0.5 shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]",
+                          statusStyles[hackathon.status],
+                        )}
+                      >
+                        {statusLabel[hackathon.status]}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          <section className="rounded-xl border border-white/[0.08] bg-card/60 p-4 backdrop-blur-md">
+            <p className="mb-3 inline-flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">
+              <Filter className="h-3.5 w-3.5" />
+              Status
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "All"],
+                  ["ready", "Ready"],
+                  ["submitted", "Submitted"],
+                  ["draft", "Draft"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setStatusFilter(value)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                    statusFilter === value
+                      ? "border-primary/40 bg-primary/15 text-primary"
+                      : "border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <a
+            href={DISCORD_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/15"
+          >
+            Join Discord
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        </aside>
+
+        <main className="min-w-0 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-display text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                Project board
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{selectedHackathon.theme}</p>
+            </div>
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search projects..."
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="rounded-xl border border-white/[0.08] bg-card/40 px-5 py-12 text-center text-sm text-muted-foreground">
+              Loading projects...
+            </div>
+          ) : filteredSubmissions.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/15 bg-card/30 px-5 py-14 text-center">
+              <LayoutGrid className="mx-auto h-8 w-8 text-muted-foreground/60" />
+              <p className="mt-4 font-display text-lg font-semibold text-foreground">
+                No projects on this board yet
+              </p>
+              <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+                Opt-in projects for {selectedHackathon.name} will appear here once participants share them.
+              </p>
+              <Button asChild className="mt-6">
+                <Link to="/dashboard/participant">Submit your project</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredSubmissions.map((submission) => (
+                <ProjectCard
+                  key={submission.id}
+                  submission={submission}
+                  hackathon={selectedHackathon}
+                />
+              ))}
+            </div>
+          )}
+
+          {!isLoading && filteredSubmissions.length > 0 ? (
+            <p className="pt-2 text-center font-mono text-xs text-muted-foreground">
+              Showing {filteredSubmissions.length} of {submissions.length} projects
+            </p>
+          ) : null}
+        </main>
+      </div>
+    </div>
+  );
+}

@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "admin:reset-password": "node --env-file=.env.local scripts/reset-admin-password.mjs"
+    "admin:reset-password": "node --env-file=.env.local scripts/reset-admin-password.mjs",
+    "email:verify": "node scripts/verify-smtp.mjs",
+    "email:test": "node --experimental-strip-types scripts/send-test-email.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -52,8 +54,10 @@
     "firebase": "^12.10.0",
     "framer-motion": "^12.29.2",
     "input-otp": "^1.4.2",
+    "jose": "^6.2.8",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
+    "nodemailer": "^9.0.5",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -73,8 +77,10 @@
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^22.16.5",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
+    "@vercel/node": "^5.9.9",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.32.0",

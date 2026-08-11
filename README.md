@@ -55,3 +55,21 @@ This project is built with:
 ## How can I deploy this project?
 
 You can deploy this project using any static hosting service such as Vercel, Netlify, or GitHub Pages.
+
+## AI event builder
+
+Admins can open the Admin Dashboard and use **AI event builder** to paste an event brief plus an optional rulebook URL. One action generates the public event page, schedule, requirements, and judging criteria, then publishes the event at `/events/<event-id>` on the same deployment.
+
+Set this server-only environment variable in the deployment that serves the API routes (for Vercel: Project Settings → Environment Variables), then redeploy:
+
+```sh
+OPENAI_API_KEY=your_api_key
+```
+
+Optional: set `OPENAI_HACKATHON_MODEL` to a supported OpenAI Chat Completions model (default `gpt-5.6-luna`). Admins can also pick from the latest models in the AI event builder UI (`gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.5`, `gpt-5.4-mini`, `gpt-4.1`, and more). Do **not** use a `VITE_` prefix for either value; that would expose the key to browser users.
+
+Deploy the updated Firestore rules before using the builder in production:
+
+```sh
+firebase deploy --only firestore:rules
+```

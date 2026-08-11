@@ -7,16 +7,16 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import BrandLogo from "@/components/BrandLogo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
 import { loginWithReservedAdminCredentials, normalizePortalRole } from "@/lib/adminAuth";
-import { consumePendingAdminGrant } from "@/lib/adminGrants";
+import { consumePendingAdminGrant, hasPendingAdminGrant } from "@/lib/adminGrants";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 
-const sectionClass =
-  "rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm shadow-lg shadow-black/10";
+const sectionClass = "rounded-xl border border-border bg-card";
 
 const GoogleIcon = () => (
   <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
@@ -103,9 +103,9 @@ export default function AdminSignIn() {
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
       const existingRole = normalizePortalRole(userSnap.data()?.role);
-      const hasPendingAdminGrant = await consumePendingAdminGrant(db, user.email);
+      const hasAdminGrant = await hasPendingAdminGrant(db, user.email);
 
-      if (existingRole !== "admin" && !hasPendingAdminGrant) {
+      if (existingRole !== "admin" && !hasAdminGrant) {
         await firebaseSignOut(auth);
         setAuthError("This Google account does not have admin access.");
         return;
@@ -119,6 +119,9 @@ export default function AdminSignIn() {
         },
         { merge: true },
       );
+      if (hasAdminGrant) {
+        await consumePendingAdminGrant(db, user.email);
+      }
       navigate("/dashboard/admin", { replace: true });
     } catch (error: unknown) {
       const message =
@@ -151,7 +154,10 @@ export default function AdminSignIn() {
           className={`${sectionClass} mb-8 flex flex-col gap-4 p-6`}
           aria-label="Admin sign in header"
         >
-          <p className="text-xs uppercase tracking-[0.3em] text-primary/70">Impact Kyoto</p>
+          <BrandLogo size="md" href="/" priority />
+          <p className="font-display text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+            Cognisor Admin
+          </p>
           <h1 className="font-display text-2xl tracking-[0.18em] uppercase md:text-3xl">Admin Sign In</h1>
           <p className="max-w-xl text-sm text-muted-foreground">
             Use the admin username and password, or sign in with a Google account that has been granted admin access.

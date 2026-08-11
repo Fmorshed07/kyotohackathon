@@ -4,9 +4,17 @@ import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
+import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { JudgeDashboard } from "@/components/dashboard/JudgeDashboard";
-import { fetchSubmissionsForHackathon, getHackathonById, SITE_HACKATHON_ID } from "@/lib/hackathons";
+import {
+  fetchSubmissionsForHackathon,
+  getHackathonsByIds,
+  getUserAllowedHackathonIds,
+  HACKATHON_STORAGE_KEYS,
+  isHackathonId,
+  type HackathonId,
+} from "@/lib/hackathons";
 import { canAccessStaffDashboard, isStaffRole } from "@/lib/portalRoutes";
 import { buildJudgeStatistics } from "@/lib/judgingStatistics";
 import {
@@ -28,13 +36,34 @@ import {
   clampCriterionScore,
   type JudgingCriterionId,
 } from "@/components/dashboard/judgingCriteria";
+import { sectionClass } from "@/components/dashboard/DashboardLayout";
 
 export default function JudgeDashboardPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
-  const selectedHackathon = getHackathonById(SITE_HACKATHON_ID);
+
+  const allowedHackathonIds = useMemo<HackathonId[]>(() => {
+    if (!sessionUser) return [];
+    return getUserAllowedHackathonIds({
+      hackathonId: sessionUser.hackathonId && isHackathonId(sessionUser.hackathonId)
+        ? sessionUser.hackathonId
+        : undefined,
+      hackathonIds: (sessionUser.hackathonIds ?? []).filter(isHackathonId),
+    });
+  }, [sessionUser]);
+
+  const allowedHackathons = useMemo(
+    () => getHackathonsByIds(allowedHackathonIds),
+    [allowedHackathonIds]
+  );
+
+  const { selectedHackathonId, selectedHackathon, setSelectedHackathonId } = useHackathonSelection(
+    HACKATHON_STORAGE_KEYS.judge,
+    allowedHackathonIds
+  );
+  const canAccessSelectedHackathon = allowedHackathonIds.includes(selectedHackathonId);
   const { criteria: judgingCriteria, isLoading: isLoadingCriteria } =
-    useHackathonCriteria(SITE_HACKATHON_ID);
+    useHackathonCriteria(selectedHackathonId);
 
   const [judgeSubmissions, setJudgeSubmissions] = useState<Submission[]>([]);
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
@@ -53,11 +82,26 @@ export default function JudgeDashboardPage() {
 
   useEffect(() => {
     if (!sessionUser || (sessionUser.role !== "judge" && sessionUser.role !== "mentor")) return;
+    if (!canAccessSelectedHackathon) {
+      setJudgeSubmissions([]);
+      setTop3Ranks(createEmptyTop3Ranks());
+      setTop3SavedAt(null);
+      setIsLoadingSubmissions(false);
+      setJudgeMessage(
+        allowedHackathonIds.length === 0
+          ? "No events assigned yet. Ask an admin to grant you access to a hackathon."
+          : "You do not have access to this event."
+      );
+      return;
+    }
 
-    const loadKyotoSubmissions = async () => {
+    const loadHackathonSubmissions = async () => {
       setIsLoadingSubmissions(true);
+      setJudgeMessage(null);
+      setTop3Ranks(createEmptyTop3Ranks());
+      setTop3SavedAt(null);
       try {
-        const submissions = await fetchSubmissionsForHackathon(db, SITE_HACKATHON_ID);
+        const submissions = await fetchSubmissionsForHackathon(db, selectedHackathonId);
         const mappedSubmissions: Submission[] = submissions.map((data) =>
           mapSubmissionForJudge(
             {
@@ -74,13 +118,13 @@ export default function JudgeDashboardPage() {
           const rankingRef = doc(
             db,
             "judge_rankings",
-            buildJudgeRankingDocId(sessionUser.id, SITE_HACKATHON_ID)
+            buildJudgeRankingDocId(sessionUser.id, selectedHackathonId)
           );
           const rankingSnap = await getDoc(rankingRef);
           const ranking = parseTop3RankingFromFirestore(
             rankingSnap.exists() ? (rankingSnap.data() as Record<string, unknown>) : undefined,
             sessionUser.id,
-            SITE_HACKATHON_ID
+            selectedHackathonId
           );
           setTop3Ranks(ranking.ranks);
           setTop3SavedAt(ranking.updated_at);
@@ -103,9 +147,17 @@ export default function JudgeDashboardPage() {
     };
 
     if (!isLoadingCriteria) {
-      void loadKyotoSubmissions();
+      void loadHackathonSubmissions();
     }
-  }, [sessionUser, db, judgingCriteria, isLoadingCriteria]);
+  }, [
+    sessionUser,
+    db,
+    judgingCriteria,
+    isLoadingCriteria,
+    selectedHackathonId,
+    canAccessSelectedHackathon,
+    allowedHackathonIds.length,
+  ]);
 
   const filteredJudgeSubmissions = judgeSubmissions;
 
@@ -127,7 +179,7 @@ export default function JudgeDashboardPage() {
   }, [judgeStatistics]);
 
   const handleJudgeNotesChange = (id: string, value: string) => {
-    if (!sessionUser) return;
+    if (!sessionUser || !canAccessSelectedHackathon) return;
     setJudgeSubmissions((current) =>
       current.map((submission) => {
         if (submission.id !== id) return submission;
@@ -148,7 +200,7 @@ export default function JudgeDashboardPage() {
     criterionId: JudgingCriterionId,
     value: number | null
   ) => {
-    if (!sessionUser) return;
+    if (!sessionUser || !canAccessSelectedHackathon) return;
     setJudgeSubmissions((current) =>
       current.map((submission) => {
         if (submission.id !== id) return submission;
@@ -182,7 +234,7 @@ export default function JudgeDashboardPage() {
 
   const handleJudgeSave = useCallback(
     async (submissionId: string) => {
-      if (!sessionUser) return;
+      if (!sessionUser || !canAccessSelectedHackathon) return;
 
       const submission = judgeSubmissionsRef.current.find((item) => item.id === submissionId);
       if (!submission) {
@@ -259,10 +311,11 @@ export default function JudgeDashboardPage() {
         setSavingSubmissionId(null);
       }
     },
-    [sessionUser, db, judgingCriteria]
+    [sessionUser, db, judgingCriteria, canAccessSelectedHackathon]
   );
 
   const handleTop3RankChange = (slot: Top3RankSlot, submissionId: string | null) => {
+    if (!canAccessSelectedHackathon) return;
     setTop3Ranks((current) => ({
       ...current,
       [slot]: submissionId,
@@ -270,7 +323,7 @@ export default function JudgeDashboardPage() {
   };
 
   const handleSaveTop3Ranking = useCallback(async () => {
-    if (!sessionUser) return;
+    if (!sessionUser || !canAccessSelectedHackathon) return;
 
     const submissionIds = judgeSubmissionsRef.current.map((submission) => submission.id);
     const validationError = validateTop3Ranks(top3Ranks, submissionIds);
@@ -285,11 +338,11 @@ export default function JudgeDashboardPage() {
       const rankingRef = doc(
         db,
         "judge_rankings",
-        buildJudgeRankingDocId(sessionUser.id, SITE_HACKATHON_ID)
+        buildJudgeRankingDocId(sessionUser.id, selectedHackathonId)
       );
       const payload = buildTop3RankingFirestorePayload(
         sessionUser.id,
-        SITE_HACKATHON_ID,
+        selectedHackathonId,
         top3Ranks
       );
 
@@ -305,7 +358,7 @@ export default function JudgeDashboardPage() {
     } finally {
       setIsSavingTop3(false);
     }
-  }, [sessionUser, db, top3Ranks]);
+  }, [sessionUser, db, top3Ranks, selectedHackathonId, canAccessSelectedHackathon]);
 
   if (authLoading) {
     return (
@@ -336,25 +389,45 @@ export default function JudgeDashboardPage() {
       sessionUser={sessionUser}
       role={layoutRole}
       onSignOut={signOut}
+      hackathons={allowedHackathons}
+      selectedHackathonId={
+        allowedHackathons.length > 0 && canAccessSelectedHackathon
+          ? selectedHackathonId
+          : allowedHackathons[0]?.id
+      }
+      onHackathonChange={
+        allowedHackathons.length > 0 ? setSelectedHackathonId : undefined
+      }
     >
-      <JudgeDashboard
-        selectedHackathon={selectedHackathon}
-        judgingCriteria={judgingCriteria}
-        submissions={filteredJudgeSubmissions}
-        isLoadingSubmissions={isLoadingSubmissions || isLoadingCriteria}
-        judgeMessage={judgeMessage}
-        summary={judgeSummary}
-        statistics={judgeStatistics}
-        onCriterionScoreChange={handleCriterionScoreChange}
-        onNotesChange={handleJudgeNotesChange}
-        onSave={handleJudgeSave}
-        savingSubmissionId={savingSubmissionId}
-        top3Ranks={top3Ranks}
-        top3SavedAt={top3SavedAt}
-        isSavingTop3={isSavingTop3}
-        onTop3RankChange={handleTop3RankChange}
-        onSaveTop3Ranking={handleSaveTop3Ranking}
-      />
+      {allowedHackathons.length === 0 ? (
+        <section className={sectionClass}>
+          <p className="dash-eyebrow">Event access</p>
+          <h2 className="dash-title">No events assigned</h2>
+          <p className="dash-subtitle mt-2">
+            Your account is approved, but an admin has not granted access to any hackathon yet.
+            Ask an admin to assign you to an event.
+          </p>
+        </section>
+      ) : (
+        <JudgeDashboard
+          selectedHackathon={selectedHackathon}
+          judgingCriteria={judgingCriteria}
+          submissions={filteredJudgeSubmissions}
+          isLoadingSubmissions={isLoadingSubmissions || isLoadingCriteria}
+          judgeMessage={judgeMessage}
+          summary={judgeSummary}
+          statistics={judgeStatistics}
+          onCriterionScoreChange={handleCriterionScoreChange}
+          onNotesChange={handleJudgeNotesChange}
+          onSave={handleJudgeSave}
+          savingSubmissionId={savingSubmissionId}
+          top3Ranks={top3Ranks}
+          top3SavedAt={top3SavedAt}
+          isSavingTop3={isSavingTop3}
+          onTop3RankChange={handleTop3RankChange}
+          onSaveTop3Ranking={handleSaveTop3Ranking}
+        />
+      )}
     </DashboardLayout>
   );
 }

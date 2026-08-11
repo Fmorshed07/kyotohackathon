@@ -15,12 +15,12 @@ const UpdatedBannerSection = () => {
           transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
         >
           <img
-            src="/banner.png"
-            alt="Impact Kyoto 2026 event banner"
+            src="/cognisor-horizon.png"
+            alt="Cognisor Hackathons horizon"
             className="h-auto w-full object-cover"
             loading="lazy"
           />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_55%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,251,255,0.12),transparent_55%)]" />
         </motion.div>
       </div>
     </section>

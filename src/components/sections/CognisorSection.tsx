@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import BrandLogo from "@/components/BrandLogo";
 import PreviousHackathonsLivePreview from "@/components/PreviousHackathonsLivePreview";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
@@ -22,16 +23,24 @@ const CognisorSection = () => {
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
         >
-          <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_hsl(199_89%_68%_/_0.8)]" />
+          <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_hsl(199_100%_50%_/_0.8)]" />
           ORGANIZED BY
         </motion.span>
 
         {/* Logo / Brand */}
+        <motion.div
+          className="mt-8 flex justify-center"
+          initial={{ opacity: 0, y: 24, scale: 0.92 }}
+          animate={isVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
+          transition={{ duration: 0.75, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <BrandLogo size="xl" href="https://cognisorai.com" />
+        </motion.div>
         <motion.h2
-          className="mt-6 font-display text-5xl font-bold tracking-wide md:text-6xl lg:text-7xl"
+          className="mt-5 font-display text-5xl font-bold tracking-wide md:text-6xl lg:text-7xl"
           initial={{ opacity: 0, y: 30 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.8, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
         >
           <motion.a
             href="https://cognisorai.com"
@@ -40,9 +49,9 @@ const CognisorSection = () => {
             className="text-gradient-cyan transition-colors hover:text-primary"
             animate={isVisible ? {
               textShadow: [
-                "0 0 20px hsl(199 89% 68% / 0.3)",
-                "0 0 40px hsl(199 89% 68% / 0.5)",
-                "0 0 20px hsl(199 89% 68% / 0.3)",
+                "0 0 20px hsl(199 100% 50% / 0.3)",
+                "0 0 40px hsl(185 100% 50% / 0.45)",
+                "0 0 20px hsl(199 100% 50% / 0.3)",
               ],
             } : {}}
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
@@ -87,7 +96,7 @@ const CognisorSection = () => {
             <div className="pointer-events-none absolute -bottom-16 left-0 h-40 w-40 rounded-full bg-secondary/15 blur-[60px]" />
             <div className="relative">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-primary">
-                <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_hsl(199_89%_68%/0.9)]" />
+                <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_hsl(199_100%_50%/0.9)]" />
                 IVS Japan
               </div>
               <h3 className="mt-5 font-display text-2xl font-semibold tracking-wide text-foreground md:text-3xl">
@@ -107,7 +116,7 @@ const CognisorSection = () => {
                   (label) => (
                     <span
                       key={label}
-                      className="rounded-full border border-secondary/30 bg-secondary/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-secondary"
+                      className="rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-primary"
                     >
                       {label}
                     </span>
@@ -159,11 +168,11 @@ const CognisorSection = () => {
 
         {/* Mission Statement */}
         <motion.div
-          className="mt-16 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-card/50 via-card/30 to-transparent p-8 text-left shadow-[0_0_40px_hsl(199_89%_68%_/_0.08)] backdrop-blur md:p-12"
+          className="mt-16 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-card/50 via-card/30 to-transparent p-8 text-left shadow-[0_0_40px_hsl(199_100%_50%_/_0.12)] backdrop-blur md:p-12"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={isVisible ? { opacity: 1, scale: 1 } : {}}
           transition={{ duration: 0.8, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          whileHover={{ borderColor: "hsl(199 89% 68% / 0.35)" }}
+          whileHover={{ borderColor: "hsl(199 100% 50% / 0.4)" }}
         >
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Cognisor AI Philosophy

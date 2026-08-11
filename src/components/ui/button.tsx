@@ -10,13 +10,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-gradient-to-b from-primary to-[hsl(199_89%_58%)] text-primary-foreground shadow-[0_4px_16px_-4px_hsl(199_89%_68%/0.5),inset_0_1px_0_hsl(0_0%_100%/0.25)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-6px_hsl(199_89%_68%/0.65),inset_0_1px_0_hsl(0_0%_100%/0.25)]",
+          "bg-primary text-primary-foreground shadow-[0_0_24px_hsl(199_100%_50%/0.35)] hover:brightness-110",
         destructive:
-          "bg-gradient-to-b from-destructive to-[hsl(0_74%_50%)] text-destructive-foreground shadow-[0_4px_14px_-4px_hsl(0_84%_60%/0.5),inset_0_1px_0_hsl(0_0%_100%/0.15)] hover:-translate-y-0.5 hover:shadow-[0_8px_22px_-6px_hsl(0_84%_60%/0.6),inset_0_1px_0_hsl(0_0%_100%/0.15)]",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-primary/35 bg-primary/5 text-foreground backdrop-blur-sm hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/10 hover:shadow-[0_0_18px_-4px_hsl(199_89%_68%/0.4)]",
+          "border border-primary/40 bg-primary/5 text-foreground backdrop-blur-sm hover:border-primary/60 hover:bg-primary/10 hover:shadow-[0_0_20px_-6px_hsl(199_100%_50%/0.45)]",
         secondary:
-          "bg-gradient-to-b from-secondary to-[hsl(270_55%_62%)] text-secondary-foreground shadow-[0_4px_16px_-4px_hsl(270_55%_72%/0.5),inset_0_1px_0_hsl(0_0%_100%/0.2)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-6px_hsl(270_55%_72%/0.6),inset_0_1px_0_hsl(0_0%_100%/0.2)]",
+          "border border-white/10 bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "font-body font-medium hover:bg-primary/10 hover:text-primary",
         link: "font-body text-primary underline-offset-4 hover:underline",
       },

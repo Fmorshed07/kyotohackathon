@@ -63,7 +63,7 @@ export function JudgingStatsPanel({
       </div>
 
       {!isLoading && completionRate != null ? (
-        <div className="rounded-xl border border-white/10 bg-muted/15 p-4">
+        <div className="rounded-lg border border-white/10 bg-muted/15 p-4">
           <div className="mb-2.5 flex items-center justify-between gap-3 text-sm sm:text-base">
             <span className="font-display text-base font-semibold text-foreground sm:text-lg">Scoring progress</span>
             <span className="font-mono text-lg font-bold tabular-nums text-primary sm:text-xl">
@@ -80,13 +80,13 @@ export function JudgingStatsPanel({
       ) : null}
 
       {!isLoading && criterionAverages.some((criterion) => criterion.average != null) ? (
-        <div className="rounded-xl border border-white/10 bg-muted/15 p-4">
+        <div className="rounded-lg border border-white/10 bg-muted/15 p-4">
           <p className="dash-eyebrow mb-3">Average by criterion</p>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {criterionAverages.map((criterion) => (
               <div
                 key={criterion.id}
-                className="rounded-lg border border-white/10 bg-background/40 px-3 py-2.5 transition-colors hover:border-primary/35"
+                className="rounded-md border border-white/10 bg-background/40 px-3 py-2.5 transition-colors hover:border-primary/35"
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="min-w-0 text-sm font-medium leading-snug text-foreground sm:text-base md:text-lg">

@@ -70,7 +70,7 @@ const ThemeSection = () => {
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
           <motion.span
-            className="font-display text-sm tracking-[0.3em] text-secondary"
+            className="font-display text-sm tracking-[0.3em] text-primary"
             initial={{ opacity: 0, x: -20 }}
             animate={headerVisible ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}

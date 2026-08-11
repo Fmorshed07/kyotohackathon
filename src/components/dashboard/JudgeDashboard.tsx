@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Gavel, Trophy, Users } from "lucide-react";
+import { CheckCircle2, Gavel, ListChecks, Target, Trophy, Users } from "lucide-react";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
@@ -173,48 +173,78 @@ export function JudgeDashboard({
       <HackathonContextBanner hackathon={selectedHackathon} role="judge" />
 
       {/* Overview */}
-      <section className={`${sectionClass}`} aria-label="Judge overview">
-        <div className="dash-stack-header flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
-              <Gavel className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="dash-eyebrow">Judge panel</p>
-              <h2 className="dash-title">Overview</h2>
-              <p className="dash-subtitle">
-                Track submissions and scoring progress for {selectedHackathon.name}.
-              </p>
+      <section className={`${sectionClass} dash-command-panel`} aria-label="Judge overview">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.55fr)]">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+                <Gavel className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="dash-eyebrow">Judge command center</p>
+                <h2 className="dash-title">Overview</h2>
+                <p className="dash-subtitle max-w-2xl">
+                  Track your review queue, scoring progress, and final ranking for{" "}
+                  {selectedHackathon.name}.
+                </p>
+              </div>
             </div>
+
+            {!isLoadingSubmissions && submissions.length > 0 ? (
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <div className="dash-workflow-card">
+                  <div className="flex items-center gap-2 text-primary">
+                    <ListChecks className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">Queue</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {summary.total - summary.scored} ideas still need a complete score.
+                  </p>
+                </div>
+                <div className="dash-workflow-card">
+                  <div className="flex items-center gap-2 text-emerald-300">
+                    <CheckCircle2 className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">Progress</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {overallProgress.percent}% complete across assigned submissions.
+                  </p>
+                </div>
+                <div className="dash-workflow-card">
+                  <div className="flex items-center gap-2 text-amber-300">
+                    <Target className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">Decision</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Use saved scores to make a clean top 3 ballot.
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </div>
-          <div className="dash-stat-grid grid w-full gap-2 sm:grid-cols-3 sm:gap-3 lg:w-auto lg:gap-4">
+
+          <div className="dash-stat-grid grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
             <div className="dash-stat-tile dash-stat-tile--highlight">
               <p className="dash-stat-value">
-                {isLoadingSubmissions ? "—" : summary.total}
+                {isLoadingSubmissions ? "-" : summary.total}
               </p>
-              <p className="dash-stat-label">
-                Submissions
-              </p>
+              <p className="dash-stat-label">Submissions</p>
             </div>
             <div className="dash-stat-tile">
               <p className="dash-stat-value">
-                {isLoadingSubmissions ? "—" : summary.scored}
+                {isLoadingSubmissions ? "-" : summary.scored}
               </p>
-              <p className="dash-stat-label">
-                Scored
-              </p>
+              <p className="dash-stat-label">Scored</p>
             </div>
-            <div className="dash-stat-tile sm:col-span-1 col-span-2">
+            <div className="dash-stat-tile">
               <p className="dash-stat-value">
                 {isLoadingSubmissions
-                  ? "—"
+                  ? "-"
                   : summary.averageScore != null
                     ? summary.averageScore.toFixed(1)
-                    : "—"}
+                    : "-"}
               </p>
-              <p className="dash-stat-label">
-                Avg Score
-              </p>
+              <p className="dash-stat-label">Avg Score</p>
             </div>
           </div>
         </div>
@@ -225,10 +255,10 @@ export function JudgeDashboard({
         )}
         {!isLoadingSubmissions && submissions.length > 0 ? (
           <>
-            <div className="mt-5 rounded-xl border border-primary/25 bg-gradient-to-r from-primary/10 via-muted/10 to-transparent p-4">
+            <div className="dash-progress-card mt-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">
                     Your scoring progress
                   </p>
                   <p className="mt-1 font-display text-lg font-bold text-foreground">
@@ -246,18 +276,22 @@ export function JudgeDashboard({
                 />
               </div>
             </div>
-            <div className="mt-4 max-w-xl">
+            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.56fr)_minmax(0,1fr)] lg:items-center">
               <SubmissionSearchInput
                 value={searchQuery}
                 onChange={setSearchQuery}
                 placeholder="Search teams, projects, or members..."
               />
               {hasSearchQuery ? (
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Showing {filteredTeams.length} of {teams.length} teams and{" "}
                   {filteredSubmissions.length} of {submissions.length} submissions.
                 </p>
-              ) : null}
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Search filters the roster, scoring queue, and ballot candidate list.
+                </p>
+              )}
             </div>
           </>
         ) : null}
@@ -331,7 +365,7 @@ export function JudgeDashboard({
                     key={team.name}
                     type="button"
                     onClick={() => setSelectedTeamName(team.name)}
-                    className={`rounded-xl border px-4 py-3 text-left transition ${
+                    className={`rounded-lg border px-4 py-3 text-left transition ${
                       isActive
                         ? accentStyle.active
                         : accentStyle.inactive
@@ -366,7 +400,7 @@ export function JudgeDashboard({
             </div>
 
             <div
-              className={`rounded-xl border p-4 ${
+              className={`rounded-lg border p-4 ${
                 activeTeamAccent ? activeTeamAccent.panel : "border-border/50 bg-muted/20"
               }`}
             >
@@ -542,7 +576,7 @@ export function JudgeDashboard({
               <p className="dash-eyebrow">Live scoring</p>
               <h2
                 id="scoring-heading"
-                className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl md:text-3xl"
+                className="mt-1 font-display text-xl font-bold tracking-normal sm:text-2xl md:text-3xl"
               >
                 <span className="bg-gradient-to-r from-foreground via-primary to-secondary bg-clip-text text-transparent">
                   Submissions & live scoring
@@ -552,7 +586,7 @@ export function JudgeDashboard({
                 Score one idea at a time, criterion by criterion, then review and save.
               </p>
             </div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 font-display text-xs font-semibold uppercase tracking-[0.14em] text-primary shadow-[0_0_16px_-6px_hsl(199_89%_68%/0.5)]">
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 font-display text-xs font-semibold uppercase tracking-[0.14em] text-primary shadow-[0_0_16px_-6px_hsl(199_100%_50%/0.45)]">
               <Gavel className="h-3.5 w-3.5" aria-hidden />
               Judge panel
             </span>

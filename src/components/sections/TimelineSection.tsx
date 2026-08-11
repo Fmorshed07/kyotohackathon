@@ -75,7 +75,7 @@ function TimelineMilestone({ milestone, index }: { milestone: Milestone; index: 
           {milestone.title}
         </h3>
         {"note" in milestone && milestone.note ? (
-          <p className="mt-2 text-sm text-secondary">{milestone.note}</p>
+          <p className="mt-2 text-sm text-primary/80">{milestone.note}</p>
         ) : null}
         <div className="mt-2 flex items-center gap-3 md:justify-end">
           <span className="text-xs text-muted-foreground/60">{milestone.kanji}</span>
@@ -147,7 +147,7 @@ const TimelineSection = () => {
                 </div>
                 <a
                   href="https://luma.com/cmevass2"
-                  className="inline-flex items-center justify-center rounded-md border border-secondary/70 bg-secondary/20 px-5 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-secondary transition-colors hover:bg-secondary/30"
+                  className="inline-flex items-center justify-center rounded-md border border-primary/50 bg-primary/15 px-5 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-primary transition-colors hover:bg-primary/25"
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -208,7 +208,7 @@ const TimelineSection = () => {
           {/* Vertical Line */}
           <div className="absolute left-4 top-0 h-full w-[2px] overflow-hidden md:left-1/2 md:-translate-x-1/2">
             <motion.div
-              className="h-full w-full bg-gradient-to-b from-primary via-secondary to-primary/20"
+              className="h-full w-full bg-gradient-to-b from-primary via-[hsl(185_100%_50%)] to-primary/20"
               initial={{ scaleY: 0 }}
               animate={lineVisible ? { scaleY: 1 } : {}}
               transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1] }}

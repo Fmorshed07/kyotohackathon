@@ -1,7 +1,12 @@
 {
+  "functions": {
+    "api/email.ts": {
+      "includeFiles": "server/email/assets/**"
+    }
+  },
   "rewrites": [
     {
-      "source": "/((?!.*\\.).*)",
+      "source": "/((?!api(?:/|$)|.*\\.).*)",
       "destination": "/index.html"
     }
   ]

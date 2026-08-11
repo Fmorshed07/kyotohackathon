@@ -111,7 +111,7 @@ export function JudgeTop3RankingSection({
             <div
               key={slot}
               className={cn(
-                "rounded-xl border p-3.5 sm:p-4",
+                "rounded-lg border p-3.5 sm:p-4",
                 accent ? accent.panel : "border-border/50 bg-muted/20"
               )}
             >
@@ -184,7 +184,7 @@ export function JudgeTop3RankingSection({
         })}
       </div>
 
-      <div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 -mx-1 rounded-xl border border-white/10 bg-card/95 p-3 shadow-lg backdrop-blur-md sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
+      <div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 -mx-1 rounded-lg border border-white/10 bg-card/95 p-3 shadow-lg backdrop-blur-md sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:border-t sm:border-white/10 sm:pt-4">
           <p className="text-center text-xs text-muted-foreground sm:text-left">
             {savedAt

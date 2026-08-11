@@ -1,12 +1,21 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  Activity,
   BarChart3,
+  CalendarCheck2,
+  ExternalLink,
+  Github,
+  Mail,
+  Radar,
   ShieldCheck,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -22,10 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
-import { getHackathonById, type PortalHackathon, type HackathonId } from "@/lib/hackathons";
+import { getHackathonById, PORTAL_HACKATHONS, type PortalHackathon, type HackathonId } from "@/lib/hackathons";
 import type { AdminGrantRecord } from "@/lib/adminGrants";
 import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { MarkingCriteriaSection } from "@/components/dashboard/MarkingCriteriaSection";
@@ -33,16 +43,23 @@ import { AdminTop3RankingPanel } from "@/components/dashboard/AdminTop3RankingPa
 import { AdminTop3MarksPanel } from "@/components/dashboard/AdminTop3MarksPanel";
 import { AdminJudgeMarksPanel } from "@/components/dashboard/AdminJudgeMarksPanel";
 import { AdminSubmissionsPanel } from "@/components/dashboard/AdminSubmissionsPanel";
+import { PlatformOpsConsole, type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole";
+import { AiHackathonLauncher } from "@/components/dashboard/AiHackathonLauncher";
+import { ManualHackathonLauncher } from "@/components/dashboard/ManualHackathonLauncher";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { AdminTop3RankingSummary } from "@/lib/judgeTop3Rankings";
-import type { JudgeApprovalStatus, PortalRole } from "@/types/portal";
+import type { HostApprovalStatus, JudgeApprovalStatus, PortalRole, UserProfile } from "@/types/portal";
+import type { AiHackathonDraft, HostedHackathon, ManualHackathonDraft } from "@/lib/aiHackathons";
 
 export type AdminUser = {
   id: string;
   email: string;
   role: PortalRole;
   judgeApprovalStatus?: JudgeApprovalStatus;
+  hostApprovalStatus?: HostApprovalStatus;
   hackathonId?: HackathonId | null;
+  hackathonIds?: HackathonId[];
+  profile?: UserProfile;
 };
 
 export type AdminSubmissionRow = {
@@ -84,6 +101,7 @@ type AdminDashboardProps = {
   isSavingCriteria: boolean;
   onSaveCriteria: (criteria: JudgingCriterion[]) => Promise<void>;
   users: AdminUser[];
+  hostAccounts: AdminUser[];
   isLoadingUsers: boolean;
   submissions: AdminSubmissionRow[];
   isLoadingSubmissions: boolean;
@@ -94,11 +112,19 @@ type AdminDashboardProps = {
   onRoleChange: (userId: string, role: PortalRole) => void;
   onSaveRole: (user: AdminUser) => Promise<void>;
   onApproveJudge: (user: AdminUser) => Promise<void>;
+  onApproveHost: (user: AdminUser) => Promise<void>;
+  onUpdateHackathonAccess: (user: AdminUser, hackathonIds: HackathonId[]) => Promise<void>;
   adminGrantEmail: string;
   onAdminGrantEmailChange: (email: string) => void;
   pendingAdminGrants: AdminGrantRecord[];
   isGrantingAdmin: boolean;
   onGrantAdminAccess: () => Promise<void>;
+  broadcastSubject: string;
+  onBroadcastSubjectChange: (value: string) => void;
+  broadcastMessage: string;
+  onBroadcastMessageChange: (value: string) => void;
+  isSendingBroadcast: boolean;
+  onSendParticipantBroadcast: () => Promise<void>;
   isCreatingSubmission: boolean;
   deletingSubmissionId: string | null;
   onCreateSubmission: (payload: NewSubmissionInput) => Promise<void>;
@@ -109,16 +135,220 @@ type AdminDashboardProps = {
     string,
     { id: string; title: string | null; team_name?: string | null; participantEmail: string }
   >;
+  platformOpsLive: PlatformOpsLive;
+  onCreateAiHackathon: (
+    draft: AiHackathonDraft,
+    rulebookUrl: string,
+  ) => Promise<HostedHackathon>;
+  onCreateManualHackathon: (
+    draft: ManualHackathonDraft,
+    rulebookUrl: string,
+  ) => Promise<HostedHackathon>;
 };
 
 const roleBadgeVariant: Record<PortalRole, "default" | "secondary" | "outline"> = {
   participant: "secondary",
   mentor: "default",
   judge: "default",
+  host: "secondary",
   admin: "outline",
 };
 
 const isStaffRole = (role: PortalRole) => role === "judge" || role === "mentor";
+
+const hasText = (value: string | null | undefined) => Boolean(value?.trim());
+
+const getGithubUrl = (profile?: UserProfile) => {
+  if (hasText(profile?.githubProfileUrl)) return profile?.githubProfileUrl?.trim() ?? "";
+  if (hasText(profile?.githubUsername)) return `https://github.com/${profile?.githubUsername?.trim().replace(/^@/, "")}`;
+  return "";
+};
+
+const getProfileCompletion = (user: AdminUser) => {
+  const profile = user.profile;
+  const signals = [
+    profile?.avatarUrl,
+    profile?.fullName,
+    profile?.headline || profile?.publicRole,
+    profile?.bio,
+    profile?.githubUsername || profile?.githubProfileUrl,
+    profile?.linkedinUrl || profile?.portfolioUrl,
+    profile?.skills,
+    profile?.interests || profile?.lookingFor,
+  ];
+  return Math.round((signals.filter(hasText).length / signals.length) * 100);
+};
+
+const getProfileInitials = (name?: string | null) => {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+};
+
+const roleLabels: Record<PortalRole, string> = {
+  participant: "Participants",
+  mentor: "Mentors",
+  judge: "Judges",
+  host: "Hosts",
+  admin: "Admins",
+};
+
+type HostAnalytics = {
+  totalUsers: number;
+  participants: number;
+  staff: number;
+  admins: number;
+  githubConnected: number;
+  socialConnected: number;
+  completedProfiles: number;
+  averageProfileCompletion: number;
+  roleCounts: Record<PortalRole, number>;
+};
+
+function buildHostAnalytics(users: AdminUser[]): HostAnalytics {
+  const roleCounts: Record<PortalRole, number> = {
+    participant: 0,
+    mentor: 0,
+    judge: 0,
+    host: 0,
+    admin: 0,
+  };
+  let githubConnected = 0;
+  let socialConnected = 0;
+  let completedProfiles = 0;
+  let completionTotal = 0;
+
+  for (const user of users) {
+    roleCounts[user.role] += 1;
+    const completion = getProfileCompletion(user);
+    completionTotal += completion;
+    if (completion >= 80) completedProfiles += 1;
+    if (getGithubUrl(user.profile)) githubConnected += 1;
+    if (
+      hasText(user.profile?.linkedinUrl) ||
+      hasText(user.profile?.portfolioUrl) ||
+      hasText(user.profile?.xUrl) ||
+      hasText(user.profile?.discordHandle)
+    ) {
+      socialConnected += 1;
+    }
+  }
+
+  return {
+    totalUsers: users.length,
+    participants: roleCounts.participant,
+    staff: roleCounts.mentor + roleCounts.judge,
+    admins: roleCounts.admin,
+    githubConnected,
+    socialConnected,
+    completedProfiles,
+    averageProfileCompletion:
+      users.length > 0 ? Math.round(completionTotal / users.length) : 0,
+    roleCounts,
+  };
+}
+
+function HostAnalyticsPanel({
+  analytics,
+  isLoading,
+}: {
+  analytics: HostAnalytics;
+  isLoading: boolean;
+}) {
+  const display = (value: string | number) => (isLoading ? "..." : String(value));
+  const githubCoverage =
+    analytics.totalUsers > 0 ? Math.round((analytics.githubConnected / analytics.totalUsers) * 100) : 0;
+  const profileCoverage =
+    analytics.totalUsers > 0 ? Math.round((analytics.completedProfiles / analytics.totalUsers) * 100) : 0;
+
+  return (
+    <section className={`${sectionClass}`} id="host-analytics">
+      <div className="mb-5 flex items-start gap-3 border-b border-white/10 pb-4">
+        <span className="dash-icon-chip" aria-hidden>
+          <Activity className="h-4 w-4" />
+        </span>
+        <div>
+          <p className="dash-eyebrow">Host analytics</p>
+          <h2 className="dash-title">People and readiness intelligence</h2>
+          <p className="dash-subtitle">
+            Role mix, profile depth, and social coverage for running a stronger hackathon.
+          </p>
+        </div>
+      </div>
+
+      <div className="dash-stat-grid grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-6">
+        <div className="dash-stat-tile dash-stat-tile--highlight">
+          <p className="dash-stat-value">{display(analytics.totalUsers)}</p>
+          <p className="dash-stat-label">People</p>
+        </div>
+        <div className="dash-stat-tile">
+          <p className="dash-stat-value">{display(analytics.participants)}</p>
+          <p className="dash-stat-label">Participants</p>
+        </div>
+        <div className="dash-stat-tile">
+          <p className="dash-stat-value">{display(analytics.staff)}</p>
+          <p className="dash-stat-label">Mentors + judges</p>
+        </div>
+        <div className="dash-stat-tile">
+          <p className="dash-stat-value">{display(analytics.githubConnected)}</p>
+          <p className="dash-stat-label">GitHub linked</p>
+        </div>
+        <div className="dash-stat-tile">
+          <p className="dash-stat-value">{display(analytics.socialConnected)}</p>
+          <p className="dash-stat-label">Social linked</p>
+        </div>
+        <div className="dash-stat-tile">
+          <p className="dash-stat-value">{display(`${analytics.averageProfileCompletion}%`)}</p>
+          <p className="dash-stat-label">Avg profile</p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-xl border border-white/10 bg-muted/15 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <span className="font-display text-base font-semibold text-foreground">Profile coverage</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-primary">
+              {display(`${profileCoverage}%`)}
+            </span>
+          </div>
+          <div className="dash-progress-track">
+            <div className="dash-progress-fill" style={{ width: `${profileCoverage}%` }} />
+          </div>
+          <div className="mt-4 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+            <span>GitHub adoption</span>
+            <span className="font-mono text-primary">{display(`${githubCoverage}%`)}</span>
+          </div>
+          <div className="mt-2 dash-progress-track">
+            <div className="dash-progress-fill" style={{ width: `${githubCoverage}%` }} />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-muted/15 p-4">
+          <p className="dash-eyebrow mb-3">Role distribution</p>
+          <div className="space-y-3">
+            {(Object.keys(roleLabels) as PortalRole[]).map((role) => {
+              const count = analytics.roleCounts[role];
+              const percent =
+                analytics.totalUsers > 0 ? Math.round((count / analytics.totalUsers) * 100) : 0;
+              return (
+                <div key={role}>
+                  <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                    <span className="text-foreground/85">{roleLabels[role]}</span>
+                    <span className="font-mono text-primary">{display(count)}</span>
+                  </div>
+                  <div className="dash-progress-track">
+                    <div className="dash-progress-fill" style={{ width: `${percent}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function UserManagementTable({
   users,
@@ -131,6 +361,7 @@ function UserManagementTable({
   onRoleChange,
   onSaveRole,
   onApproveJudge,
+  onUpdateHackathonAccess,
 }: {
   users: AdminUser[];
   title: string;
@@ -142,6 +373,7 @@ function UserManagementTable({
   onRoleChange: (userId: string, role: PortalRole) => void;
   onSaveRole: (user: AdminUser) => Promise<void>;
   onApproveJudge: (user: AdminUser) => Promise<void>;
+  onUpdateHackathonAccess: (user: AdminUser, hackathonIds: HackathonId[]) => Promise<void>;
 }) {
   return (
     <section className={`${sectionClass} overflow-hidden p-0`} id={sectionId}>
@@ -166,8 +398,14 @@ function UserManagementTable({
               <TableHeader>
                 <TableRow className="border-white/10 bg-muted/15 hover:bg-muted/15">
                   <TableHead className="dash-table-head">Email</TableHead>
-                  <TableHead className="dash-table-head w-[110px]">
-                    Event
+                  <TableHead className="dash-table-head min-w-[220px]">
+                    Profile
+                  </TableHead>
+                  <TableHead className="dash-table-head min-w-[190px]">
+                    Social Accounts
+                  </TableHead>
+                  <TableHead className="dash-table-head min-w-[220px]">
+                    Event access
                   </TableHead>
                   <TableHead className="dash-table-head w-[140px]">
                     Current Role
@@ -187,15 +425,149 @@ function UserManagementTable({
                   const hasPendingChange = selectedRole !== user.role;
                   const isPendingStaff =
                     isStaffRole(user.role) && user.judgeApprovalStatus === "pending";
+                  const profile = user.profile;
+                  const githubUrl = getGithubUrl(profile);
+                  const socialLinks = [
+                    { label: "LinkedIn", href: profile?.linkedinUrl },
+                    { label: "Portfolio", href: profile?.portfolioUrl },
+                    { label: "X", href: profile?.xUrl },
+                  ].filter((link) => hasText(link.href));
+                  const profileCompletion = getProfileCompletion(user);
+                  const grantedIds = user.hackathonIds ?? (user.hackathonId ? [user.hackathonId] : []);
 
                   return (
                     <TableRow key={user.id} className="border-white/5 transition-colors hover:bg-primary/5">
                       <TableCell className="text-sm">{user.email}</TableCell>
                       <TableCell>
+                        <div className="flex min-w-0 items-start gap-3">
+                          <Avatar className="mt-0.5 h-10 w-10 rounded-xl border border-white/10">
+                            {profile?.avatarUrl?.trim() ? (
+                              <AvatarImage
+                                src={profile.avatarUrl.trim()}
+                                alt={profile?.fullName?.trim() || user.email}
+                                className="rounded-xl object-cover"
+                              />
+                            ) : null}
+                            <AvatarFallback className="rounded-xl bg-primary/10 text-[0.7rem] font-semibold tracking-[0.12em] text-primary">
+                              {getProfileInitials(profile?.fullName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground">
+                                {profile?.fullName?.trim() || "Unnamed user"}
+                              </span>
+                              <Badge variant="outline" className="text-[0.65rem] uppercase tracking-[0.12em]">
+                                {profileCompletion}% profile
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {profile?.headline?.trim() ||
+                                profile?.publicRole?.trim() ||
+                                "No people role set"}
+                              {profile?.experienceLevel?.trim()
+                                ? ` - ${profile.experienceLevel.trim()}`
+                                : ""}
+                            </p>
+                            {profile?.organization?.trim() ? (
+                              <p className="text-xs text-muted-foreground">
+                                {profile.organization.trim()}
+                              </p>
+                            ) : null}
+                            {profile?.location?.trim() || profile?.timezone?.trim() ? (
+                              <p className="text-xs text-muted-foreground">
+                                {[profile?.location, profile?.timezone].filter(hasText).join(" / ")}
+                              </p>
+                            ) : null}
+                            {profile?.bio?.trim() ? (
+                              <p className="line-clamp-2 text-xs text-foreground/70">
+                                {profile.bio.trim()}
+                              </p>
+                            ) : null}
+                            {profile?.skills?.trim() ? (
+                              <p className="line-clamp-2 text-xs text-foreground/75">
+                                {profile.skills.trim()}
+                              </p>
+                            ) : null}
+                            {profile?.lookingFor?.trim() ? (
+                              <p className="text-xs text-primary/90">
+                                Looking for: {profile.lookingFor.trim()}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex min-w-[170px] flex-wrap gap-2">
+                          {githubUrl ? (
+                            <a
+                              href={githubUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg border border-primary/30 px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-primary hover:bg-primary/10"
+                            >
+                              <Github className="h-3.5 w-3.5" />
+                              GitHub
+                            </a>
+                          ) : null}
+                          {socialLinks.map((link) => (
+                            <a
+                              key={link.label}
+                              href={link.href}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary/30 hover:text-primary"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              {link.label}
+                            </a>
+                          ))}
+                          {profile?.discordHandle?.trim() ? (
+                            <Badge variant="secondary" className="text-[0.68rem]">
+                              {profile.discordHandle.trim()}
+                            </Badge>
+                          ) : null}
+                          {!githubUrl && socialLinks.length === 0 && !profile?.discordHandle?.trim() ? (
+                            <span className="text-xs text-muted-foreground">No social accounts</span>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         {user.role === "admin" ? (
                           <Badge variant="outline" className="text-[0.65rem] uppercase tracking-[0.12em]">
                             All events
                           </Badge>
+                        ) : isStaffRole(user.role) ? (
+                          <div className="flex min-w-[200px] flex-wrap gap-1.5">
+                            {PORTAL_HACKATHONS.map((hackathon) => {
+                              const isGranted = grantedIds.includes(hackathon.id);
+                              return (
+                                <button
+                                  key={hackathon.id}
+                                  type="button"
+                                  disabled={savingUserId === user.id}
+                                  onClick={() => {
+                                    const nextIds = isGranted
+                                      ? grantedIds.filter((id) => id !== hackathon.id)
+                                      : [...grantedIds, hackathon.id];
+                                    void onUpdateHackathonAccess(user, nextIds);
+                                  }}
+                                  className={`rounded-md border px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] transition ${
+                                    isGranted
+                                      ? "border-primary/40 bg-primary/15 text-primary"
+                                      : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-primary"
+                                  }`}
+                                  title={
+                                    isGranted
+                                      ? `Revoke ${hackathon.shortName} access`
+                                      : `Grant ${hackathon.shortName} access`
+                                  }
+                                >
+                                  {hackathon.shortName}
+                                </button>
+                              );
+                            })}
+                          </div>
                         ) : user.hackathonId ? (
                           <Badge variant="secondary" className="text-[0.65rem] uppercase tracking-[0.12em]">
                             {getHackathonById(user.hackathonId).shortName}
@@ -221,6 +593,7 @@ function UserManagementTable({
                             <SelectItem value="participant">participant</SelectItem>
                             <SelectItem value="mentor">mentor</SelectItem>
                             <SelectItem value="judge">judge</SelectItem>
+                            <SelectItem value="host">host</SelectItem>
                             <SelectItem value="admin">admin</SelectItem>
                           </SelectContent>
                         </Select>
@@ -269,6 +642,70 @@ function UserManagementTable({
   );
 }
 
+function HostApprovalPanel({
+  hosts,
+  savingUserId,
+  onApproveHost,
+}: {
+  hosts: AdminUser[];
+  savingUserId: string | null;
+  onApproveHost: (user: AdminUser) => Promise<void>;
+}) {
+  const pendingHosts = hosts.filter((host) => host.hostApprovalStatus !== "approved");
+  const approvedHosts = hosts.filter((host) => host.hostApprovalStatus === "approved");
+
+  return (
+    <section className={`${sectionClass} overflow-hidden p-0`} id="manage-hosts">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+        <div className="flex items-start gap-3">
+          <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Host access control</p>
+            <h2 className="dash-title">Host approval queue</h2>
+            <p className="dash-subtitle">Approve organisers before they can create events, issue tickets, or check in attendees.</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Badge variant="secondary">{pendingHosts.length} pending</Badge>
+          <Badge variant="outline">{approvedHosts.length} approved</Badge>
+        </div>
+      </div>
+      <div className="grid gap-3 p-4 sm:p-6 lg:grid-cols-2">
+        {hosts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No host access requests yet.</p>
+        ) : (
+          hosts.map((host) => {
+            const isPending = host.hostApprovalStatus !== "approved";
+            return (
+              <article key={host.id} className="rounded-xl border border-white/10 bg-muted/10 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-foreground">{host.profile?.fullName?.trim() || host.email}</p>
+                    <p className="text-sm text-muted-foreground">{host.email}</p>
+                    {host.profile?.organization?.trim() ? <p className="mt-2 text-xs text-muted-foreground">{host.profile.organization.trim()}</p> : null}
+                  </div>
+                  <Badge variant={isPending ? "secondary" : "default"} className="uppercase tracking-[0.12em]">
+                    {isPending ? "Pending" : "Approved"}
+                  </Badge>
+                </div>
+                {isPending ? (
+                  <Button size="sm" className="mt-4" disabled={savingUserId === host.id} onClick={() => void onApproveHost(host)}>
+                    {savingUserId === host.id ? "Approving..." : "Approve host"}
+                  </Button>
+                ) : (
+                  <p className="mt-4 text-xs text-primary">This host can manage their own event workspace.</p>
+                )}
+              </article>
+            );
+          })
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function AdminDashboard({
   selectedHackathon,
   judgingCriteria,
@@ -276,6 +713,7 @@ export function AdminDashboard({
   isSavingCriteria,
   onSaveCriteria,
   users,
+  hostAccounts,
   isLoadingUsers,
   submissions,
   isLoadingSubmissions,
@@ -286,11 +724,19 @@ export function AdminDashboard({
   onRoleChange,
   onSaveRole,
   onApproveJudge,
+  onApproveHost,
+  onUpdateHackathonAccess,
   adminGrantEmail,
   onAdminGrantEmailChange,
   pendingAdminGrants,
   isGrantingAdmin,
   onGrantAdminAccess,
+  broadcastSubject,
+  onBroadcastSubjectChange,
+  broadcastMessage,
+  onBroadcastMessageChange,
+  isSendingBroadcast,
+  onSendParticipantBroadcast,
   isCreatingSubmission,
   deletingSubmissionId,
   onCreateSubmission,
@@ -298,6 +744,9 @@ export function AdminDashboard({
   top3RankingSummary,
   isLoadingTop3Rankings,
   top3SubmissionLookup,
+  platformOpsLive,
+  onCreateAiHackathon,
+  onCreateManualHackathon,
 }: AdminDashboardProps) {
   const [newSubmission, setNewSubmission] = useState<NewSubmissionInput>({
     participantId: "",
@@ -309,6 +758,7 @@ export function AdminDashboard({
   });
   const participants = users.filter((user) => user.role === "participant");
   const staff = users.filter((user) => isStaffRole(user.role));
+  const hostAnalytics = buildHostAnalytics(users);
 
   useEffect(() => {
     setNewSubmission({
@@ -323,6 +773,9 @@ export function AdminDashboard({
 
   return (
     <div className="space-y-8" id="overview">
+      <AiHackathonLauncher onCreate={onCreateAiHackathon} />
+      <ManualHackathonLauncher onCreate={onCreateManualHackathon} />
+
       <HackathonContextBanner hackathon={selectedHackathon} role="admin" />
 
       <section className={`${sectionClass} relative overflow-hidden`} aria-label="Admin overview">
@@ -372,6 +825,52 @@ export function AdminDashboard({
           </p>
         )}
       </section>
+
+      <section className={`${sectionClass}`} id="platform" aria-label="Platform features">
+        <div className="dash-stack-header mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="dash-icon-chip" aria-hidden>
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Platform</p>
+              <h2 className="dash-title">Screen, match, score, and rank</h2>
+              <p className="dash-subtitle">
+                Live ops for {selectedHackathon.name} — open the screening agent or operations console.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link to="/dashboard/admin/events">
+                <CalendarCheck2 className="h-4 w-4" />
+                Event management
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link to="/dashboard/admin/screening">
+                <Radar className="h-4 w-4" />
+                Screening agent
+              </Link>
+            </Button>
+            <Button asChild size="sm" className="gap-1.5">
+              <Link to="/dashboard/admin/operations">
+                <Activity className="h-4 w-4" />
+                Operations
+              </Link>
+            </Button>
+          </div>
+        </div>
+        <PlatformOpsConsole live={platformOpsLive} />
+      </section>
+
+      <HostAnalyticsPanel analytics={hostAnalytics} isLoading={isLoadingUsers} />
+
+      <HostApprovalPanel
+        hosts={hostAccounts}
+        savingUserId={savingUserId}
+        onApproveHost={onApproveHost}
+      />
 
       <section className={`${sectionClass} overflow-hidden p-0`} id="grant-admin-access">
         <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
@@ -426,6 +925,61 @@ export function AdminDashboard({
               </ul>
             </div>
           ) : null}
+        </div>
+      </section>
+
+      <section className={`${sectionClass} overflow-hidden p-0`} id="participant-broadcast">
+        <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
+          <span className="dash-icon-chip" aria-hidden>
+            <Mail className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Participant email</p>
+            <h2 className="dash-title">Broadcast to participants</h2>
+            <p className="dash-subtitle">
+              Send one email to every participant registered for {selectedHackathon.name}.
+            </p>
+          </div>
+        </div>
+        <div className="space-y-4 p-4 sm:p-6">
+          <div className="space-y-2">
+            <label
+              htmlFor="participant-broadcast-subject"
+              className="text-xs uppercase tracking-[0.22em] text-muted-foreground"
+            >
+              Subject
+            </label>
+            <Input
+              id="participant-broadcast-subject"
+              value={broadcastSubject}
+              onChange={(event) => onBroadcastSubjectChange(event.target.value)}
+              placeholder="Submission reminder"
+            />
+          </div>
+          <div className="space-y-2">
+            <label
+              htmlFor="participant-broadcast-message"
+              className="text-xs uppercase tracking-[0.22em] text-muted-foreground"
+            >
+              Message
+            </label>
+            <Textarea
+              id="participant-broadcast-message"
+              value={broadcastMessage}
+              onChange={(event) => onBroadcastMessageChange(event.target.value)}
+              placeholder="Write the update participants should receive..."
+              rows={5}
+            />
+          </div>
+          <Button
+            className="h-10 px-4 text-[0.7rem] uppercase tracking-[0.22em]"
+            disabled={
+              isSendingBroadcast || !broadcastSubject.trim() || !broadcastMessage.trim()
+            }
+            onClick={() => void onSendParticipantBroadcast()}
+          >
+            {isSendingBroadcast ? "Sending..." : "Send broadcast"}
+          </Button>
         </div>
       </section>
 
@@ -537,6 +1091,7 @@ export function AdminDashboard({
             onRoleChange={onRoleChange}
             onSaveRole={onSaveRole}
             onApproveJudge={onApproveJudge}
+            onUpdateHackathonAccess={onUpdateHackathonAccess}
           />
           <UserManagementTable
             users={participants}
@@ -549,11 +1104,12 @@ export function AdminDashboard({
             onRoleChange={onRoleChange}
             onSaveRole={onSaveRole}
             onApproveJudge={onApproveJudge}
+            onUpdateHackathonAccess={onUpdateHackathonAccess}
           />
           <UserManagementTable
             users={staff}
             title={`Mentors & judges · ${selectedHackathon.shortName}`}
-            description={`Mentor and judge accounts for ${selectedHackathon.name}.`}
+            description={`Mentor and judge accounts for ${selectedHackathon.name}. Toggle event chips to grant or revoke access.`}
             emptyMessage={`No mentors or judges for ${selectedHackathon.name} yet.`}
             sectionId="manage-judges"
             savingUserId={savingUserId}
@@ -561,6 +1117,7 @@ export function AdminDashboard({
             onRoleChange={onRoleChange}
             onSaveRole={onSaveRole}
             onApproveJudge={onApproveJudge}
+            onUpdateHackathonAccess={onUpdateHackathonAccess}
           />
         </>
       )}

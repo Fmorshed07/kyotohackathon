@@ -15,8 +15,8 @@ function CriterionCard({ criterion, index }: { criterion: JudgingCriterion; inde
       visible={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{
-        borderColor: "hsl(270 70% 60% / 0.4)",
-        backgroundColor: "hsl(270 70% 60% / 0.05)",
+        borderColor: "hsl(199 100% 50% / 0.45)",
+        backgroundColor: "hsl(199 100% 50% / 0.06)",
       }}
     >
       <div className="flex items-center justify-between gap-3">
@@ -72,7 +72,7 @@ const JudgingSection = () => {
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
           <motion.span
-            className="font-display text-xs tracking-[0.25em] text-secondary sm:text-sm sm:tracking-[0.3em]"
+            className="font-display text-xs tracking-[0.25em] text-primary sm:text-sm sm:tracking-[0.3em]"
             initial={{ opacity: 0, x: -20 }}
             animate={headerVisible ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}

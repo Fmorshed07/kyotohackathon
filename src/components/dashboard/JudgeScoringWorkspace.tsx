@@ -114,7 +114,7 @@ export function JudgeScoringWorkspace({
                 type="button"
                 onClick={() => setSelectedSubmissionId(submission.id)}
                 className={cn(
-                  "min-w-[200px] max-w-[240px] shrink-0 rounded-xl border px-3 py-2.5 text-left transition",
+                  "min-w-[200px] max-w-[240px] shrink-0 rounded-lg border px-3 py-2.5 text-left transition",
                   isActive ? accent.active : accent.inactive
                 )}
               >
@@ -136,7 +136,7 @@ export function JudgeScoringWorkspace({
         </div>
       </div>
 
-      <article className={cn("rounded-2xl border p-4 sm:p-6", ideaAccent.panel)}>
+      <article className={cn("rounded-lg border p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.05)] sm:p-6", ideaAccent.panel)}>
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
           <div className="min-w-0 space-y-1">
             <span
@@ -257,7 +257,7 @@ export function JudgeScoringWorkspace({
                 return (
                   <div
                     key={criterion.id}
-                    className={cn("rounded-xl border px-3 py-2.5", accent.card)}
+                    className={cn("rounded-lg border px-3 py-2.5", accent.card)}
                   >
                     <p className="text-xs font-medium text-muted-foreground">{criterion.title}</p>
                     <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
@@ -268,7 +268,7 @@ export function JudgeScoringWorkspace({
               })}
             </div>
 
-            <div className="flex items-center justify-between rounded-xl border border-primary/35 bg-gradient-to-r from-primary/15 to-secondary/10 px-4 py-3">
+            <div className="flex items-center justify-between rounded-lg border border-primary/35 bg-gradient-to-r from-primary/15 to-secondary/10 px-4 py-3">
               <p className="font-display text-sm font-semibold text-primary/90">Total score</p>
               <p className="font-mono text-2xl font-bold tabular-nums text-primary">
                 {totalScore}/100
@@ -363,7 +363,7 @@ function CriterionStepPanel({
   const criterionAccent = getCriterionAccentStyle(criterion.id);
 
   return (
-    <div className={cn("mt-6 rounded-xl border p-4 sm:p-5", criterionAccent.card)}>
+    <div className={cn("mt-6 rounded-lg border p-4 sm:p-5", criterionAccent.card)}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">

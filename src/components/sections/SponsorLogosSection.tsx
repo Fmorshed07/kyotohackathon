@@ -10,7 +10,7 @@ const sponsors = [
   },
   {
     name: "Cognisor",
-    src: "/partners/cognisor.png",
+    src: "/app.png",
     alt: "Cognisor logo",
     logoClassName: "max-h-16 md:max-h-20",
   },

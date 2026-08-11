@@ -78,19 +78,19 @@ const HackathonLivePreviewCard = ({
     transition={{ duration: 0.6, delay: 0.1 + index * 0.1 }}
   >
     <div className="border-b border-white/10 p-5 md:p-6">
-      <p className="font-display text-xs tracking-[0.25em] text-secondary">
+      <p className="font-display text-xs tracking-[0.25em] text-primary">
         {hackathon.eyebrow}
       </p>
       <h3 className="mt-2 font-display text-xl font-bold tracking-wide md:text-2xl">
-        <span className="text-gradient-impact glow-impact">{hackathon.title}</span>
+        <span className="text-gradient-impact">{hackathon.title}</span>
         {hackathon.titleAccent && (
           <>
             <span className="mx-2 text-white/30">·</span>
-            <span className="text-gradient-sunset">{hackathon.titleAccent}</span>
+            <span className="text-muted-foreground">{hackathon.titleAccent}</span>
           </>
         )}
       </h3>
-      <p className="mt-3 text-sm leading-relaxed text-white/75 md:text-base">
+      <p className="mt-3 text-sm leading-relaxed text-white/70 md:text-base">
         {hackathon.description}
       </p>
 
@@ -121,11 +121,11 @@ const HackathonLivePreviewCard = ({
       </a>
     </div>
 
-    <div className="bg-[hsl(248_45%_8%_/_0.6)] p-4 md:p-5">
+    <div className="bg-black/50 p-4 md:p-5">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="font-display text-xs tracking-[0.2em] text-foreground">
-          <span className="text-gradient-japanese">{hackathon.siteLabel}</span>
-          <span className="text-white/50"> — live preview</span>
+          <span className="text-primary">{hackathon.siteLabel}</span>
+          <span className="text-white/45"> — live preview</span>
         </p>
         <a
           href={hackathon.previewUrl}
@@ -140,8 +140,8 @@ const HackathonLivePreviewCard = ({
 
       <div className="poster-preview-frame hackathon-live-preview">
         <div className="poster-preview-chrome">
-          <span className="h-2 w-2 rounded-full bg-accent/90" aria-hidden />
-          <span className="h-2 w-2 rounded-full bg-secondary/90" aria-hidden />
+          <span className="h-2 w-2 rounded-full bg-white/40" aria-hidden />
+          <span className="h-2 w-2 rounded-full bg-white/25" aria-hidden />
           <span className="h-2 w-2 rounded-full bg-primary/90" aria-hidden />
           <span className="ml-2 truncate font-mono text-[0.65rem] text-primary/70">
             {hackathon.siteLabel}
@@ -150,7 +150,7 @@ const HackathonLivePreviewCard = ({
         <iframe
           title={`${hackathon.title} live website preview`}
           src={hackathon.previewUrl}
-          className="h-[min(55vh,520px)] w-full bg-[#1A1B4B]"
+          className="h-[min(55vh,520px)] w-full bg-black"
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
         />
@@ -161,43 +161,48 @@ const HackathonLivePreviewCard = ({
 
 type PreviousHackathonsLivePreviewProps = {
   isVisible?: boolean;
+  /** Restrict the preview to specific archived events when embedded elsewhere. */
+  eventIds?: string[];
 };
 
 const PreviousHackathonsLivePreview = ({
   isVisible = true,
+  eventIds,
 }: PreviousHackathonsLivePreviewProps) => (
   <div id="previous-hackathons" className="relative mb-20 scroll-mt-24 text-left">
     <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
       <img
-        src="/banner.png"
+        src="/cognisor-horizon.png"
         alt=""
-        className="h-full w-full object-cover opacity-[0.1]"
+        className="h-full w-full object-cover opacity-[0.18]"
       />
-      <div className="absolute inset-0 poster-section-bg opacity-90" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
     </div>
 
-    <div className="relative rounded-3xl border border-white/10 p-6 md:p-8">
+    <div className="relative rounded-3xl border border-white/[0.08] p-6 md:p-8">
       <span className="poster-pill text-[0.6rem] tracking-[0.35em] text-primary">
         PAST EVENTS
       </span>
       <h2 className="mt-4 font-display text-2xl font-bold md:text-3xl lg:text-4xl">
-        <span className="text-gradient-impact glow-impact">Previous hackathons</span>
-        <span className="text-gradient-sunset"> — live preview</span>
+        <span className="text-gradient-impact">Previous hackathons</span>
+        <span className="text-muted-foreground"> — live preview</span>
       </h2>
-      <p className="mt-3 max-w-2xl text-sm text-white/70 md:text-base">
+      <p className="mt-3 max-w-2xl text-sm text-white/65 md:text-base">
         Scroll through each official event site below, or open the full website in a
         new tab.
       </p>
 
       <div className="mt-10 space-y-12">
-        {previousHackathons.map((hackathon, index) => (
+        {previousHackathons
+          .filter((hackathon) => !eventIds || eventIds.includes(hackathon.id))
+          .map((hackathon, index) => (
           <HackathonLivePreviewCard
             key={hackathon.id}
             hackathon={hackathon}
             index={index}
             isVisible={isVisible}
           />
-        ))}
+          ))}
       </div>
     </div>
 

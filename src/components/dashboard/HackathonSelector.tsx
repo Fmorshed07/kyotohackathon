@@ -1,5 +1,8 @@
 import { CalendarDays, MapPin, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import kyotoHero from "@/assets/kyoto-hero.jpg";
+import kyotoSkyline from "@/assets/kyoto-skyline.jpg";
+import kyotoAbstract from "@/assets/kyoto-abstract.jpg";
 import {
   Select,
   SelectContent,
@@ -16,6 +19,7 @@ import {
 type HackathonSelectorProps = {
   selectedHackathonId: HackathonId;
   onSelect: (hackathonId: HackathonId) => void;
+  hackathons?: PortalHackathon[];
   compact?: boolean;
 };
 
@@ -34,12 +38,19 @@ const statusVariant: Record<
   past: "outline",
 };
 
+const hackathonVisuals: Record<HackathonId, string> = {
+  "impact-kyoto": kyotoHero,
+  "impact-tokyo": kyotoSkyline,
+  "impact-dhaka": kyotoAbstract,
+};
+
 export function HackathonSelector({
   selectedHackathonId,
   onSelect,
+  hackathons = PORTAL_HACKATHONS,
   compact = false,
 }: HackathonSelectorProps) {
-  const selected = PORTAL_HACKATHONS.find((hackathon) => hackathon.id === selectedHackathonId);
+  const selected = hackathons.find((hackathon) => hackathon.id === selectedHackathonId);
 
   return (
     <div className={compact ? "w-full min-w-0" : "w-full max-w-xl"}>
@@ -47,8 +58,8 @@ export function HackathonSelector({
         <SelectTrigger
           className={
             compact
-              ? "h-auto min-h-11 w-full border-border/60 bg-card/80 py-2.5 text-base sm:min-h-12 sm:text-lg"
-              : "h-auto min-h-[4.5rem] w-full border-primary/30 bg-gradient-to-r from-primary/10 via-card/90 to-secondary/10 py-3 text-base sm:text-lg"
+              ? "h-auto min-h-11 w-full border-border bg-card py-2.5 text-base sm:min-h-12 sm:text-lg"
+              : "h-auto min-h-[4.5rem] w-full border-border bg-card py-3 text-base sm:text-lg"
           }
         >
           <SelectValue placeholder="Choose hackathon">
@@ -72,7 +83,7 @@ export function HackathonSelector({
           </SelectValue>
         </SelectTrigger>
         <SelectContent className="max-h-[min(70vh,420px)]">
-          {PORTAL_HACKATHONS.map((hackathon) => (
+          {hackathons.map((hackathon) => (
             <SelectItem key={hackathon.id} value={hackathon.id} className="py-3">
               <div className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -96,43 +107,76 @@ export function HackathonSelector({
 
 type HackathonContextBannerProps = {
   hackathon: PortalHackathon;
-  role: "admin" | "judge";
+  role: "admin" | "judge" | "participant";
+  publicSiteUrl?: string;
 };
 
-export function HackathonContextBanner({ hackathon, role }: HackathonContextBannerProps) {
+const roleEyebrow: Record<HackathonContextBannerProps["role"], string> = {
+  admin: "Managing hackathon",
+  judge: "Judging hackathon",
+  participant: "Participating in",
+};
+
+export function HackathonContextBanner({
+  hackathon,
+  role,
+  publicSiteUrl,
+}: HackathonContextBannerProps) {
+  const visual = hackathonVisuals[hackathon.id] ?? kyotoAbstract;
+
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/10 via-card/90 to-secondary/10 p-4 shadow-[0_20px_50px_-30px_hsl(199_89%_68%/0.35)] backdrop-blur-md sm:p-5">
-      <div
-        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent"
-        aria-hidden
-      />
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" aria-hidden />
-            <p className="font-display text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-primary/80">
-              {role === "admin" ? "Managing hackathon" : "Judging hackathon"}
-            </p>
-            <Badge variant={statusVariant[hackathon.status]} className="text-[0.6rem] uppercase">
+    <div className="dash-event-card relative overflow-hidden rounded-lg border border-white/[0.08] bg-card">
+      <div className="absolute inset-0 opacity-55">
+        <img
+          src={visual}
+          alt=""
+          className="h-full w-full object-cover"
+          aria-hidden
+        />
+      </div>
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,hsl(0_0%_0%/0.94)_0%,hsl(0_0%_0%/0.78)_44%,hsl(0_0%_0%/0.42)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,hsl(0_0%_0%/0.82)_100%)]" />
+      <div className="relative grid gap-5 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_auto] md:p-6">
+        <div className="min-w-0">
+          <div className="mb-5 flex flex-wrap items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-primary/35 bg-primary/15 text-primary">
+              <Sparkles className="h-4 w-4" aria-hidden />
+            </span>
+            <p className="dash-eyebrow">{roleEyebrow[role]}</p>
+            <Badge variant={statusVariant[hackathon.status]} className="text-[0.65rem] uppercase">
               {statusLabel[hackathon.status]}
             </Badge>
           </div>
-          <h2 className="font-display text-xl font-bold tracking-wide sm:text-2xl md:text-3xl lg:text-4xl">
-            <span className="bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
-              {hackathon.name}
-            </span>
+          <h2 className="max-w-3xl font-display text-2xl font-semibold leading-tight tracking-normal text-foreground sm:text-3xl md:text-4xl">
+            {hackathon.name}
           </h2>
-          <p className="text-base text-muted-foreground sm:text-lg">{hackathon.theme}</p>
+          <p className="mt-2 max-w-2xl text-base text-muted-foreground sm:text-lg">
+            {hackathon.theme}
+          </p>
+          {publicSiteUrl ? (
+            <a
+              href={publicSiteUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-primary underline-offset-4 hover:underline"
+            >
+              Open event site
+            </a>
+          ) : null}
         </div>
-        <div className="grid gap-2 text-sm text-muted-foreground sm:text-right">
-          <p className="inline-flex items-center gap-2 sm:justify-end">
-            <CalendarDays className="h-4 w-4 text-primary" aria-hidden />
-            {hackathon.eventDate}
-          </p>
-          <p className="inline-flex items-center gap-2 sm:justify-end">
-            <MapPin className="h-4 w-4 text-primary" aria-hidden />
-            {hackathon.location}
-          </p>
+        <div className="grid content-start gap-2 text-sm text-muted-foreground md:min-w-48 md:text-right">
+          <div className="rounded-lg border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md">
+            <p className="inline-flex items-center gap-2 md:justify-end">
+              <CalendarDays className="h-4 w-4 text-primary" aria-hidden />
+              {hackathon.eventDate}
+            </p>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md">
+            <p className="inline-flex items-center gap-2 md:justify-end">
+              <MapPin className="h-4 w-4 text-primary" aria-hidden />
+              {hackathon.location}
+            </p>
+          </div>
         </div>
       </div>
     </div>

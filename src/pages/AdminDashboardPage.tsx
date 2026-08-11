@@ -18,9 +18,11 @@ import {
 import {
   fetchSubmissionsForHackathon,
   filterUsersForHackathon,
+  getUserAllowedHackathonIds,
   getUserHackathonId,
   HACKATHON_STORAGE_KEYS,
   PORTAL_HACKATHONS,
+  type HackathonId,
 } from "@/lib/hackathons";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
@@ -31,16 +33,55 @@ import {
   fetchJudgeRankingsForHackathon,
 } from "@/lib/judgeTop3Rankings";
 import { buildAdminJudgingStatistics } from "@/lib/judgingStatistics";
-import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
-import type { JudgeApprovalStatus, PortalRole, Submission } from "@/types/portal";
+import { sendParticipantEmail, queueParticipantEmail } from "@/lib/participantEmail";
+import {
+  fetchAiHackathons,
+  publishAiHackathon,
+  publishManualHackathon,
+  type AiHackathonDraft,
+  type HostedHackathon,
+  type ManualHackathonDraft,
+} from "@/lib/aiHackathons";
+import {
+  calculateTotalFromCriteria,
+  DEFAULT_JUDGING_CRITERIA,
+  type JudgingCriterion,
+} from "@/components/dashboard/judgingCriteria";
+import {
+  emptyPlatformOps,
+  evaluateApplicant,
+  fetchPlatformOps,
+  inferRoleFit,
+  matchApplicantsIntoTeams,
+  savePlatformOps,
+  submissionQuality,
+  suggestCriteriaScores,
+  type PlatformOpsState,
+} from "@/lib/platformOps";
+import type {
+  HostApprovalStatus,
+  JudgeApprovalStatus,
+  PortalRole,
+  Submission,
+  UserProfile,
+} from "@/types/portal";
 
 const normalizePortalRole = (value: unknown): PortalRole | undefined => {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim().toLowerCase();
   if (normalized === "judge" || normalized === "judges") return "judge";
   if (normalized === "mentor" || normalized === "mentors") return "mentor";
+  if (normalized === "host" || normalized === "hosts") return "host";
   if (normalized === "participant" || normalized === "participants") return "participant";
   if (normalized === "admin" || normalized === "admins") return "admin";
+  return undefined;
+};
+
+const normalizeHostApprovalStatus = (value: unknown): HostApprovalStatus | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "pending") return "pending";
+  if (normalized === "approved") return "approved";
   return undefined;
 };
 
@@ -54,11 +95,46 @@ const normalizeJudgeApprovalStatus = (value: unknown): JudgeApprovalStatus | und
 
 const isStaffRole = (role: PortalRole) => role === "judge" || role === "mentor";
 
+const getStringField = (value: unknown) => (typeof value === "string" ? value : "");
+
+const mapUserProfile = (data: Record<string, unknown>): UserProfile => ({
+  fullName: getStringField(data.fullName),
+  avatarUrl: getStringField(data.avatarUrl),
+  headline: getStringField(data.headline),
+  bio: getStringField(data.bio),
+  publicRole: getStringField(data.publicRole),
+  experienceLevel: getStringField(data.experienceLevel),
+  organization: getStringField(data.organization),
+  location: getStringField(data.location),
+  timezone: getStringField(data.timezone),
+  languages: getStringField(data.languages),
+  lookingFor: getStringField(data.lookingFor),
+  githubUsername: getStringField(data.githubUsername),
+  githubProfileUrl: getStringField(data.githubProfileUrl),
+  linkedinUrl: getStringField(data.linkedinUrl),
+  portfolioUrl: getStringField(data.portfolioUrl),
+  xUrl: getStringField(data.xUrl),
+  discordHandle: getStringField(data.discordHandle),
+  skills: getStringField(data.skills),
+  interests: getStringField(data.interests),
+  profileUpdatedAt: getStringField(data.profileUpdatedAt),
+});
+
 export default function AdminDashboardPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
+  const [aiHackathons, setAiHackathons] = useState<HostedHackathon[]>([]);
+  const adminHackathons = useMemo(
+    () => [
+      ...PORTAL_HACKATHONS,
+      ...aiHackathons.filter((event) => !PORTAL_HACKATHONS.some((item) => item.id === event.id)),
+    ],
+    [aiHackathons],
+  );
   const { selectedHackathonId, selectedHackathon, setSelectedHackathonId } = useHackathonSelection(
-    HACKATHON_STORAGE_KEYS.admin
+    HACKATHON_STORAGE_KEYS.admin,
+    undefined,
+    adminHackathons,
   );
   const { criteria: judgingCriteria, isLoading: isLoadingCriteria, setCriteria: setJudgingCriteria } =
     useHackathonCriteria(selectedHackathonId);
@@ -77,10 +153,28 @@ export default function AdminDashboardPage() {
   const [adminGrantEmail, setAdminGrantEmail] = useState("");
   const [pendingAdminGrants, setPendingAdminGrants] = useState<AdminGrantRecord[]>([]);
   const [isGrantingAdmin, setIsGrantingAdmin] = useState(false);
+  const [broadcastSubject, setBroadcastSubject] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
   const [judgeRankings, setJudgeRankings] = useState<Awaited<
     ReturnType<typeof fetchJudgeRankingsForHackathon>
   >>([]);
   const [isLoadingTop3Rankings, setIsLoadingTop3Rankings] = useState(false);
+  const [platformOps, setPlatformOps] = useState<PlatformOpsState>(emptyPlatformOps);
+  const [isSavingOps, setIsSavingOps] = useState(false);
+  const [platformOpsMessage, setPlatformOpsMessage] = useState<string | null>(null);
+  const [activeOpsProjectId, setActiveOpsProjectId] = useState<string | null>(null);
+  const [opsRubric, setOpsRubric] = useState<Record<string, number>>({});
+  const [opsCopilotNote, setOpsCopilotNote] = useState("Select a submission, then run the copilot.");
+
+  useEffect(() => {
+    if (!sessionUser || sessionUser.role !== "admin") return;
+    void fetchAiHackathons(db)
+      .then((events) => setAiHackathons(events))
+      .catch((error: unknown) => {
+        console.warn("[admin] Could not load AI-created hackathons.", error);
+      });
+  }, [db, sessionUser]);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -92,7 +186,7 @@ export default function AdminDashboardPage() {
         const snapshot = await getDocs(usersRef);
         const emailLookup: Record<string, string> = {};
         const allUsers: AdminUser[] = snapshot.docs
-          .map((docSnap) => {
+          .map((docSnap): AdminUser | null => {
             const data = docSnap.data();
             if (typeof data.email === "string" && data.email.trim()) {
               const normalizedEmail = data.email.trim().toLowerCase();
@@ -104,12 +198,22 @@ export default function AdminDashboardPage() {
             const judgeApprovalStatus = isStaffRole(role)
                 ? normalizeJudgeApprovalStatus(data.judgeApprovalStatus) ?? "approved"
                 : undefined;
+            const hostApprovalStatus = role === "host"
+              ? normalizeHostApprovalStatus(data.hostApprovalStatus) ?? "pending"
+              : undefined;
+            const hackathonIds = getUserAllowedHackathonIds({
+              hackathon_id: data.hackathon_id,
+              hackathon_ids: data.hackathon_ids,
+            });
             return {
               id: docSnap.id,
               email: data.email,
               role,
               judgeApprovalStatus,
-              hackathonId: getUserHackathonId({ hackathon_id: data.hackathon_id }),
+              hostApprovalStatus,
+              hackathonId: hackathonIds[0] ?? getUserHackathonId({ hackathon_id: data.hackathon_id }),
+              hackathonIds,
+              profile: mapUserProfile(data),
             };
           })
           .filter((user): user is AdminUser => user !== null);
@@ -190,6 +294,34 @@ export default function AdminDashboardPage() {
     void loadJudgeRankings();
   }, [sessionUser, db, selectedHackathonId]);
 
+  useEffect(() => {
+    if (!sessionUser || sessionUser.role !== "admin") return;
+    let cancelled = false;
+
+    const loadOps = async () => {
+      try {
+        const state = await fetchPlatformOps(db, selectedHackathonId);
+        if (cancelled) return;
+        setPlatformOps(state);
+        setPlatformOpsMessage(null);
+        setActiveOpsProjectId(null);
+        setOpsCopilotNote("Select a submission, then run the copilot.");
+      } catch (error: unknown) {
+        if (cancelled) return;
+        const text =
+          typeof error === "object" && error && "message" in error
+            ? String((error as { message?: string }).message)
+            : "Failed to load platform ops.";
+        setPlatformOpsMessage(text);
+      }
+    };
+
+    void loadOps();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUser, db, selectedHackathonId]);
+
   const getUserEmail = (identifier: string | null | undefined) => {
     if (!identifier) return null;
     const normalizedIdentifier = identifier.trim().toLowerCase();
@@ -199,7 +331,12 @@ export default function AdminDashboardPage() {
   const hackathonUsers = useMemo(
     () =>
       filterUsersForHackathon(
-        users.map((user) => ({ ...user, hackathon_id: user.hackathonId })),
+        users.map((user) => ({
+          ...user,
+          hackathon_id: user.hackathonId,
+          hackathon_ids: user.hackathonIds,
+          hackathonIds: user.hackathonIds,
+        })),
         selectedHackathonId,
         submissions
       ),
@@ -322,6 +459,7 @@ export default function AdminDashboardPage() {
   );
 
   const staffJudges = hackathonUsers.filter((user) => isStaffRole(user.role));
+  const hostAccounts = users.filter((user) => user.role === "host");
 
   const top3SubmissionLookup = useMemo(() => {
     const lookup = new Map<
@@ -370,11 +508,23 @@ export default function AdminDashboardPage() {
             ? "pending"
             : "approved"
           : null;
+      const nextHostApprovalStatus = nextRole === "host"
+        ? user.role === "host" ? user.hostApprovalStatus ?? "pending" : "pending"
+        : null;
       await setDoc(
         userRef,
         {
           role: nextRole,
           judgeApprovalStatus: nextJudgeApprovalStatus,
+          hostApprovalStatus: nextHostApprovalStatus,
+          hackathon_id: selectedHackathonId,
+          ...(isStaffRole(nextRole)
+            ? {
+                hackathon_ids: Array.from(
+                  new Set([...(user.hackathonIds ?? []), selectedHackathonId])
+                ),
+              }
+            : {}),
         },
         { merge: true }
       );
@@ -385,6 +535,11 @@ export default function AdminDashboardPage() {
                 ...currentUser,
                 role: nextRole,
                 judgeApprovalStatus: isStaffRole(nextRole) ? nextJudgeApprovalStatus ?? "approved" : undefined,
+                hostApprovalStatus: nextRole === "host" ? nextHostApprovalStatus ?? "pending" : undefined,
+                hackathonId: selectedHackathonId,
+                hackathonIds: isStaffRole(nextRole)
+                  ? Array.from(new Set([...(currentUser.hackathonIds ?? []), selectedHackathonId]))
+                  : currentUser.hackathonIds,
               }
             : currentUser
         )
@@ -411,24 +566,104 @@ export default function AdminDashboardPage() {
     setMessage(null);
     setSavingUserId(user.id);
     try {
+      const existingIds = user.hackathonIds ?? (user.hackathonId ? [user.hackathonId] : []);
+      const nextHackathonIds = Array.from(new Set([...existingIds, selectedHackathonId]));
       const userRef = doc(db, "users", user.id);
-      await setDoc(userRef, { judgeApprovalStatus: "approved" }, { merge: true });
+      await setDoc(
+        userRef,
+        {
+          judgeApprovalStatus: "approved",
+          hackathon_id: nextHackathonIds[0] ?? selectedHackathonId,
+          hackathon_ids: nextHackathonIds,
+        },
+        { merge: true }
+      );
       setUsers((current) =>
         current.map((currentUser) =>
           currentUser.id === user.id
             ? {
                 ...currentUser,
                 judgeApprovalStatus: "approved",
+                hackathonId: nextHackathonIds[0] ?? selectedHackathonId,
+                hackathonIds: nextHackathonIds,
               }
             : currentUser
         )
       );
-      setMessage(`Approved ${user.role} access for ${user.email}.`);
+      setMessage(
+        `Approved ${user.role} access for ${user.email} (${nextHackathonIds
+          .map((id) => PORTAL_HACKATHONS.find((h) => h.id === id)?.shortName ?? id)
+          .join(", ")}).`
+      );
     } catch (error: unknown) {
       const text =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
           : "Failed to approve judge access.";
+      setMessage(text);
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleApproveHost = async (user: AdminUser) => {
+    if (user.role !== "host" || user.hostApprovalStatus === "approved") return;
+    setMessage(null);
+    setSavingUserId(user.id);
+    try {
+      await setDoc(doc(db, "users", user.id), { hostApprovalStatus: "approved" }, { merge: true });
+      setUsers((current) => current.map((currentUser) =>
+        currentUser.id === user.id ? { ...currentUser, hostApprovalStatus: "approved" } : currentUser,
+      ));
+      setMessage(`Approved host access for ${user.email}.`);
+    } catch (error: unknown) {
+      const text = typeof error === "object" && error && "message" in error
+        ? String((error as { message?: string }).message)
+        : "Failed to approve host access.";
+      setMessage(text);
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleUpdateHackathonAccess = async (user: AdminUser, hackathonIds: HackathonId[]) => {
+    if (!isStaffRole(user.role)) return;
+    setMessage(null);
+    setSavingUserId(user.id);
+    try {
+      const uniqueIds = Array.from(new Set(hackathonIds));
+      const userRef = doc(db, "users", user.id);
+      await setDoc(
+        userRef,
+        {
+          hackathon_ids: uniqueIds,
+          hackathon_id: uniqueIds[0] ?? selectedHackathonId,
+        },
+        { merge: true }
+      );
+      setUsers((current) =>
+        current.map((currentUser) =>
+          currentUser.id === user.id
+            ? {
+                ...currentUser,
+                hackathonIds: uniqueIds,
+                hackathonId: uniqueIds[0] ?? null,
+              }
+            : currentUser
+        )
+      );
+      setMessage(
+        uniqueIds.length === 0
+          ? `Removed all event access for ${user.email}.`
+          : `Updated event access for ${user.email}: ${uniqueIds
+              .map((id) => PORTAL_HACKATHONS.find((h) => h.id === id)?.shortName ?? id)
+              .join(", ")}.`
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to update event access.";
       setMessage(text);
     } finally {
       setSavingUserId(null);
@@ -467,6 +702,18 @@ export default function AdminDashboardPage() {
       const ref = await addDoc(collection(db, "submissions"), submissionPayload);
       setSubmissions((current) => [...current, { id: ref.id, ...submissionPayload }]);
       setMessage("Submission added.");
+
+      const participantEmail =
+        users.find((user) => user.id === payload.participantId)?.email ??
+        userEmailLookup[payload.participantId];
+      if (participantEmail) {
+        queueParticipantEmail({
+          type: "admin_submission",
+          toEmail: participantEmail,
+          title: submissionPayload.title ?? undefined,
+          hackathonName: selectedHackathon.name,
+        });
+      }
     } catch (error: unknown) {
       const text =
         typeof error === "object" && error && "message" in error
@@ -495,6 +742,30 @@ export default function AdminDashboardPage() {
     } finally {
       setIsSavingCriteria(false);
     }
+  };
+
+  const handleCreateAiHackathon = async (
+    draft: AiHackathonDraft,
+    rulebookUrl: string,
+  ): Promise<HostedHackathon> => {
+    if (!sessionUser) throw new Error("You must be signed in as an admin to create an event.");
+    const event = await publishAiHackathon(db, draft, rulebookUrl, sessionUser.id);
+    setAiHackathons((current) => [event, ...current.filter((currentEvent) => currentEvent.id !== event.id)]);
+    setSelectedHackathonId(event.id);
+    setMessage(`${event.name} was created and published.`);
+    return event;
+  };
+
+  const handleCreateManualHackathon = async (
+    draft: ManualHackathonDraft,
+    rulebookUrl: string,
+  ): Promise<HostedHackathon> => {
+    if (!sessionUser) throw new Error("You must be signed in as an admin to create an event.");
+    const event = await publishManualHackathon(db, draft, rulebookUrl, sessionUser.id);
+    setAiHackathons((current) => [event, ...current.filter((currentEvent) => currentEvent.id !== event.id)]);
+    setSelectedHackathonId(event.id);
+    setMessage(`${event.name} was manually created and published.`);
+    return event;
   };
 
   const handleGrantAdminAccess = async () => {
@@ -556,11 +827,65 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleSendParticipantBroadcast = async () => {
+    const subject = broadcastSubject.trim();
+    const body = broadcastMessage.trim();
+    if (!subject || !body) {
+      setMessage("Enter a broadcast subject and message.");
+      return;
+    }
+
+    const recipients = hackathonUsers
+      .filter((user) => user.role === "participant")
+      .map((user) => user.email.trim())
+      .filter(Boolean);
+
+    if (recipients.length === 0) {
+      setMessage("No participants found for this hackathon.");
+      return;
+    }
+
+    setMessage(null);
+    setIsSendingBroadcast(true);
+    try {
+      const result = await sendParticipantEmail({
+        type: "broadcast",
+        subject,
+        message: body,
+        recipients,
+        hackathonName: selectedHackathon.name,
+      });
+
+      if (result.ok === false) {
+        setMessage(result.error);
+        return;
+      }
+
+      const failedNote = result.failed ? ` (${result.failed} failed)` : "";
+      setMessage(
+        result.preview
+          ? `Broadcast logged for ${result.sent ?? recipients.length} participants (SMTP not configured).${failedNote}`
+          : `Broadcast sent to ${result.sent ?? recipients.length} participants.${failedNote}`,
+      );
+      setBroadcastSubject("");
+      setBroadcastMessage("");
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to send broadcast.";
+      setMessage(text);
+    } finally {
+      setIsSendingBroadcast(false);
+    }
+  };
+
   const handleDeleteSubmission = async (submissionId: string) => {
     setMessage(null);
     setDeletingSubmissionId(submissionId);
     try {
       await deleteDoc(doc(db, "submissions", submissionId));
+      await deleteDoc(doc(db, "public_projects", submissionId)).catch(() => undefined);
       setSubmissions((current) => current.filter((submission) => submission.id !== submissionId));
       setMessage("Submission removed.");
     } catch (error: unknown) {
@@ -571,6 +896,312 @@ export default function AdminDashboardPage() {
       setMessage(text);
     } finally {
       setDeletingSubmissionId(null);
+    }
+  };
+
+  const persistPlatformOps = async (next: PlatformOpsState, note?: string) => {
+    const withTime = { ...next, updatedAt: new Date().toISOString() };
+    await savePlatformOps(db, selectedHackathonId, withTime);
+    setPlatformOps(withTime);
+    if (note) setPlatformOpsMessage(note);
+  };
+
+  const handleRunScreening = async () => {
+    const participants = hackathonUsers.filter((user) => user.role === "participant");
+    if (participants.length === 0) {
+      setPlatformOpsMessage("No participants in this hackathon yet.");
+      return;
+    }
+    setIsSavingOps(true);
+    try {
+      const applicants = { ...platformOps.applicants };
+      participants.forEach((person) => {
+        const evaluation = evaluateApplicant(person.profile, person.email);
+        const existing = applicants[person.id];
+        applicants[person.id] = {
+          status:
+            existing?.status && existing.status !== "pending"
+              ? existing.status
+              : evaluation.recommendation === "shortlisted"
+                ? "shortlisted"
+                : "pending",
+          score: evaluation.score,
+          teamName: existing?.teamName ?? null,
+          checkedIn: existing?.checkedIn ?? false,
+        };
+      });
+      await persistPlatformOps(
+        { ...platformOps, applicants, screenedAt: new Date().toISOString() },
+        `Screened ${participants.length} applicants for ${selectedHackathon.name}.`,
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to run screening.";
+      setPlatformOpsMessage(text);
+    } finally {
+      setIsSavingOps(false);
+    }
+  };
+
+  const handleSetApplicantStatus = async (userId: string, status: "pending" | "shortlisted" | "passed") => {
+    setIsSavingOps(true);
+    try {
+      const existing = platformOps.applicants[userId] ?? {
+        status: "pending" as const,
+        score: null,
+        teamName: null,
+        checkedIn: false,
+      };
+      await persistPlatformOps({
+        ...platformOps,
+        applicants: {
+          ...platformOps.applicants,
+          [userId]: { ...existing, status },
+        },
+      });
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to update applicant.";
+      setPlatformOpsMessage(text);
+    } finally {
+      setIsSavingOps(false);
+    }
+  };
+
+  const handleMatchTeams = async () => {
+    const shortlisted = hackathonUsers
+      .filter((user) => user.role === "participant" && platformOps.applicants[user.id]?.status === "shortlisted")
+      .map((user) => ({ id: user.id, role: inferRoleFit(user.profile) }));
+
+    if (shortlisted.length < 2) {
+      setPlatformOpsMessage("Shortlist at least two people, then match.");
+      return;
+    }
+
+    setIsSavingOps(true);
+    try {
+      const formed = matchApplicantsIntoTeams(shortlisted);
+      const applicants = { ...platformOps.applicants };
+      for (const team of formed) {
+        for (const member of team.members) {
+          const existing = applicants[member.id];
+          applicants[member.id] = {
+            status: "shortlisted",
+            score: existing?.score ?? null,
+            teamName: team.name,
+            checkedIn: existing?.checkedIn ?? false,
+          };
+        }
+      }
+
+      for (const team of formed) {
+        for (const member of team.members) {
+          const submission = submissions.find((entry) => entry.user_id === member.id);
+          if (!submission) continue;
+          await setDoc(doc(db, "submissions", submission.id), { team_name: team.name }, { merge: true });
+        }
+      }
+
+      setSubmissions((current) =>
+        current.map((submission) => {
+          const team = formed.find((entry) => entry.members.some((member) => member.id === submission.user_id));
+          return team ? { ...submission, team_name: team.name } : submission;
+        }),
+      );
+
+      await persistPlatformOps(
+        { ...platformOps, applicants },
+        `Matched ${formed.length} team${formed.length === 1 ? "" : "s"} and updated submissions.`,
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to match teams.";
+      setPlatformOpsMessage(text);
+    } finally {
+      setIsSavingOps(false);
+    }
+  };
+
+  const handleToggleCheckIn = async (teamName: string) => {
+    setIsSavingOps(true);
+    try {
+      const applicants = { ...platformOps.applicants };
+      const members = Object.entries(applicants).filter(([, record]) => record.teamName === teamName);
+      const nextCheckedIn = !members.every(([, record]) => record.checkedIn);
+      for (const [id, record] of members) {
+        applicants[id] = { ...record, checkedIn: nextCheckedIn };
+      }
+      await persistPlatformOps(
+        { ...platformOps, applicants },
+        nextCheckedIn ? `${teamName} checked in.` : `${teamName} check-in cleared.`,
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to update check-in.";
+      setPlatformOpsMessage(text);
+    } finally {
+      setIsSavingOps(false);
+    }
+  };
+
+  const handleOpsBroadcast = async (messageBody: string) => {
+    const recipients = hackathonUsers
+      .filter((user) => user.role === "participant")
+      .map((user) => user.email.trim())
+      .filter(Boolean);
+
+    if (recipients.length === 0) {
+      setPlatformOpsMessage("No participants found for this hackathon.");
+      return;
+    }
+
+    setIsSavingOps(true);
+    try {
+      const result = await sendParticipantEmail({
+        type: "broadcast",
+        subject: `Live update · ${selectedHackathon.name}`,
+        message: messageBody,
+        recipients,
+        hackathonName: selectedHackathon.name,
+      });
+      if (result.ok === false) {
+        setPlatformOpsMessage(result.error);
+        return;
+      }
+      await persistPlatformOps(
+        { ...platformOps, lastBroadcast: messageBody },
+        result.preview
+          ? `Broadcast logged for ${result.sent ?? recipients.length} participants (SMTP not configured).`
+          : `Broadcast sent to ${result.sent ?? recipients.length} participants.`,
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to send broadcast.";
+      setPlatformOpsMessage(text);
+    } finally {
+      setIsSavingOps(false);
+    }
+  };
+
+  const handleRunCopilot = () => {
+    const submission = adminSubmissionRows.find((entry) => entry.id === activeOpsProjectId) ?? adminSubmissionRows[0];
+    if (!submission) {
+      setOpsCopilotNote("No submission to review yet.");
+      return;
+    }
+    setActiveOpsProjectId(submission.id);
+    const criteria = judgingCriteria.length ? judgingCriteria : DEFAULT_JUDGING_CRITERIA;
+    const suggested = suggestCriteriaScores(criteria, submissionQuality(submission));
+    setOpsRubric(suggested);
+    setOpsCopilotNote(`Suggested marks for ${submission.title?.trim() || "this project"}. Save to lock the score.`);
+  };
+
+  const handleSaveOpsScore = async () => {
+    const submissionId = activeOpsProjectId ?? adminSubmissionRows[0]?.id;
+    if (!submissionId) return;
+    const criteria = judgingCriteria.length ? judgingCriteria : DEFAULT_JUDGING_CRITERIA;
+    const total = calculateTotalFromCriteria(opsRubric, criteria);
+    setIsSavingOps(true);
+    try {
+      await persistPlatformOps(
+        {
+          ...platformOps,
+          projectScores: { ...platformOps.projectScores, [submissionId]: total },
+          projectCriteria: { ...platformOps.projectCriteria, [submissionId]: opsRubric },
+        },
+        `Saved ${total} pts. Rankings updated.`,
+      );
+      setOpsCopilotNote(`Saved at ${total} pts. Rankings updated.`);
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to save score.";
+      setPlatformOpsMessage(text);
+    } finally {
+      setIsSavingOps(false);
+    }
+  };
+
+  const handleCarryForward = async (targetId: HackathonId) => {
+    const shortlistedIds = Object.entries(platformOps.applicants)
+      .filter(([, record]) => record.status === "shortlisted")
+      .map(([id]) => id);
+
+    if (shortlistedIds.length === 0) {
+      setPlatformOpsMessage("Shortlist applicants before carrying them forward.");
+      return;
+    }
+
+    setIsSavingOps(true);
+    try {
+      for (const userId of shortlistedIds) {
+        const user = users.find((entry) => entry.id === userId);
+        if (!user) continue;
+        const nextIds = Array.from(new Set([...(user.hackathonIds ?? []), selectedHackathonId, targetId]));
+        await setDoc(
+          doc(db, "users", userId),
+          {
+            hackathon_ids: nextIds,
+            hackathon_id: user.hackathonId ?? selectedHackathonId,
+          },
+          { merge: true },
+        );
+      }
+
+      setUsers((current) =>
+        current.map((user) =>
+          shortlistedIds.includes(user.id)
+            ? {
+                ...user,
+                hackathonIds: Array.from(new Set([...(user.hackathonIds ?? []), selectedHackathonId, targetId])),
+              }
+            : user,
+        ),
+      );
+
+      const targetOps = await fetchPlatformOps(db, targetId);
+      const mergedApplicants = { ...targetOps.applicants };
+      for (const userId of shortlistedIds) {
+        const current = platformOps.applicants[userId];
+        mergedApplicants[userId] = {
+          status: "shortlisted",
+          score: current?.score ?? null,
+          teamName: current?.teamName ?? null,
+          checkedIn: false,
+        };
+      }
+      await savePlatformOps(db, targetId, {
+        ...targetOps,
+        applicants: mergedApplicants,
+        screenedAt: targetOps.screenedAt ?? new Date().toISOString(),
+        replayedTo: targetId,
+        updatedAt: new Date().toISOString(),
+      });
+
+      await persistPlatformOps(
+        { ...platformOps, replayedTo: targetId },
+        `Carried ${shortlistedIds.length} applicants to ${PORTAL_HACKATHONS.find((item) => item.id === targetId)?.name ?? targetId}.`,
+      );
+      setSelectedHackathonId(targetId);
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to carry applicants forward.";
+      setPlatformOpsMessage(text);
+    } finally {
+      setIsSavingOps(false);
     }
   };
 
@@ -591,7 +1222,7 @@ export default function AdminDashboardPage() {
       sessionUser={sessionUser}
       role="admin"
       onSignOut={signOut}
-      hackathons={PORTAL_HACKATHONS}
+      hackathons={adminHackathons}
       selectedHackathonId={selectedHackathonId}
       onHackathonChange={setSelectedHackathonId}
     >
@@ -602,6 +1233,7 @@ export default function AdminDashboardPage() {
         isSavingCriteria={isSavingCriteria}
         onSaveCriteria={handleSaveCriteria}
         users={hackathonUsers}
+        hostAccounts={hostAccounts}
         isLoadingUsers={isLoadingUsers}
         submissions={adminSubmissionRows}
         isLoadingSubmissions={isLoadingSubmissions}
@@ -612,11 +1244,19 @@ export default function AdminDashboardPage() {
         onRoleChange={handleRoleChange}
         onSaveRole={handleSaveRole}
         onApproveJudge={handleApproveJudge}
+        onApproveHost={handleApproveHost}
+        onUpdateHackathonAccess={handleUpdateHackathonAccess}
         adminGrantEmail={adminGrantEmail}
         onAdminGrantEmailChange={setAdminGrantEmail}
         pendingAdminGrants={pendingAdminGrants}
         isGrantingAdmin={isGrantingAdmin}
         onGrantAdminAccess={handleGrantAdminAccess}
+        broadcastSubject={broadcastSubject}
+        onBroadcastSubjectChange={setBroadcastSubject}
+        broadcastMessage={broadcastMessage}
+        onBroadcastMessageChange={setBroadcastMessage}
+        isSendingBroadcast={isSendingBroadcast}
+        onSendParticipantBroadcast={handleSendParticipantBroadcast}
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}
         onCreateSubmission={handleCreateSubmission}
@@ -624,6 +1264,32 @@ export default function AdminDashboardPage() {
         top3RankingSummary={top3RankingSummary}
         isLoadingTop3Rankings={isLoadingTop3Rankings}
         top3SubmissionLookup={top3SubmissionLookup}
+        platformOpsLive={{
+          hackathon: selectedHackathon,
+          participants: hackathonUsers.filter((user) => user.role === "participant"),
+          submissions: adminSubmissionRows,
+          judgingCriteria,
+          ops: platformOps,
+          isBusy: isSavingOps || isSendingBroadcast,
+          statusMessage: platformOpsMessage,
+          onHackathonChange: setSelectedHackathonId,
+          onRunScreening: handleRunScreening,
+          onSetApplicantStatus: handleSetApplicantStatus,
+          onMatchTeams: handleMatchTeams,
+          onToggleCheckIn: handleToggleCheckIn,
+          onSendBroadcast: handleOpsBroadcast,
+          onSelectProject: setActiveOpsProjectId,
+          activeProjectId: activeOpsProjectId ?? adminSubmissionRows[0]?.id ?? null,
+          rubric: opsRubric,
+          onRubricChange: (criterionId, value) =>
+            setOpsRubric((current) => ({ ...current, [criterionId]: value })),
+          onRunCopilot: handleRunCopilot,
+          onSaveScore: handleSaveOpsScore,
+          copilotNote: opsCopilotNote,
+          onCarryForward: handleCarryForward,
+        }}
+        onCreateAiHackathon={handleCreateAiHackathon}
+        onCreateManualHackathon={handleCreateManualHackathon}
       />
     </DashboardLayout>
   );

@@ -2,6 +2,7 @@ import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -29,6 +30,7 @@ let firebaseApp: FirebaseApp | null = null;
 let firebaseAnalytics: Analytics | null = null;
 let firebaseAuth: Auth | null = null;
 let firebaseDb: Firestore | null = null;
+let firebaseStorage: FirebaseStorage | null = null;
 
 function getAppInstance(): FirebaseApp {
   if (firebaseApp) return firebaseApp;
@@ -58,4 +60,10 @@ export const getFirestoreDb = (): Firestore => {
   if (firebaseDb) return firebaseDb;
   firebaseDb = getFirestore(getAppInstance());
   return firebaseDb;
+};
+
+export const getFirebaseStorage = (): FirebaseStorage => {
+  if (firebaseStorage) return firebaseStorage;
+  firebaseStorage = getStorage(getAppInstance());
+  return firebaseStorage;
 };

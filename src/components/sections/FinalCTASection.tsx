@@ -1,137 +1,98 @@
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import BrandLogo from "@/components/BrandLogo";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-
-const LUMA_URL = "https://luma.com/cmevass2";
-const PARTNER_EMAIL = "mailto:cognisorai@gmail.com?subject=Impact%20Kyoto%202026%20Partnership";
 
 const FinalCTASection = () => {
   const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.2 });
 
   return (
     <section
-      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-32"
+      className="relative flex min-h-[75vh] flex-col items-center justify-center overflow-hidden px-6 py-28"
       id="cta"
     >
       <div ref={ref} className="absolute inset-0" />
-      <motion.div
-        className="absolute inset-0 -z-10"
-        initial={{ opacity: 0 }}
-        animate={isVisible ? { opacity: 1 } : {}}
-        transition={{ duration: 1.5 }}
-      >
+      <div className="absolute inset-0 -z-10">
         <img
-          src="/banner.png"
+          src="/cognisor-horizon.png"
           alt=""
-          className="h-full w-full object-cover object-center opacity-[0.12]"
+          className="h-full w-full object-cover object-[center_60%] opacity-40"
         />
-        <div className="absolute inset-0 poster-section-bg opacity-95" />
-        <div className="absolute inset-0 section-glow-top" />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse 50% 40% at 50% 100%, hsl(18 95% 58% / 0.1), transparent)",
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-background/70" />
-      </motion.div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-black/75 to-black" />
+        <div className="starfield absolute inset-0 opacity-30" />
+      </div>
 
-      <div className="max-w-4xl text-center">
-        <motion.span
-          className="mb-6 inline-block font-display text-sm tracking-[0.4em] text-primary/60"
-          initial={{ opacity: 0, y: 20 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          JOIN IMPACT KYOTO 2026
-        </motion.span>
-
-        <motion.h2
-          className="font-display text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl xl:text-7xl"
-          initial={{ opacity: 0, y: 40 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        >
-          Building Japan&apos;s Next Generation
-          <br />
-          <motion.span
-            className="text-gradient-sunset"
-            animate={
-              isVisible
-                ? {
-                    textShadow: [
-                      "0 0 20px hsl(18 95% 58% / 0.3)",
-                      "0 0 40px hsl(270 55% 72% / 0.35)",
-                      "0 0 20px hsl(18 95% 58% / 0.3)",
-                    ],
-                  }
-                : {}
-            }
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          >
-            of AI Innovators
-          </motion.span>
-        </motion.h2>
-
+      <div className="relative max-w-3xl text-center">
         <motion.div
-          className="mx-auto mt-8 flex flex-wrap justify-center gap-3"
-          initial={{ opacity: 0, y: 20 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.45 }}
+          className="mb-6 flex justify-center"
+          initial={{ opacity: 0, y: 16, scale: 0.9 }}
+          animate={isVisible ? { opacity: 1, y: 0, scale: 1 } : {}}
+          transition={{ duration: 0.7 }}
         >
-          {["Students", "Builders", "Researchers", "Founders"].map((label) => (
-            <span
-              key={label}
-              className="rounded-full border border-primary/30 bg-primary/10 px-4 py-2 font-display text-sm tracking-wide text-primary"
-            >
-              {label}
-            </span>
-          ))}
+          <BrandLogo size="lg" href={null} className="pointer-events-none" />
         </motion.div>
 
+        <motion.div
+          className="horizon-flare mx-auto mb-8 w-40"
+          initial={{ opacity: 0, scaleX: 0.3 }}
+          animate={isVisible ? { opacity: 1, scaleX: 1 } : {}}
+          transition={{ duration: 0.8, delay: 0.05 }}
+        />
+
         <motion.p
-          className="mx-auto mt-8 max-w-2xl font-body text-lg text-muted-foreground md:text-xl"
-          initial={{ opacity: 0, y: 20 }}
+          className="mb-5 font-display text-xs font-semibold tracking-[0.36em] text-primary"
+          initial={{ opacity: 0, y: 16 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.5 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
         >
-          Together, we can create AI solutions that strengthen industries, empower communities,
-          and shape the future.
+          COGNISOR HACKATHONS
+        </motion.p>
+
+        <motion.h2
+          className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl lg:text-6xl"
+          initial={{ opacity: 0, y: 28 }}
+          animate={isVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+        >
+          Build beyond the horizon.
+        </motion.h2>
+
+        <motion.p
+          className="mx-auto mt-6 max-w-xl font-body text-base text-white/65 sm:text-lg"
+          initial={{ opacity: 0, y: 16 }}
+          animate={isVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, delay: 0.22 }}
+        >
+          Enter the portal to manage submissions, scoring, and rankings across every Cognisor
+          Impact hackathon.
         </motion.p>
 
         <motion.div
-          className="mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
-          initial={{ opacity: 0, y: 30 }}
+          className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
+          initial={{ opacity: 0, y: 20 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.7 }}
+          transition={{ duration: 0.5, delay: 0.32 }}
         >
-          <motion.a
-            href={LUMA_URL}
-            className="btn-poster-cta min-w-[220px]"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+          <Link to="/signin" className="btn-poster-cta min-w-[200px]">
+            Enter portal
+          </Link>
+          <a
+            href="https://www.cognisorai.com"
             target="_blank"
             rel="noreferrer"
+            className="inline-flex min-w-[200px] items-center justify-center rounded-md border border-white/20 bg-black/40 px-6 py-3.5 font-display text-sm font-medium tracking-[0.1em] text-white backdrop-blur-md transition-colors hover:border-primary/50"
           >
-            <span className="relative z-10">Register Now</span>
-          </motion.a>
-          <motion.a
-            href={PARTNER_EMAIL}
-            className="inline-flex min-w-[220px] items-center justify-center rounded-md border border-secondary/70 bg-secondary/20 px-6 py-3 font-display text-sm font-medium tracking-[0.15em] text-secondary transition-colors hover:bg-secondary/30"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            Become a Partner
-          </motion.a>
+            cognisorai.com
+          </a>
         </motion.div>
 
         <motion.p
-          className="mt-16 font-body text-xs tracking-[0.2em] text-muted-foreground/50"
+          className="mt-16 font-body text-xs tracking-[0.22em] text-white/35"
           initial={{ opacity: 0 }}
           animate={isVisible ? { opacity: 1 } : {}}
-          transition={{ duration: 0.6, delay: 0.9 }}
+          transition={{ duration: 0.5, delay: 0.45 }}
         >
-          IMPACT KYOTO 2026 • AGENTIC AI FOR JAPAN&apos;S FUTURE • ORGANIZED BY COGNISOR AI
+          ORGANIZED BY COGNISOR AI · TOKYO
         </motion.p>
       </div>
     </section>

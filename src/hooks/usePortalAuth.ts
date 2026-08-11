@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
-import type { JudgeApprovalStatus, PortalRole, SessionUser } from "@/types/portal";
+import { getUserAllowedHackathonIds, getUserHackathonId } from "@/lib/hackathons";
+import type {
+  HostApprovalStatus,
+  JudgeApprovalStatus,
+  PortalRole,
+  SessionUser,
+} from "@/types/portal";
 
 const ADMIN_OVERRIDE_STORAGE_KEY = "portal_admin_override";
 
@@ -11,8 +17,17 @@ const normalizePortalRole = (value: unknown): PortalRole | undefined => {
   const normalized = value.trim().toLowerCase();
   if (normalized === "judge" || normalized === "judges") return "judge";
   if (normalized === "mentor" || normalized === "mentors") return "mentor";
+  if (normalized === "host" || normalized === "hosts") return "host";
   if (normalized === "participant" || normalized === "participants") return "participant";
   if (normalized === "admin" || normalized === "admins") return "admin";
+  return undefined;
+};
+
+const normalizeHostApprovalStatus = (value: unknown): HostApprovalStatus | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "pending") return "pending";
+  if (normalized === "approved") return "approved";
   return undefined;
 };
 
@@ -66,16 +81,35 @@ export function usePortalAuth() {
       unsubscribeRoleDoc = onSnapshot(
         userRef,
         (userSnap) => {
-          const role = normalizePortalRole(userSnap.data()?.role);
-          const judgeApprovalStatus = normalizeJudgeApprovalStatus(userSnap.data()?.judgeApprovalStatus);
+          const data = userSnap.data() ?? {};
+          const role = normalizePortalRole(data.role);
+          const judgeApprovalStatus = normalizeJudgeApprovalStatus(data.judgeApprovalStatus);
+          const hostApprovalStatus = normalizeHostApprovalStatus(data.hostApprovalStatus);
+          const hackathonIds = getUserAllowedHackathonIds({
+            hackathon_id: data.hackathon_id,
+            hackathon_ids: data.hackathon_ids,
+          });
           setSessionUser({
             id: user.uid,
             email:
-              typeof userSnap.data()?.email === "string" && userSnap.data()?.email.trim()
-                ? userSnap.data()?.email.trim()
+              typeof data.email === "string" && data.email.trim()
+                ? data.email.trim()
                 : (user.email ?? ""),
             role,
             judgeApprovalStatus,
+            hostApprovalStatus,
+            hackathonId: hackathonIds[0] ?? getUserHackathonId({
+              hackathon_id: data.hackathon_id,
+              hackathon_ids: data.hackathon_ids,
+            }),
+            hackathonIds,
+            onboardingCompletedAt:
+              typeof data.onboardingCompletedAt === "string" ? data.onboardingCompletedAt : null,
+            profile: {
+              fullName: typeof data.fullName === "string" ? data.fullName : null,
+              profileUpdatedAt:
+                typeof data.profileUpdatedAt === "string" ? data.profileUpdatedAt : null,
+            },
           });
           setLoading(false);
         },
