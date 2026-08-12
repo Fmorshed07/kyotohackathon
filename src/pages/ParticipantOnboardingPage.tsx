@@ -462,6 +462,25 @@ export default function ParticipantOnboardingPage() {
         type: "welcome",
         hackathonName: selectedHackathon.name,
       });
+      queueParticipantEmail({
+        type: "participant_details",
+        hackathonName: selectedHackathon.name,
+        fullName: form.fullName.trim(),
+        publicRole: role,
+        experienceLevel: form.experienceLevel.trim(),
+        organization: form.organization.trim(),
+        location: form.location.trim(),
+        bio: form.bio.trim(),
+        skills: form.skills.trim(),
+        interests: form.interests.trim(),
+        lookingFor: form.lookingFor.trim(),
+        languages: form.languages.trim(),
+        githubUsername,
+        linkedinUrl: normalizeHandleOrUrl(form.linkedinUrl, "linkedin.com"),
+        portfolioUrl: normalizeHandleOrUrl(form.portfolioUrl),
+        xUrl: normalizeHandleOrUrl(form.xUrl, "x.com"),
+        discordHandle: form.discordHandle.trim().replace(/^@/, ""),
+      });
       clearOnboardingDraft();
       navigate("/dashboard/participant", { replace: true });
     } catch (err: unknown) {

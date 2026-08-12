@@ -18,6 +18,7 @@ import {
 import {
   getHackathonVisibilityLabel,
   getHostedHackathonUrl,
+  isPortalCatalogEvent,
   type HostedHackathon,
   type HostedHackathonUpdate,
 } from "@/lib/aiHackathons";
@@ -354,6 +355,7 @@ export function EventManagementWorkspace({
                 const publicUrl = getHostedHackathonUrl(event.id);
                 const visibility = getHackathonVisibilityLabel(event);
                 const isEditing = editingId === event.id && editDraft;
+                const isCatalog = isPortalCatalogEvent(event);
 
                 return (
                   <li key={event.id} className="bg-white/[0.02] px-4 py-4 sm:px-5">
@@ -372,7 +374,14 @@ export function EventManagementWorkspace({
                           >
                             {visibility}
                           </Badge>
-                          {event.hostEventId ? (
+                          {isCatalog ? (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-400/30 bg-amber-400/10 font-display text-[10px] uppercase tracking-wide text-amber-200"
+                            >
+                              Portal
+                            </Badge>
+                          ) : event.hostEventId ? (
                             <Badge
                               variant="outline"
                               className="border-sky-400/30 bg-sky-400/10 font-display text-[10px] uppercase tracking-wide text-sky-300"
@@ -405,7 +414,15 @@ export function EventManagementWorkspace({
                           {event.theme || event.summary || "No theme yet."}
                         </p>
                         <div className="flex flex-wrap items-center gap-3 pt-1">
-                          {event.published ? (
+                          {isCatalog ? (
+                            <Link
+                              to="/hackathons"
+                              className="inline-flex items-center gap-1 font-display text-xs font-semibold text-primary hover:underline"
+                            >
+                              View on /hackathons
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          ) : event.published ? (
                             <Link
                               to={publicUrl}
                               className="inline-flex items-center gap-1 font-display text-xs font-semibold text-primary hover:underline"
@@ -427,7 +444,7 @@ export function EventManagementWorkspace({
                             </Link>
                           ) : null}
                           <span className="font-mono text-[11px] text-muted-foreground/80">{event.id}</span>
-                          {event.createdBy ? (
+                          {!isCatalog && event.createdBy ? (
                             <span className="font-mono text-[11px] text-muted-foreground/60">
                               by {event.createdBy.slice(0, 8)}…
                             </span>
@@ -436,6 +453,13 @@ export function EventManagementWorkspace({
                       </div>
 
                       <div className="flex shrink-0 flex-col gap-2 sm:min-w-[240px]">
+                        {isCatalog ? (
+                          <p className="font-body text-xs text-muted-foreground">
+                            Portal catalog edition — always listed here, including past events.
+                            Publish a host/admin listing with this id to unlock full edit controls.
+                          </p>
+                        ) : (
+                          <>
                         <p className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                           Access
                         </p>
@@ -536,6 +560,8 @@ export function EventManagementWorkspace({
                             Mark past
                           </Button>
                         </div>
+                          </>
+                        )}
                       </div>
                     </div>
 

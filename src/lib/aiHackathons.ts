@@ -1,6 +1,11 @@
 import { collection, doc, deleteDoc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch, type Firestore } from "firebase/firestore";
 import { getFirebaseAuth } from "@/lib/firebaseClient";
-import type { HackathonId, HackathonStatus, PortalHackathon } from "@/lib/hackathons";
+import {
+  PORTAL_HACKATHONS,
+  type HackathonId,
+  type HackathonStatus,
+  type PortalHackathon,
+} from "@/lib/hackathons";
 import { buildHostEventSummary, formatPublicEventDate, type HostEvent } from "@/lib/hostEvents";
 import {
   getEventFontPreset,
@@ -623,4 +628,58 @@ export function getHackathonVisibilityLabel(event: Pick<HostedHackathon, "publis
   if (event.status === "active") return "Live";
   if (event.status === "past") return "Past";
   return "Published";
+}
+
+/** Marker used for portal catalog rows that are not yet backed by a Firestore listing. */
+export const PORTAL_CATALOG_CREATED_BY = "portal-catalog";
+
+export function isPortalCatalogEvent(event: Pick<HostedHackathon, "createdBy" | "id">) {
+  return event.createdBy === PORTAL_CATALOG_CREATED_BY;
+}
+
+export function portalHackathonAsHosted(hackathon: PortalHackathon): HostedHackathon {
+  return {
+    id: hackathon.id,
+    name: hackathon.name,
+    shortName: hackathon.shortName,
+    eventDate: hackathon.eventDate,
+    location: hackathon.location,
+    theme: hackathon.theme,
+    status: hackathon.status,
+    summary: hackathon.theme,
+    format: "Portal catalog",
+    eligibility: "See event board",
+    teamSize: "See event board",
+    prize: hackathon.status === "past" ? "Completed" : "Portal live",
+    requirements: [],
+    schedule: [],
+    rulebookUrl: "",
+    coverImageUrl: "",
+    bannerImageUrl: "",
+    galleryUrls: [],
+    guests: [],
+    lumaUrl: "",
+    // Portal boards stay listed on /hackathons (including past editions).
+    published: true,
+    createdAt: "",
+    createdBy: PORTAL_CATALOG_CREATED_BY,
+    aiGenerated: false,
+    createdManually: false,
+  };
+}
+
+/**
+ * Admin event management: include fixed portal editions (Kyoto / Tokyo / Dhaka)
+ * alongside Firestore-hosted listings so past catalog events stay visible.
+ * Firestore docs for the same id win over the catalog stub.
+ */
+export function mergePortalCatalogIntoEvents(events: HostedHackathon[]): HostedHackathon[] {
+  const byId = new Map(events.map((event) => [event.id, event]));
+  const portalRows = PORTAL_HACKATHONS.map(
+    (portal) => byId.get(portal.id) ?? portalHackathonAsHosted(portal),
+  );
+  const hostedOnly = events.filter(
+    (event) => !PORTAL_HACKATHONS.some((portal) => portal.id === event.id),
+  );
+  return sortHostedHackathons([...portalRows, ...hostedOnly]);
 }

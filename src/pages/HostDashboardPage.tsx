@@ -33,7 +33,7 @@ import {
 } from "@/lib/aiHackathons";
 import { formDraftStorageKey } from "@/lib/formDrafts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { getHackathonById, type HackathonId, type HackathonStatus } from "@/lib/hackathons";
+import { type HackathonStatus } from "@/lib/hackathons";
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import { createJudgeInvite } from "@/lib/portalInvites";
 import {
@@ -122,6 +122,9 @@ export default function HostDashboardPage() {
   const suppressEventFormSyncRef = useRef(false);
   const hostAutosaveTimerRef = useRef<number | null>(null);
   const isHostAutosavingRef = useRef(false);
+  const saveSelectedEventRef = useRef<((options?: { quiet?: boolean }) => Promise<void>) | null>(
+    null,
+  );
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
@@ -279,6 +282,37 @@ export default function HostDashboardPage() {
     void load();
   }, [db, sessionUser]);
 
+  // Autosave existing host event briefs after a short idle.
+  // Must stay above early returns to keep hook order stable.
+  useEffect(() => {
+    if (!selectedEvent || !isHostEventDirty || isBusy || isHostAutosavingRef.current) return;
+    if (!eventForm.name.trim()) return;
+
+    if (hostAutosaveTimerRef.current) {
+      window.clearTimeout(hostAutosaveTimerRef.current);
+    }
+
+    hostAutosaveTimerRef.current = window.setTimeout(() => {
+      void (async () => {
+        if (isHostAutosavingRef.current || isBusy) return;
+        isHostAutosavingRef.current = true;
+        try {
+          await saveSelectedEventRef.current?.({ quiet: true });
+        } catch {
+          // Local draft remains via useFormDraftPersistence.
+        } finally {
+          isHostAutosavingRef.current = false;
+        }
+      })();
+    }, 2500);
+
+    return () => {
+      if (hostAutosaveTimerRef.current) {
+        window.clearTimeout(hostAutosaveTimerRef.current);
+      }
+    };
+  }, [selectedEvent?.id, isHostEventDirty, eventForm, isBusy]);
+
   if (loading) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background text-sm text-muted-foreground">
@@ -434,37 +468,7 @@ export default function HostDashboardPage() {
       if (!options?.quiet) setIsBusy(false);
     }
   };
-
-  // Autosave existing host event briefs (including published field edits) after a short idle.
-  useEffect(() => {
-    if (!selectedEvent || !isHostEventDirty || isBusy || isHostAutosavingRef.current) return;
-    if (!eventForm.name.trim()) return;
-
-    if (hostAutosaveTimerRef.current) {
-      window.clearTimeout(hostAutosaveTimerRef.current);
-    }
-
-    hostAutosaveTimerRef.current = window.setTimeout(() => {
-      void (async () => {
-        if (isHostAutosavingRef.current || isBusy) return;
-        isHostAutosavingRef.current = true;
-        try {
-          await saveSelectedEvent({ quiet: true });
-        } catch {
-          // Local draft remains via useFormDraftPersistence.
-        } finally {
-          isHostAutosavingRef.current = false;
-        }
-      })();
-    }, 2500);
-
-    return () => {
-      if (hostAutosaveTimerRef.current) {
-        window.clearTimeout(hostAutosaveTimerRef.current);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEvent?.id, isHostEventDirty, eventForm, isBusy]);
+  saveSelectedEventRef.current = saveSelectedEvent;
 
   const publishEvent = async () => {
     if (!selectedEvent) return;
@@ -1042,8 +1046,30 @@ export default function HostDashboardPage() {
           </div>
           {selectedEvent?.public_hackathon_id ? (
             <JudgeInvitePanel
-              hackathons={[getHackathonById(selectedEvent.public_hackathon_id as HackathonId)]}
-              selectedHackathonIds={[selectedEvent.public_hackathon_id as HackathonId]}
+              hackathons={[
+                publicListing
+                  ? {
+                      id: publicListing.id,
+                      name: publicListing.name,
+                      shortName: publicListing.shortName,
+                      eventDate: publicListing.eventDate,
+                      location: publicListing.location,
+                      theme: publicListing.theme,
+                      status: publicListing.status,
+                    }
+                  : {
+                      id: selectedEvent.public_hackathon_id,
+                      name: selectedEvent.name || "Hosted event",
+                      shortName: selectedEvent.name?.split(/\s+/).slice(0, 2).join(" ") || "Event",
+                      eventDate: selectedEvent.start_at
+                        ? formatDateTime(selectedEvent.start_at)
+                        : "TBC",
+                      location: selectedEvent.location || "TBC",
+                      theme: selectedEvent.theme || selectedEvent.tagline || "Hosted event",
+                      status: publicListing?.status ?? "upcoming",
+                    },
+              ]}
+              selectedHackathonIds={[selectedEvent.public_hackathon_id]}
               onToggleHackathon={() => undefined}
               label={selectedEvent.name}
               onLabelChange={() => undefined}

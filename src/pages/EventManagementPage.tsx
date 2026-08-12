@@ -9,6 +9,7 @@ import { HACKATHON_STORAGE_KEYS, PORTAL_HACKATHONS, type HackathonStatus } from 
 import {
   deleteHostedHackathon,
   fetchAllHackathonsForAdmin,
+  mergePortalCatalogIntoEvents,
   publishHostEventPublicly,
   setHackathonPublished,
   setHackathonStatus,
@@ -33,6 +34,8 @@ export default function EventManagementPage() {
   const [isBusy, setIsBusy] = useState(false);
   const [busyEventId, setBusyEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const listingEvents = mergePortalCatalogIntoEvents(events);
 
   const adminHackathons = [
     ...PORTAL_HACKATHONS,
@@ -211,7 +214,7 @@ export default function EventManagementPage() {
 
       <section className={sectionClass}>
         <EventManagementWorkspace
-          events={events}
+          events={listingEvents}
           hostEvents={hostEvents}
           isLoading={isLoading}
           isBusy={isBusy}

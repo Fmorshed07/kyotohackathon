@@ -596,6 +596,92 @@ export function submissionEmail(input: {
   };
 }
 
+export function participantDetailsNotifyEmail(input: {
+  participantEmail: string;
+  hackathonName?: string;
+  fullName?: string;
+  publicRole?: string;
+  experienceLevel?: string;
+  organization?: string;
+  location?: string;
+  bio?: string;
+  skills?: string;
+  interests?: string;
+  lookingFor?: string;
+  languages?: string;
+  githubUsername?: string;
+  linkedinUrl?: string;
+  portfolioUrl?: string;
+  xUrl?: string;
+  discordHandle?: string;
+}) {
+  const event = input.hackathonName?.trim();
+  const name = input.fullName?.trim() || "Unnamed participant";
+  const email = input.participantEmail.trim();
+
+  const detailPairs: Array<{ label: string; value: string }> = [
+    { label: "Name", value: name },
+    { label: "Email", value: email },
+    ...(event ? [{ label: "Event", value: event }] : []),
+    ...(input.publicRole?.trim() ? [{ label: "Role", value: input.publicRole.trim() }] : []),
+    ...(input.experienceLevel?.trim()
+      ? [{ label: "Experience", value: input.experienceLevel.trim() }]
+      : []),
+    ...(input.organization?.trim()
+      ? [{ label: "Organization", value: input.organization.trim() }]
+      : []),
+    ...(input.location?.trim() ? [{ label: "Location", value: input.location.trim() }] : []),
+    ...(input.languages?.trim() ? [{ label: "Languages", value: input.languages.trim() }] : []),
+    ...(input.skills?.trim() ? [{ label: "Skills", value: input.skills.trim() }] : []),
+    ...(input.interests?.trim() ? [{ label: "Interests", value: input.interests.trim() }] : []),
+    ...(input.lookingFor?.trim() ? [{ label: "Looking for", value: input.lookingFor.trim() }] : []),
+    ...(input.bio?.trim() ? [{ label: "Bio", value: input.bio.trim() }] : []),
+    ...(input.githubUsername?.trim()
+      ? [{ label: "GitHub", value: input.githubUsername.trim() }]
+      : []),
+    ...(input.linkedinUrl?.trim() ? [{ label: "LinkedIn", value: input.linkedinUrl.trim() }] : []),
+    ...(input.portfolioUrl?.trim()
+      ? [{ label: "Portfolio", value: input.portfolioUrl.trim() }]
+      : []),
+    ...(input.xUrl?.trim() ? [{ label: "X", value: input.xUrl.trim() }] : []),
+    ...(input.discordHandle?.trim()
+      ? [{ label: "Discord", value: input.discordHandle.trim() }]
+      : []),
+  ];
+
+  const text = [
+    "New participant details submitted",
+    "",
+    ...detailPairs.map((row) => `${row.label}: ${row.value}`),
+    "",
+    portalUrl("/dashboard/admin"),
+    "",
+    "— Cognisor AI portal",
+  ].join("\n");
+
+  const html = layout({
+    kicker: "Participant signup",
+    title: "New participant details",
+    lead: `${name} just completed their participant profile.`,
+    preheader: `${name} submitted participant details${event ? ` for ${event}` : ""}.`,
+    bodyHtml: `<p class="t-body" style="margin:0;font-family:${FONT};font-size:15px;line-height:1.7;color:${C.body};text-align:left;">
+        Review the profile fields below in the admin portal if you need to follow up.
+      </p>`,
+    details: detailPairs,
+    primaryCta: { label: "Open admin portal", href: portalUrl("/dashboard/admin") },
+    secondaryHref: brandSite,
+    secondaryLabel: "Visit cognisorai.com",
+  });
+
+  const logo = getLogoAttachment();
+  return {
+    subject: `New participant: ${name}${event ? ` · ${event}` : ""}`,
+    html,
+    text,
+    attachments: logo ? [logo] : [],
+  };
+}
+
 export function broadcastEmail(input: {
   subject: string;
   message: string;

@@ -6,6 +6,25 @@ export type ParticipantEmailPayload =
       hackathonName?: string;
     }
   | {
+      type: "participant_details";
+      hackathonName?: string;
+      fullName?: string;
+      publicRole?: string;
+      experienceLevel?: string;
+      organization?: string;
+      location?: string;
+      bio?: string;
+      skills?: string;
+      interests?: string;
+      lookingFor?: string;
+      languages?: string;
+      githubUsername?: string;
+      linkedinUrl?: string;
+      portfolioUrl?: string;
+      xUrl?: string;
+      discordHandle?: string;
+    }
+  | {
       type: "submission_created" | "submission_updated" | "admin_submission";
       toEmail?: string;
       title?: string;

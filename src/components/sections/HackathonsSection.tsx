@@ -667,7 +667,7 @@ const HackathonsSection = () => {
         </div>
 
         <div className="mt-16">
-          <PreviousHackathonsLivePreview eventIds={["impact-tokyo"]} />
+          <PreviousHackathonsLivePreview />
         </div>
       </div>
     </section>

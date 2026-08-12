@@ -1,7 +1,14 @@
 import { getUserRoleFromFirestore, isAdminRole, isPortalAdminEmail, verifyFirebaseIdToken } from "./auth";
-import { broadcastEmail, submissionEmail, welcomeEmail } from "./templates";
+import {
+  broadcastEmail,
+  participantDetailsNotifyEmail,
+  submissionEmail,
+  welcomeEmail,
+} from "./templates";
 import { sendMail } from "./transport";
 import type { EmailRequestBody, SendError, SendResult } from "./types";
+
+const DEFAULT_PARTICIPANT_NOTIFY_EMAIL = "creativecognisor@gmail.com";
 
 function jsonError(error: string, status: number): SendError {
   return { ok: false, error, status };
@@ -13,6 +20,16 @@ function normalizeEmail(value: string) {
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function getParticipantNotifyEmail() {
+  const configured = (process.env.PARTICIPANT_NOTIFY_EMAIL || "").trim();
+  if (configured && isValidEmail(configured)) return normalizeEmail(configured);
+  return DEFAULT_PARTICIPANT_NOTIFY_EMAIL;
+}
+
+function optionalTrim(value: unknown) {
+  return typeof value === "string" ? value.trim() : undefined;
 }
 
 export async function handleEmailRequest(input: {
@@ -50,6 +67,36 @@ export async function handleEmailRequest(input: {
     if (!authUser.email) return jsonError("Authenticated user has no email address.", 400);
     const template = welcomeEmail({ hackathonName: body.hackathonName });
     const result = await sendMail({ to: authUser.email, ...template });
+    return { ok: true, messageId: result.messageId, preview: result.preview };
+  }
+
+  if (body.type === "participant_details") {
+    if (!authUser.email) return jsonError("Authenticated user has no email address.", 400);
+
+    const template = participantDetailsNotifyEmail({
+      participantEmail: authUser.email,
+      hackathonName: optionalTrim(body.hackathonName),
+      fullName: optionalTrim(body.fullName),
+      publicRole: optionalTrim(body.publicRole),
+      experienceLevel: optionalTrim(body.experienceLevel),
+      organization: optionalTrim(body.organization),
+      location: optionalTrim(body.location),
+      bio: optionalTrim(body.bio),
+      skills: optionalTrim(body.skills),
+      interests: optionalTrim(body.interests),
+      lookingFor: optionalTrim(body.lookingFor),
+      languages: optionalTrim(body.languages),
+      githubUsername: optionalTrim(body.githubUsername),
+      linkedinUrl: optionalTrim(body.linkedinUrl),
+      portfolioUrl: optionalTrim(body.portfolioUrl),
+      xUrl: optionalTrim(body.xUrl),
+      discordHandle: optionalTrim(body.discordHandle),
+    });
+
+    const result = await sendMail({
+      to: getParticipantNotifyEmail(),
+      ...template,
+    });
     return { ok: true, messageId: result.messageId, preview: result.preview };
   }
 
