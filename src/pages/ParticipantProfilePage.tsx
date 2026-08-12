@@ -8,8 +8,11 @@ import {
   type PeopleProfileFormState,
 } from "@/components/dashboard/PeopleProfileSection";
 import { Button } from "@/components/ui/button";
+import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { formDraftStorageKey } from "@/lib/formDrafts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import {
   getHackathonsByIds,
@@ -124,6 +127,7 @@ export default function ParticipantProfilePage() {
   );
 
   const [profileForm, setProfileForm] = useState<PeopleProfileFormState>(initialProfileForm);
+  const [profileBaseline, setProfileBaseline] = useState<PeopleProfileFormState>(initialProfileForm);
   const [enrolledHackathonIds, setEnrolledHackathonIds] = useState<HackathonId[]>([]);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -134,6 +138,23 @@ export default function ParticipantProfilePage() {
   const [coverMessage, setCoverMessage] = useState<string | null>(null);
   const [isUploadingGallery, setIsUploadingGallery] = useState(false);
   const [galleryMessage, setGalleryMessage] = useState<string | null>(null);
+
+  const profileDraftKey = formDraftStorageKey(["participant-profile", sessionUser?.id]);
+
+  const {
+    isDirty: isProfileDraftDirty,
+    clearDraft: clearProfileDraft,
+    pendingRestore: pendingProfileRestore,
+    consumePendingRestore: consumeProfileRestore,
+  } = useFormDraftPersistence<PeopleProfileFormState>({
+    storageKey: profileDraftKey,
+    value: profileForm,
+    enabled: Boolean(sessionUser?.role === "participant") && !isLoadingProfile,
+    baseline: profileBaseline,
+    debounceMs: 400,
+  });
+
+  useUnsavedChangesGuard(isProfileDraftDirty);
 
   const accessibleHackathonIds = useMemo(() => {
     const ids = new Set<HackathonId>([...enrolledHackathonIds]);
@@ -176,7 +197,9 @@ export default function ParticipantProfilePage() {
           hackathon_ids: userData?.hackathon_ids,
         });
         setEnrolledHackathonIds(allowedIds);
-        setProfileForm(mapUserProfileToForm(profile));
+        const mapped = mapUserProfileToForm(profile);
+        setProfileBaseline(mapped);
+        setProfileForm(mapped);
       } catch {
         // keep editable empty form
       } finally {
@@ -186,6 +209,14 @@ export default function ParticipantProfilePage() {
 
     void loadProfile();
   }, [sessionUser, db]);
+
+  useEffect(() => {
+    if (!pendingProfileRestore) return;
+    const restored = pendingProfileRestore.value as PeopleProfileFormState;
+    setProfileForm(restored);
+    setSaveMessage("Restored unsaved profile draft from this browser.");
+    consumeProfileRestore();
+  }, [pendingProfileRestore, consumeProfileRestore]);
 
   const persistProfileMedia = async (patch: {
     avatarUrl?: string;
@@ -379,7 +410,10 @@ export default function ParticipantProfilePage() {
         profileUpdatedAt: new Date().toISOString(),
       };
       await setDoc(doc(db, "users", sessionUser.id), payload, { merge: true });
-      setProfileForm(mapUserProfileToForm(payload));
+      const mapped = mapUserProfileToForm(payload);
+      setProfileBaseline(mapped);
+      setProfileForm(mapped);
+      clearProfileDraft();
       setSaveMessage("Profile saved successfully.");
     } catch (error: unknown) {
       const message =

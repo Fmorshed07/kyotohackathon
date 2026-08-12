@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import {
   addDoc,
@@ -19,14 +19,21 @@ import { emptyHostEventBriefForm } from "@/lib/hostEventBriefForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
+  fetchHackathonForAdmin,
+  getHackathonVisibilityLabel,
   getHostedHackathonUrl,
   publishHostEventPublicly,
-  unpublishHostEventPublicly,
+  setHackathonPublished,
+  setHackathonStatus,
+  type HostedHackathon,
 } from "@/lib/aiHackathons";
+import { formDraftStorageKey } from "@/lib/formDrafts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { getHackathonById, type HackathonId } from "@/lib/hackathons";
+import { getHackathonById, type HackathonId, type HackathonStatus } from "@/lib/hackathons";
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import { createJudgeInvite } from "@/lib/portalInvites";
 import {
@@ -106,11 +113,15 @@ export default function HostDashboardPage() {
   const [judgeForm, setJudgeForm] = useState(emptyJudgeForm);
   const [checkInCode, setCheckInCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [portalJudgeInviteUrl, setPortalJudgeInviteUrl] = useState<string | null>(null);
   const [portalJudgeInviteMessage, setPortalJudgeInviteMessage] = useState<string | null>(null);
   const [isCreatingPortalJudgeInvite, setIsCreatingPortalJudgeInvite] = useState(false);
+  const [eventFormBaseline, setEventFormBaseline] = useState<HostEventBriefForm>(() => emptyEventForm());
+  const [publicListing, setPublicListing] = useState<HostedHackathon | null>(null);
+  const suppressEventFormSyncRef = useRef(false);
+  const hostAutosaveTimerRef = useRef<number | null>(null);
+  const isHostAutosavingRef = useRef(false);
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
@@ -128,8 +139,18 @@ export default function HostDashboardPage() {
   );
 
   useEffect(() => {
-    if (!selectedEvent) return;
-    setEventForm({
+    if (!selectedEvent) {
+      const blank = emptyEventForm();
+      setEventForm(blank);
+      setEventFormBaseline(blank);
+      setPublicListing(null);
+      return;
+    }
+    if (suppressEventFormSyncRef.current) {
+      suppressEventFormSyncRef.current = false;
+      return;
+    }
+    const nextForm: HostEventBriefForm = {
       name: selectedEvent.name,
       tagline: selectedEvent.tagline,
       description: selectedEvent.description,
@@ -156,13 +177,59 @@ export default function HostDashboardPage() {
       endAt: selectedEvent.end_at ? toDatetimeLocalValue(selectedEvent.end_at) : "",
       location: selectedEvent.location,
       capacity: String(selectedEvent.capacity || ""),
-    });
-    setPublishedUrl(
-      selectedEvent.public_hackathon_id
-        ? getHostedHackathonUrl(selectedEvent.public_hackathon_id)
-        : null,
-    );
+    };
+    setEventForm(nextForm);
+    setEventFormBaseline(nextForm);
   }, [selectedEvent]);
+
+  const hostEventDraftKey = formDraftStorageKey([
+    "host-event",
+    sessionUser?.id,
+    selectedEventId || "new",
+  ]);
+
+  const {
+    isDirty: isHostEventDirty,
+    clearDraft: clearHostEventDraft,
+    pendingRestore: pendingHostEventRestore,
+    consumePendingRestore: consumeHostEventRestore,
+  } = useFormDraftPersistence<HostEventBriefForm>({
+    storageKey: hostEventDraftKey,
+    value: eventForm,
+    enabled: Boolean(sessionUser) && !loading,
+    baseline: eventFormBaseline,
+    debounceMs: 500,
+  });
+
+  useUnsavedChangesGuard(isHostEventDirty);
+
+  useEffect(() => {
+    if (!pendingHostEventRestore) return;
+    setEventForm(pendingHostEventRestore.value as HostEventBriefForm);
+    setMessage("Restored unsaved event draft from this browser.");
+    consumeHostEventRestore();
+  }, [pendingHostEventRestore, consumeHostEventRestore]);
+
+  useEffect(() => {
+    const publicId = selectedEvent?.public_hackathon_id?.trim();
+    if (!publicId) {
+      setPublicListing(null);
+      return;
+    }
+    let cancelled = false;
+    const loadPublicListing = async () => {
+      try {
+        const listing = await fetchHackathonForAdmin(db, publicId);
+        if (!cancelled) setPublicListing(listing);
+      } catch {
+        if (!cancelled) setPublicListing(null);
+      }
+    };
+    void loadPublicListing();
+    return () => {
+      cancelled = true;
+    };
+  }, [db, selectedEvent?.public_hackathon_id, selectedEvent?.status, selectedEvent?.updated_at]);
 
   useEffect(() => {
     if (!sessionUser) return;
@@ -296,7 +363,7 @@ export default function HostDashboardPage() {
   const createEvent = async () => {
     setIsBusy(true);
     setMessage(null);
-    setPublishedUrl(null);
+    setPublicListing(null);
     try {
       const fields = buildEventFieldsFromForm();
       const now = new Date().toISOString();
@@ -310,8 +377,11 @@ export default function HostDashboardPage() {
       };
       const ref = await addDoc(collection(db, "host_events"), payload);
       const created = mapHostEventFromFirestore(ref.id, payload);
+      suppressEventFormSyncRef.current = true;
       setEvents((prev) => [created, ...prev]);
       setSelectedEventId(ref.id);
+      setEventFormBaseline(eventForm);
+      clearHostEventDraft();
       setMessage("Event draft created. Publish it when you are ready for it to appear on /hackathons.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to create event.");
@@ -320,11 +390,13 @@ export default function HostDashboardPage() {
     }
   };
 
-  const saveSelectedEvent = async () => {
+  const saveSelectedEvent = async (options?: { quiet?: boolean }) => {
     if (!selectedEvent) return;
 
-    setIsBusy(true);
-    setMessage(null);
+    if (!options?.quiet) {
+      setIsBusy(true);
+      setMessage(null);
+    }
     try {
       const fields = buildEventFieldsFromForm();
       const updatedAt = new Date().toISOString();
@@ -333,28 +405,66 @@ export default function HostDashboardPage() {
       let nextEvent: HostEvent = { ...selectedEvent, ...patch };
 
       // Keep the public listing in sync when the event is already live.
-      if (selectedEvent.status === "published") {
+      if (selectedEvent.status === "published" && !options?.quiet) {
         const publicEvent = await publishHostEventPublicly(db, nextEvent, sessionUser.id);
         nextEvent = {
           ...nextEvent,
           public_hackathon_id: publicEvent.id,
           status: "published",
         };
-        setPublishedUrl(getHostedHackathonUrl(publicEvent.id));
+        setPublicListing(publicEvent);
         setMessage("Event details saved and public page updated.");
-      } else {
+      } else if (!options?.quiet) {
         setMessage("Event details saved.");
+      } else {
+        setMessage("Event draft autosaved.");
       }
 
+      suppressEventFormSyncRef.current = true;
       setEvents((prev) =>
         prev.map((event) => (event.id === selectedEvent.id ? nextEvent : event)),
       );
+      setEventFormBaseline(eventForm);
+      clearHostEventDraft();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to save event details.");
+      if (!options?.quiet) {
+        setMessage(error instanceof Error ? error.message : "Unable to save event details.");
+      }
     } finally {
-      setIsBusy(false);
+      if (!options?.quiet) setIsBusy(false);
     }
   };
+
+  // Autosave existing host event briefs (including published field edits) after a short idle.
+  useEffect(() => {
+    if (!selectedEvent || !isHostEventDirty || isBusy || isHostAutosavingRef.current) return;
+    if (!eventForm.name.trim()) return;
+
+    if (hostAutosaveTimerRef.current) {
+      window.clearTimeout(hostAutosaveTimerRef.current);
+    }
+
+    hostAutosaveTimerRef.current = window.setTimeout(() => {
+      void (async () => {
+        if (isHostAutosavingRef.current || isBusy) return;
+        isHostAutosavingRef.current = true;
+        try {
+          await saveSelectedEvent({ quiet: true });
+        } catch {
+          // Local draft remains via useFormDraftPersistence.
+        } finally {
+          isHostAutosavingRef.current = false;
+        }
+      })();
+    }, 2500);
+
+    return () => {
+      if (hostAutosaveTimerRef.current) {
+        window.clearTimeout(hostAutosaveTimerRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEvent?.id, isHostEventDirty, eventForm, isBusy]);
 
   const publishEvent = async () => {
     if (!selectedEvent) return;
@@ -374,7 +484,6 @@ export default function HostDashboardPage() {
         updated_at: updatedAt,
       };
       const publicEvent = await publishHostEventPublicly(db, eventForPublish, sessionUser.id);
-      const publicPath = getHostedHackathonUrl(publicEvent.id);
 
       setEvents((prev) =>
         prev.map((event) =>
@@ -388,8 +497,14 @@ export default function HostDashboardPage() {
             : event,
         ),
       );
-      setPublishedUrl(publicPath);
-      setMessage("Event is live on the public directory.");
+      setPublicListing(publicEvent);
+      setMessage(
+        publicEvent.status === "past"
+          ? "Past event is published again on the public directory."
+          : publicEvent.status === "active"
+            ? "Event is live on the public directory."
+            : "Event is published on the public directory.",
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to publish event.");
     } finally {
@@ -397,23 +512,77 @@ export default function HostDashboardPage() {
     }
   };
 
-  const unpublishEvent = async () => {
-    if (!selectedEvent) return;
+  const setPublicLifecycle = async (status: HackathonStatus) => {
+    if (!selectedEvent?.public_hackathon_id) {
+      setMessage("Publish the event first, then set it to live, upcoming, or past.");
+      return;
+    }
     setIsBusy(true);
     setMessage(null);
     try {
-      await unpublishHostEventPublicly(db, selectedEvent);
-      const updatedAt = new Date().toISOString();
+      await setHackathonStatus(db, selectedEvent.public_hackathon_id, status);
+      if (status === "active") {
+        setEvents((prev) =>
+          prev.map((event) =>
+            event.id === selectedEvent.id
+              ? { ...event, status: "published", updated_at: new Date().toISOString() }
+              : event,
+          ),
+        );
+      }
+      setPublicListing((current) =>
+        current
+          ? {
+              ...current,
+              status,
+              published: status === "active" ? true : current.published,
+            }
+          : current,
+      );
+      setMessage(
+        status === "active"
+          ? "Event is marked live."
+          : status === "past"
+            ? "Event is marked past. You can still edit details or unpublish it."
+            : "Event is marked upcoming.",
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update event lifecycle.");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const togglePublicVisibility = async (published: boolean) => {
+    if (!selectedEvent?.public_hackathon_id) {
+      if (published) {
+        await publishEvent();
+      }
+      return;
+    }
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      await setHackathonPublished(db, selectedEvent.public_hackathon_id, published);
       setEvents((prev) =>
         prev.map((event) =>
           event.id === selectedEvent.id
-            ? { ...event, status: "draft", updated_at: updatedAt }
+            ? {
+                ...event,
+                status: published ? "published" : "draft",
+                updated_at: new Date().toISOString(),
+              }
             : event,
         ),
       );
-      setMessage("Event unpublished. It is hidden from /hackathons until you publish again.");
+      setPublicListing((current) => (current ? { ...current, published } : current));
+      if (published) {
+        setMessage("Event is visible on the public directory.");
+      } else {
+        setMessage("Event hidden from /hackathons. Lifecycle (live/past) is kept for when you publish again.");
+      }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to unpublish event.");
+      setMessage(error instanceof Error ? error.message : "Unable to update visibility.");
     } finally {
       setIsBusy(false);
     }
@@ -610,15 +779,27 @@ export default function HostDashboardPage() {
             </div>
           </div>
           {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
-          {publishedUrl && selectedEvent?.status === "published" ? (
+          {selectedEvent?.public_hackathon_id ? (
             <p className="mt-2 text-sm">
-              <Link className="underline underline-offset-4" to={publishedUrl}>
-                Open public event page
-              </Link>
-              <span className="text-muted-foreground"> · also listed on </span>
-              <Link className="underline underline-offset-4" to="/hackathons">
-                /hackathons
-              </Link>
+              {publicListing?.published ? (
+                <>
+                  <Link
+                    className="underline underline-offset-4"
+                    to={getHostedHackathonUrl(selectedEvent.public_hackathon_id)}
+                  >
+                    Open public event page
+                  </Link>
+                  <span className="text-muted-foreground"> · also listed on </span>
+                  <Link className="underline underline-offset-4" to="/hackathons">
+                    /hackathons
+                  </Link>
+                </>
+              ) : (
+                <span className="text-muted-foreground">
+                  Public page exists but is unpublished
+                  {publicListing ? ` (${getHackathonVisibilityLabel(publicListing)})` : ""}.
+                </span>
+              )}
             </p>
           ) : null}
         </section>
@@ -628,32 +809,18 @@ export default function HostDashboardPage() {
             <div>
               <h2 className="font-display text-xl font-semibold">Event brief</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Pick a ready-made template, customize the look, then publish a unique public page.
+                Edit any draft, live, or past event. Publish or unpublish independently of lifecycle.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {selectedEvent &&
-              (selectedEvent.status !== "published" || !selectedEvent.public_hackathon_id) ? (
-                <Button type="button" onClick={() => void publishEvent()} disabled={isBusy}>
-                  {selectedEvent.status === "published" && !selectedEvent.public_hackathon_id
-                    ? "Post to public directory"
-                    : "Publish to public"}
-                </Button>
-              ) : null}
-              {selectedEvent &&
-              selectedEvent.status === "published" &&
-              selectedEvent.public_hackathon_id ? (
-                <Button type="button" variant="outline" onClick={() => void unpublishEvent()} disabled={isBusy}>
-                  Unpublish
-                </Button>
-              ) : null}
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => {
                   setSelectedEventId("");
                   setEventForm(emptyEventForm());
-                  setPublishedUrl(null);
+                  setEventFormBaseline(emptyEventForm());
+                  setPublicListing(null);
                   setMessage(null);
                 }}
                 disabled={isBusy}
@@ -676,7 +843,8 @@ export default function HostDashboardPage() {
               setSelectedEventId(eventId);
               if (!eventId) {
                 setEventForm(emptyEventForm());
-                setPublishedUrl(null);
+                setEventFormBaseline(emptyEventForm());
+                setPublicListing(null);
               }
             }}
             uploaderId={sessionUser.id}
@@ -693,10 +861,94 @@ export default function HostDashboardPage() {
             </Button>
             {selectedEvent ? (
               <Badge variant={selectedEvent.status === "published" ? "default" : "secondary"}>
-                {selectedEvent.status}
+                Ops: {selectedEvent.status}
+              </Badge>
+            ) : null}
+            {publicListing ? (
+              <Badge variant={publicListing.published ? "default" : "outline"}>
+                Public: {getHackathonVisibilityLabel(publicListing)}
               </Badge>
             ) : null}
           </div>
+
+          {selectedEvent ? (
+            <div className="space-y-3 rounded-lg border border-white/10 bg-black/20 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-display text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Visibility
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Publish or hide on /hackathons — works for upcoming, live, and past events.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedEvent.public_hackathon_id && publicListing?.published ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isBusy}
+                      onClick={() => void togglePublicVisibility(false)}
+                    >
+                      Unpublish
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() =>
+                        void (selectedEvent.public_hackathon_id
+                          ? togglePublicVisibility(true)
+                          : publishEvent())
+                      }
+                    >
+                      {selectedEvent.public_hackathon_id ? "Publish again" : "Publish to public"}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 pt-3">
+                <p className="font-display text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Lifecycle
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {selectedEvent.public_hackathon_id
+                    ? "Mark the public listing live, upcoming, or past. Past events stay editable."
+                    : "Publish once to unlock live / upcoming / past controls."}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={publicListing?.status === "active" && publicListing.published ? "default" : "outline"}
+                    disabled={isBusy || !selectedEvent.public_hackathon_id}
+                    onClick={() => void setPublicLifecycle("active")}
+                  >
+                    Go live
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={publicListing?.status === "upcoming" ? "default" : "outline"}
+                    disabled={isBusy || !selectedEvent.public_hackathon_id}
+                    onClick={() => void setPublicLifecycle("upcoming")}
+                  >
+                    Upcoming
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={publicListing?.status === "past" ? "default" : "outline"}
+                    disabled={isBusy || !selectedEvent.public_hackathon_id}
+                    onClick={() => void setPublicLifecycle("past")}
+                  >
+                    Mark past
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section id="tickets" className={`${sectionClass} space-y-5 p-6`}>

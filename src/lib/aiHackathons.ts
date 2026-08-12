@@ -243,11 +243,13 @@ export async function publishManualHackathon(
 /**
  * Publish a host ops event onto the public `hackathons` directory + `/events/:id` page.
  * Writes are sequential so Firestore rules can see the hackathon before criteria is written.
+ * Re-publishing preserves an existing active/past/upcoming lifecycle unless `options.status` is set.
  */
 export async function publishHostEventPublicly(
   db: Firestore,
   hostEvent: HostEvent,
   createdBy: string,
+  options?: { status?: HackathonStatus },
 ): Promise<HostedHackathon> {
   if (!hostEvent.name.trim() || !hostEvent.start_at || !hostEvent.location.trim()) {
     throw new Error("Event name, start time, and location are required before publishing.");
@@ -261,6 +263,8 @@ export async function publishHostEventPublicly(
   const id = (existingId || `${eventSlug(hostEvent.name)}-${Date.now().toString(36).slice(-6)}`) as HackathonId;
 
   let createdAt = now;
+  // Keep active/past lifecycle when re-publishing or updating an existing public listing.
+  let lifecycleStatus: HackathonStatus = options?.status ?? "upcoming";
   if (existingId) {
     const existing = await getDoc(doc(db, "hackathons", existingId));
     if (existing.exists()) {
@@ -269,6 +273,11 @@ export async function publishHostEventPublicly(
         throw new Error("This public listing belongs to another host.");
       }
       createdAt = previous.createdAt?.trim() || now;
+      if (!options?.status) {
+        if (previous.status === "active" || previous.status === "past" || previous.status === "upcoming") {
+          lifecycleStatus = previous.status;
+        }
+      }
     }
   }
 
@@ -307,7 +316,7 @@ export async function publishHostEventPublicly(
     eventDate: formatPublicEventDate(hostEvent.start_at, hostEvent.end_at),
     location: hostEvent.location.trim(),
     theme: hostEvent.theme.trim() || hostEvent.tagline.trim().slice(0, 120) || "Hosted event",
-    status: "upcoming",
+    status: lifecycleStatus,
     summary: buildHostEventSummary(hostEvent),
     format: hostEvent.format.trim() || "Hosted event",
     eligibility: hostEvent.eligibility.trim() || "Open to registered attendees",
@@ -573,6 +582,8 @@ export async function setHackathonStatus(
 ): Promise<void> {
   const payload: { status: HackathonStatus; published?: boolean } = { status };
   // Going live also makes the event public so /hackathons and /events stay consistent.
+  // Past / upcoming keep the current published flag so you can keep past events visible
+  // or hide them independently via publish / unpublish.
   if (status === "active") {
     payload.published = true;
   }

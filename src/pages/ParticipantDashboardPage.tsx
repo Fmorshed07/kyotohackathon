@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { getDashboardPathForUser } from "@/lib/portalRoutes";
 import { getFirestoreDb } from "@/lib/firebaseClient";
+import { formDraftStorageKey } from "@/lib/formDrafts";
 import { uploadProfileImage } from "@/lib/profileMedia";
+import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -84,6 +87,35 @@ const emptyProjectFields = {
   teamName: "",
   memberNames: "",
 };
+
+type ParticipantProjectDraft = typeof emptyProjectFields;
+
+const pickProjectDraft = (form: typeof initialParticipantForm): ParticipantProjectDraft => ({
+  title: form.title,
+  shortDescription: form.shortDescription,
+  projectUrl: form.projectUrl,
+  submissionPdfUrl: form.submissionPdfUrl,
+  demoVideoUrl: form.demoVideoUrl,
+  allowPublicPreview: form.allowPublicPreview,
+  projectCoverUrl: form.projectCoverUrl,
+  projectGalleryUrls: form.projectGalleryUrls,
+  teamName: form.teamName,
+  memberNames: form.memberNames,
+});
+
+const projectDraftHasContent = (draft: ParticipantProjectDraft) =>
+  Boolean(
+    draft.title.trim() ||
+      draft.shortDescription.trim() ||
+      draft.projectUrl.trim() ||
+      draft.submissionPdfUrl.trim() ||
+      draft.demoVideoUrl.trim() ||
+      draft.projectCoverUrl.trim() ||
+      draft.projectGalleryUrls.length > 0 ||
+      draft.teamName.trim() ||
+      draft.memberNames.trim() ||
+      draft.allowPublicPreview
+  );
 
 const getStringField = (value: unknown) => (typeof value === "string" ? value : "");
 
@@ -175,8 +207,12 @@ export default function ParticipantDashboardPage() {
   const [teamInviteToken, setTeamInviteToken] = useState<string | null>(null);
   const [linkedTeamMembers, setLinkedTeamMembers] = useState<TeamMemberRecord[]>([]);
   const [isTeamInviteBusy, setIsTeamInviteBusy] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<string | null>(null);
+  const suppressFormSyncRef = useRef(false);
+  const firestoreAutosaveTimerRef = useRef<number | null>(null);
+  const isAutosavingRef = useRef(false);
 
-  const mapSubmissionToForm = (data: Submission) => ({
+  const mapSubmissionToForm = (data: Submission): ParticipantProjectDraft => ({
     title: data.title ?? "",
     shortDescription: data.short_description ?? "",
     projectUrl: data.project_url ?? "",
@@ -347,9 +383,15 @@ export default function ParticipantDashboardPage() {
   }, [activeSubmissionId, db, participantSubmission]);
 
   useEffect(() => {
+    if (suppressFormSyncRef.current) {
+      suppressFormSyncRef.current = false;
+      return;
+    }
+
     const scoped = participantSubmissions;
     if (scoped.length > 0) {
-      const activeSubmission = scoped[0];
+      const activeSubmission =
+        scoped.find((submission) => submission.id === activeSubmissionId) ?? scoped[0];
       setActiveSubmissionId(activeSubmission.id);
       setParticipantSubmission(activeSubmission);
       setParticipantForm((current) => ({
@@ -369,12 +411,60 @@ export default function ParticipantDashboardPage() {
     }));
   }, [participantSubmissions, selectedHackathonId, userProfile]);
 
+  const projectDraftValue = useMemo(
+    () => pickProjectDraft(participantForm),
+    [participantForm]
+  );
+
+  const projectDraftBaseline = useMemo(
+    () => (participantSubmission ? mapSubmissionToForm(participantSubmission) : emptyProjectFields),
+    [participantSubmission]
+  );
+
+  const projectDraftKey = formDraftStorageKey([
+    "participant-project",
+    sessionUser?.id,
+    selectedHackathonId,
+    activeSubmissionId ?? "new",
+  ]);
+
+  const {
+    draftSavedAt,
+    isDirty: isProjectDraftDirty,
+    clearDraft: clearProjectDraft,
+    flushDraft: flushProjectDraft,
+    pendingRestore: pendingProjectRestore,
+    consumePendingRestore: consumeProjectRestore,
+  } = useFormDraftPersistence<ParticipantProjectDraft>({
+    storageKey: projectDraftKey,
+    value: projectDraftValue,
+    enabled: Boolean(sessionUser?.role === "participant") && !isLoadingWorkspace,
+    baseline: projectDraftBaseline,
+    debounceMs: 400,
+  });
+
+  useUnsavedChangesGuard(isProjectDraftDirty && selectedHackathon.status !== "past");
+
+  useEffect(() => {
+    if (!pendingProjectRestore) return;
+    const restored = pendingProjectRestore.value as ParticipantProjectDraft;
+    setParticipantForm((current) => ({ ...current, ...restored }));
+    setAutosaveStatus("Restored unsaved draft from this browser.");
+    consumeProjectRestore();
+  }, [pendingProjectRestore, consumeProjectRestore]);
+
+  useEffect(() => {
+    if (!draftSavedAt || !isProjectDraftDirty) return;
+    setAutosaveStatus("Draft saved on this device.");
+  }, [draftSavedAt, isProjectDraftDirty]);
+
   const handleSelectSubmission = (submissionId: string) => {
     const selectedSubmission = participantSubmissions.find(
       (submission) => submission.id === submissionId
     );
     if (!selectedSubmission) return;
 
+    flushProjectDraft();
     setActiveSubmissionId(selectedSubmission.id);
     setParticipantSubmission(selectedSubmission);
     setParticipantForm((current) => ({
@@ -382,11 +472,132 @@ export default function ParticipantDashboardPage() {
       ...mapSubmissionToForm(selectedSubmission),
     }));
     setSubmissionMessage(null);
+    setAutosaveStatus(null);
   };
 
   const handleUploadProjectImage = async (file: File, kind: "cover" | "gallery") => {
     if (!sessionUser) throw new Error("Sign in to upload project images.");
     return uploadProfileImage(sessionUser.id, file, kind === "cover" ? "cover" : "gallery");
+  };
+
+  const persistParticipantProject = async (options: {
+    announce?: boolean;
+    queueEmail?: boolean;
+  }) => {
+    if (!sessionUser) return null;
+
+    const hasScopedSubmission =
+      participantSubmission &&
+      activeSubmissionId &&
+      getSubmissionHackathonId(participantSubmission) === selectedHackathonId;
+
+    const now = new Date().toISOString();
+    const payload = {
+      user_id: sessionUser.id,
+      hackathon_id: selectedHackathonId,
+      title: participantForm.title,
+      short_description: participantForm.shortDescription,
+      project_url: participantForm.projectUrl,
+      submission_pdf_url: participantForm.submissionPdfUrl,
+      demo_video_url: participantForm.demoVideoUrl,
+      public_preview_consent: participantForm.allowPublicPreview,
+      cover_url: participantForm.projectCoverUrl,
+      gallery_urls: participantForm.projectGalleryUrls,
+      team_name: participantForm.teamName,
+      member_names: participantForm.memberNames,
+      role: "participant",
+      created_at: hasScopedSubmission
+        ? (participantSubmission?.created_at ?? now)
+        : now,
+      updated_at: now,
+    };
+    const nextHackathonIds = Array.from(
+      new Set<HackathonId>([...enrolledHackathonIds, selectedHackathonId, SITE_HACKATHON_ID])
+    );
+
+    const submissionRef = hasScopedSubmission
+      ? doc(db, "submissions", activeSubmissionId!)
+      : doc(collection(db, "submissions"));
+    const userRef = doc(db, "users", sessionUser.id);
+
+    if (hasScopedSubmission) {
+      await setDoc(submissionRef, payload, { merge: true });
+    } else {
+      await setDoc(submissionRef, payload);
+    }
+    await setDoc(
+      userRef,
+      {
+        hackathon_id: selectedHackathonId,
+        hackathon_ids: nextHackathonIds,
+      },
+      { merge: true }
+    );
+
+    const publicProjectRef = doc(db, "public_projects", submissionRef.id);
+    if (participantForm.allowPublicPreview) {
+      await setDoc(publicProjectRef, {
+        owner_id: sessionUser.id,
+        user_id: sessionUser.id,
+        hackathon_id: selectedHackathonId,
+        title: payload.title,
+        short_description: payload.short_description,
+        project_url: payload.project_url,
+        submission_pdf_url: payload.submission_pdf_url,
+        demo_video_url: payload.demo_video_url,
+        cover_url: payload.cover_url,
+        gallery_urls: payload.gallery_urls,
+        team_name: payload.team_name,
+        member_names: payload.member_names,
+        created_at: payload.created_at,
+        updated_at: payload.updated_at,
+        public_preview_consent: true,
+      });
+    } else {
+      await deleteDoc(publicProjectRef).catch(() => undefined);
+    }
+
+    setEnrolledHackathonIds(nextHackathonIds);
+
+    const submissionSnap = await getDoc(submissionRef);
+    if (!submissionSnap.exists()) return null;
+
+    const data = {
+      id: submissionSnap.id,
+      ...(submissionSnap.data() as Omit<Submission, "id">),
+    } as Submission;
+
+    suppressFormSyncRef.current = true;
+    setActiveSubmissionId(data.id);
+    setParticipantSubmission(data);
+    setAllParticipantSubmissions((current) => {
+      const existingIndex = current.findIndex((submission) => submission.id === data.id);
+      if (existingIndex === -1) {
+        return [data, ...current];
+      }
+      const updated = [...current];
+      updated[existingIndex] = data;
+      return updated;
+    });
+
+    clearProjectDraft();
+
+    if (options.announce !== false) {
+      setSubmissionMessage("Submission saved successfully.");
+    } else {
+      setAutosaveStatus("Draft saved to cloud.");
+    }
+
+    if (options.queueEmail) {
+      queueParticipantEmail({
+        type: hasScopedSubmission ? "submission_updated" : "submission_created",
+        title: data.title ?? payload.title,
+        teamName: data.team_name ?? payload.team_name,
+        hackathonName: selectedHackathon.name,
+      });
+    }
+
+    return data;
   };
 
   const handleJoinHackathon = async (hackathonId: HackathonId) => {
@@ -429,102 +640,7 @@ export default function ParticipantDashboardPage() {
     setIsSubmittingProject(true);
     setSubmissionMessage(null);
     try {
-      const hasScopedSubmission =
-        participantSubmission &&
-        activeSubmissionId &&
-        getSubmissionHackathonId(participantSubmission) === selectedHackathonId;
-
-      const payload = {
-        user_id: sessionUser.id,
-        hackathon_id: selectedHackathonId,
-        title: participantForm.title,
-        short_description: participantForm.shortDescription,
-        project_url: participantForm.projectUrl,
-        submission_pdf_url: participantForm.submissionPdfUrl,
-        demo_video_url: participantForm.demoVideoUrl,
-        public_preview_consent: participantForm.allowPublicPreview,
-        cover_url: participantForm.projectCoverUrl,
-        gallery_urls: participantForm.projectGalleryUrls,
-        team_name: participantForm.teamName,
-        member_names: participantForm.memberNames,
-        role: "participant",
-        created_at: hasScopedSubmission
-          ? (participantSubmission?.created_at ?? new Date().toISOString())
-          : new Date().toISOString(),
-      };
-      const nextHackathonIds = Array.from(
-        new Set<HackathonId>([...enrolledHackathonIds, selectedHackathonId, SITE_HACKATHON_ID])
-      );
-
-      const submissionRef = hasScopedSubmission
-        ? doc(db, "submissions", activeSubmissionId!)
-        : doc(collection(db, "submissions"));
-      const userRef = doc(db, "users", sessionUser.id);
-
-      if (hasScopedSubmission) {
-        await setDoc(submissionRef, payload, { merge: true });
-      } else {
-        await setDoc(submissionRef, payload);
-      }
-      await setDoc(
-        userRef,
-        {
-          hackathon_id: selectedHackathonId,
-          hackathon_ids: nextHackathonIds,
-        },
-        { merge: true }
-      );
-
-      const publicProjectRef = doc(db, "public_projects", submissionRef.id);
-      if (participantForm.allowPublicPreview) {
-        await setDoc(publicProjectRef, {
-          owner_id: sessionUser.id,
-          user_id: sessionUser.id,
-          hackathon_id: selectedHackathonId,
-          title: payload.title,
-          short_description: payload.short_description,
-          project_url: payload.project_url,
-          submission_pdf_url: payload.submission_pdf_url,
-          demo_video_url: payload.demo_video_url,
-          cover_url: payload.cover_url,
-          gallery_urls: payload.gallery_urls,
-          team_name: payload.team_name,
-          member_names: payload.member_names,
-          created_at: payload.created_at,
-          public_preview_consent: true,
-        });
-      } else {
-        // Always remove the public copy when consent is off — never leave a stale gallery/board card.
-        await deleteDoc(publicProjectRef).catch(() => undefined);
-      }
-
-      setEnrolledHackathonIds(nextHackathonIds);
-
-      const submissionSnap = await getDoc(submissionRef);
-      if (submissionSnap.exists()) {
-        const data = {
-          id: submissionSnap.id,
-          ...(submissionSnap.data() as Omit<Submission, "id">),
-        } as Submission;
-        setActiveSubmissionId(data.id);
-        setParticipantSubmission(data);
-        setAllParticipantSubmissions((current) => {
-          const existingIndex = current.findIndex((submission) => submission.id === data.id);
-          if (existingIndex === -1) {
-            return [data, ...current];
-          }
-          const updated = [...current];
-          updated[existingIndex] = data;
-          return updated;
-        });
-        setSubmissionMessage("Submission saved successfully.");
-        queueParticipantEmail({
-          type: hasScopedSubmission ? "submission_updated" : "submission_created",
-          title: data.title ?? payload.title,
-          teamName: data.team_name ?? payload.team_name,
-          hackathonName: selectedHackathon.name,
-        });
-      }
+      await persistParticipantProject({ announce: true, queueEmail: true });
     } catch (error: unknown) {
       const message =
         typeof error === "object" && error && "message" in error
@@ -535,6 +651,48 @@ export default function ParticipantDashboardPage() {
       setIsSubmittingProject(false);
     }
   };
+
+  // Cloud autosave so drafts survive sudden closes even across devices.
+  useEffect(() => {
+    if (!sessionUser || sessionUser.role !== "participant") return;
+    if (isLoadingWorkspace || selectedHackathon.status === "past") return;
+    if (!isProjectDraftDirty || !projectDraftHasContent(projectDraftValue)) return;
+    if (isSubmittingProject || isAutosavingRef.current) return;
+
+    if (firestoreAutosaveTimerRef.current) {
+      window.clearTimeout(firestoreAutosaveTimerRef.current);
+    }
+
+    firestoreAutosaveTimerRef.current = window.setTimeout(() => {
+      void (async () => {
+        if (isAutosavingRef.current || isSubmittingProject) return;
+        isAutosavingRef.current = true;
+        try {
+          await persistParticipantProject({ announce: false, queueEmail: false });
+        } catch {
+          // Keep local draft; cloud autosave can retry on next edit.
+          setAutosaveStatus("Draft saved on this device (cloud sync pending).");
+        } finally {
+          isAutosavingRef.current = false;
+        }
+      })();
+    }, 2500);
+
+    return () => {
+      if (firestoreAutosaveTimerRef.current) {
+        window.clearTimeout(firestoreAutosaveTimerRef.current);
+      }
+    };
+    // persistParticipantProject closes over latest form state intentionally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    sessionUser,
+    isLoadingWorkspace,
+    selectedHackathon.status,
+    isProjectDraftDirty,
+    projectDraftValue,
+    isSubmittingProject,
+  ]);
 
   const handleCreateTeammatePost = async (input: {
     looking_for: string;
@@ -702,6 +860,7 @@ export default function ParticipantDashboardPage() {
         onSelectSubmission={handleSelectSubmission}
         participantSubmission={participantSubmission}
         submissionMessage={submissionMessage}
+        autosaveStatus={autosaveStatus}
         isSubmittingProject={isSubmittingProject}
         onUploadProjectImage={handleUploadProjectImage}
         onSave={handleParticipantSubmit}

@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
+import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { formDraftStorageKey } from "@/lib/formDrafts";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { JudgeDashboard } from "@/components/dashboard/JudgeDashboard";
 import {
@@ -34,9 +37,67 @@ import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
 import {
   calculateTotalFromCriteria,
   clampCriterionScore,
+  type CriteriaScores,
+  type JudgingCriterion,
   type JudgingCriterionId,
 } from "@/components/dashboard/judgingCriteria";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
+
+type JudgeWorkspaceDraft = {
+  scoresBySubmission: Record<
+    string,
+    {
+      notes: string;
+      criteria: CriteriaScores;
+    }
+  >;
+  top3Ranks: JudgeTop3Ranks;
+};
+
+function buildJudgeWorkspaceDraft(
+  submissions: Submission[],
+  top3Ranks: JudgeTop3Ranks
+): JudgeWorkspaceDraft {
+  const scoresBySubmission: JudgeWorkspaceDraft["scoresBySubmission"] = {};
+  for (const submission of submissions) {
+    scoresBySubmission[submission.id] = {
+      notes: submission.judge_notes ?? "",
+      criteria: submission.judge_criteria_scores ?? null,
+    };
+  }
+  return { scoresBySubmission, top3Ranks };
+}
+
+function applyJudgeWorkspaceDraft(
+  submissions: Submission[],
+  draft: JudgeWorkspaceDraft,
+  judgeId: string,
+  criteria: JudgingCriterion[]
+): Submission[] {
+  return submissions.map((submission) => {
+    const entry = draft.scoresBySubmission[submission.id];
+    if (!entry) return submission;
+    const totalScore = calculateTotalFromCriteria(entry.criteria, criteria);
+    return {
+      ...submission,
+      judge_notes: entry.notes,
+      judge_criteria_scores: entry.criteria,
+      judge_score: totalScore,
+      judge_notes_by_judge: {
+        ...(submission.judge_notes_by_judge ?? {}),
+        [judgeId]: entry.notes,
+      },
+      judge_criteria_scores_by_judge: {
+        ...(submission.judge_criteria_scores_by_judge ?? {}),
+        [judgeId]: entry.criteria,
+      },
+      judge_scores: {
+        ...(submission.judge_scores ?? {}),
+        [judgeId]: totalScore,
+      },
+    };
+  });
+}
 
 export default function JudgeDashboardPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
@@ -66,10 +127,12 @@ export default function JudgeDashboardPage() {
     useHackathonCriteria(selectedHackathonId);
 
   const [judgeSubmissions, setJudgeSubmissions] = useState<Submission[]>([]);
+  const [judgeSubmissionsBaseline, setJudgeSubmissionsBaseline] = useState<Submission[]>([]);
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [judgeMessage, setJudgeMessage] = useState<string | null>(null);
   const [savingSubmissionId, setSavingSubmissionId] = useState<string | null>(null);
   const [top3Ranks, setTop3Ranks] = useState<JudgeTop3Ranks>(createEmptyTop3Ranks);
+  const [top3RanksBaseline, setTop3RanksBaseline] = useState<JudgeTop3Ranks>(createEmptyTop3Ranks);
   const [top3SavedAt, setTop3SavedAt] = useState<string | null>(null);
   const [isSavingTop3, setIsSavingTop3] = useState(false);
   const judgeSubmissionsRef = useRef(judgeSubmissions);
@@ -79,6 +142,37 @@ export default function JudgeDashboardPage() {
   }, [judgeSubmissions]);
 
   const judgeId = sessionUser?.id ?? "";
+
+  const judgeDraftValue = useMemo(
+    () => buildJudgeWorkspaceDraft(judgeSubmissions, top3Ranks),
+    [judgeSubmissions, top3Ranks]
+  );
+
+  const judgeDraftBaseline = useMemo(
+    () => buildJudgeWorkspaceDraft(judgeSubmissionsBaseline, top3RanksBaseline),
+    [judgeSubmissionsBaseline, top3RanksBaseline]
+  );
+
+  const judgeDraftKey = formDraftStorageKey([
+    "judge-workspace",
+    judgeId,
+    selectedHackathonId,
+  ]);
+
+  const {
+    isDirty: isJudgeDraftDirty,
+    clearDraft: clearJudgeDraft,
+    pendingRestore: pendingJudgeRestore,
+    consumePendingRestore: consumeJudgeRestore,
+  } = useFormDraftPersistence<JudgeWorkspaceDraft>({
+    storageKey: judgeDraftKey,
+    value: judgeDraftValue,
+    enabled: Boolean(judgeId) && canAccessSelectedHackathon && !isLoadingSubmissions,
+    baseline: judgeDraftBaseline,
+    debounceMs: 400,
+  });
+
+  useUnsavedChangesGuard(isJudgeDraftDirty);
 
   useEffect(() => {
     if (!sessionUser || (sessionUser.role !== "judge" && sessionUser.role !== "mentor")) return;
@@ -113,6 +207,7 @@ export default function JudgeDashboardPage() {
           )
         );
         setJudgeSubmissions(mappedSubmissions);
+        setJudgeSubmissionsBaseline(mappedSubmissions);
 
         try {
           const rankingRef = doc(
@@ -127,6 +222,7 @@ export default function JudgeDashboardPage() {
             selectedHackathonId
           );
           setTop3Ranks(ranking.ranks);
+          setTop3RanksBaseline(ranking.ranks);
           setTop3SavedAt(ranking.updated_at);
         } catch (rankingError: unknown) {
           const rankingMessage =
@@ -157,6 +253,82 @@ export default function JudgeDashboardPage() {
     selectedHackathonId,
     canAccessSelectedHackathon,
     allowedHackathonIds.length,
+  ]);
+
+  useEffect(() => {
+    if (!pendingJudgeRestore || !judgeId || isLoadingSubmissions) return;
+    const draft = pendingJudgeRestore.value as JudgeWorkspaceDraft;
+    setJudgeSubmissions((current) =>
+      applyJudgeWorkspaceDraft(current, draft, judgeId, judgingCriteria)
+    );
+    setTop3Ranks(draft.top3Ranks ?? createEmptyTop3Ranks());
+    setJudgeMessage("Restored unsaved scoring draft from this browser.");
+    consumeJudgeRestore();
+  }, [
+    pendingJudgeRestore,
+    consumeJudgeRestore,
+    judgeId,
+    isLoadingSubmissions,
+    judgingCriteria,
+  ]);
+
+  // Persist partial score progress to Firestore so sudden closes don't lose mid-scoring work.
+  useEffect(() => {
+    if (!sessionUser || !canAccessSelectedHackathon || isLoadingSubmissions) return;
+    if (!isJudgeDraftDirty) return;
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const updates = judgeSubmissionsRef.current;
+        let wroteAnything = false;
+        await Promise.all(
+          updates.map(async (submission) => {
+            const baseline = judgeSubmissionsBaseline.find((item) => item.id === submission.id);
+            const notes = submission.judge_notes ?? "";
+            const criteriaScores = submission.judge_criteria_scores ?? {};
+            const baselineNotes = baseline?.judge_notes ?? "";
+            const baselineCriteria = baseline?.judge_criteria_scores ?? {};
+            const notesChanged = notes !== baselineNotes;
+            const criteriaChanged =
+              JSON.stringify(criteriaScores) !== JSON.stringify(baselineCriteria);
+            if (!notesChanged && !criteriaChanged) return;
+
+            const cleaned = sanitizeCriteriaScores(criteriaScores);
+            const score = Object.keys(cleaned).length
+              ? calculateTotalFromCriteria(cleaned, judgingCriteria)
+              : null;
+
+            try {
+              await updateDoc(
+                doc(db, "submissions", submission.id),
+                buildJudgeScoreFirestoreUpdate(sessionUser.id, score, notes, cleaned)
+              );
+              wroteAnything = true;
+            } catch {
+              // Local draft remains.
+            }
+          })
+        );
+
+        if (wroteAnything) {
+          setJudgeSubmissionsBaseline(updates);
+          setTop3RanksBaseline(top3Ranks);
+          setJudgeMessage("Scores draft autosaved.");
+        }
+      })();
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    sessionUser,
+    canAccessSelectedHackathon,
+    isLoadingSubmissions,
+    isJudgeDraftDirty,
+    judgeSubmissions,
+    judgeSubmissionsBaseline,
+    judgingCriteria,
+    top3Ranks,
+    db,
   ]);
 
   const filteredJudgeSubmissions = judgeSubmissions;
@@ -273,6 +445,11 @@ export default function JudgeDashboardPage() {
           setJudgeSubmissions((current) =>
             current.map((item) => (item.id === submissionId ? remapped : item))
           );
+          setJudgeSubmissionsBaseline((current) => {
+            const exists = current.some((item) => item.id === submissionId);
+            if (!exists) return [...current, remapped];
+            return current.map((item) => (item.id === submissionId ? remapped : item));
+          });
         } else {
           setJudgeSubmissions((current) =>
             current.map((item) =>
@@ -298,8 +475,34 @@ export default function JudgeDashboardPage() {
                 : item
             )
           );
+          setJudgeSubmissionsBaseline((current) =>
+            current.map((item) =>
+              item.id === submission.id
+                ? {
+                    ...item,
+                    judge_score: score,
+                    judge_notes: notes,
+                    judge_scores: {
+                      ...(item.judge_scores ?? {}),
+                      [sessionUser.id]: score,
+                    },
+                    judge_notes_by_judge: {
+                      ...(item.judge_notes_by_judge ?? {}),
+                      [sessionUser.id]: notes,
+                    },
+                    judge_criteria_scores: cleanedCriteriaScores,
+                    judge_criteria_scores_by_judge: {
+                      ...(item.judge_criteria_scores_by_judge ?? {}),
+                      [sessionUser.id]: cleanedCriteriaScores,
+                    },
+                  }
+                : item
+            )
+          );
         }
 
+        // Keep local draft for other unsaved submissions; rewrite snapshot after this save.
+        clearJudgeDraft();
         setJudgeMessage("Scores saved.");
       } catch (error: unknown) {
         const message =
@@ -311,7 +514,7 @@ export default function JudgeDashboardPage() {
         setSavingSubmissionId(null);
       }
     },
-    [sessionUser, db, judgingCriteria, canAccessSelectedHackathon]
+    [sessionUser, db, judgingCriteria, canAccessSelectedHackathon, clearJudgeDraft]
   );
 
   const handleTop3RankChange = (slot: Top3RankSlot, submissionId: string | null) => {
@@ -348,6 +551,8 @@ export default function JudgeDashboardPage() {
 
       await setDoc(rankingRef, payload, { merge: true });
       setTop3SavedAt(payload.updated_at);
+      setTop3RanksBaseline(top3Ranks);
+      clearJudgeDraft();
       setJudgeMessage("Top 3 ranking saved.");
     } catch (error: unknown) {
       const message =
@@ -358,7 +563,7 @@ export default function JudgeDashboardPage() {
     } finally {
       setIsSavingTop3(false);
     }
-  }, [sessionUser, db, top3Ranks, selectedHackathonId, canAccessSelectedHackathon]);
+  }, [sessionUser, db, top3Ranks, selectedHackathonId, canAccessSelectedHackathon, clearJudgeDraft]);
 
   if (authLoading) {
     return (

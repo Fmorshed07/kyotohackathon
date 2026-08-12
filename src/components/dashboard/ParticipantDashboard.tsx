@@ -155,6 +155,7 @@ export type ParticipantDashboardProps = {
   onSelectSubmission: (submissionId: string) => void;
   participantSubmission: Submission | null;
   submissionMessage: string | null;
+  autosaveStatus?: string | null;
   isSubmittingProject: boolean;
   onUploadProjectImage?: (file: File, kind: "cover" | "gallery") => Promise<string>;
   onSave: () => Promise<void>;
@@ -198,6 +199,7 @@ export function ParticipantDashboard({
   activeSubmissionId,
   onSelectSubmission,
   submissionMessage,
+  autosaveStatus = null,
   isSubmittingProject,
   onUploadProjectImage,
   onSave,
@@ -866,6 +868,9 @@ export function ParticipantDashboard({
               <p className="dash-message">
                 {submissionMessage}
               </p>
+            )}
+            {!submissionMessage && autosaveStatus && (
+              <p className="text-xs text-muted-foreground">{autosaveStatus}</p>
             )}
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline" size="lg">

@@ -29,6 +29,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
+import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { formDraftStorageKey } from "@/lib/formDrafts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import {
   SITE_HACKATHON_ID,
@@ -192,6 +195,7 @@ export default function ParticipantOnboardingPage() {
     JOINABLE[0]?.id ?? SITE_HACKATHON_ID
   );
   const [form, setForm] = useState<OnboardingForm>(emptyForm);
+  const [formBaseline, setFormBaseline] = useState<OnboardingForm>(emptyForm);
   const [customRole, setCustomRole] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -200,6 +204,26 @@ export default function ParticipantOnboardingPage() {
   const selectedHackathon = useMemo(() => getHackathonById(hackathonId), [hackathonId]);
   const selectedSkills = useMemo(() => parseSkillList(form.skills), [form.skills]);
   const knownRoleIds = useMemo(() => new Set(ROLE_OPTIONS.map((role) => role.id)), []);
+
+  const onboardingDraftKey = formDraftStorageKey([
+    "participant-onboarding",
+    sessionUser?.id,
+  ]);
+
+  const {
+    isDirty: isOnboardingDirty,
+    clearDraft: clearOnboardingDraft,
+    pendingRestore: pendingOnboardingRestore,
+    consumePendingRestore: consumeOnboardingRestore,
+  } = useFormDraftPersistence<OnboardingForm>({
+    storageKey: onboardingDraftKey,
+    value: form,
+    enabled: Boolean(sessionUser?.role === "participant") && !isLoading && !authLoading,
+    baseline: formBaseline,
+    debounceMs: 400,
+  });
+
+  useUnsavedChangesGuard(isOnboardingDirty && !isSaving);
 
   useEffect(() => {
     if (authLoading) return;
@@ -229,7 +253,7 @@ export default function ParticipantOnboardingPage() {
 
         if (!cancelled) {
           setHackathonId(nextId);
-          setForm({
+          const nextForm: OnboardingForm = {
             fullName: typeof data.fullName === "string" ? data.fullName : "",
             headline: typeof data.headline === "string" ? data.headline : "",
             publicRole: loadedRole,
@@ -249,7 +273,9 @@ export default function ParticipantOnboardingPage() {
             xUrl: typeof data.xUrl === "string" ? data.xUrl : "",
             discordHandle:
               typeof data.discordHandle === "string" ? data.discordHandle : "",
-          });
+          };
+          setForm(nextForm);
+          setFormBaseline(nextForm);
           if (loadedRole && !knownRoleIds.has(loadedRole as (typeof ROLE_OPTIONS)[number]["id"])) {
             setCustomRole(loadedRole);
           }
@@ -264,6 +290,13 @@ export default function ParticipantOnboardingPage() {
       cancelled = true;
     };
   }, [authLoading, db, knownRoleIds, sessionUser]);
+
+  useEffect(() => {
+    if (!pendingOnboardingRestore) return;
+    setForm(pendingOnboardingRestore.value as OnboardingForm);
+    setError(null);
+    consumeOnboardingRestore();
+  }, [pendingOnboardingRestore, consumeOnboardingRestore]);
 
   if (authLoading || isLoading) {
     return (
@@ -429,6 +462,7 @@ export default function ParticipantOnboardingPage() {
         type: "welcome",
         hackathonName: selectedHackathon.name,
       });
+      clearOnboardingDraft();
       navigate("/dashboard/participant", { replace: true });
     } catch (err: unknown) {
       const msg =

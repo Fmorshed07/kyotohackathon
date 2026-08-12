@@ -11,6 +11,9 @@ import {
   slugifyCriterionId,
   type JudgingCriterion,
 } from "@/components/dashboard/judgingCriteria";
+import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { formDraftStorageKey } from "@/lib/formDrafts";
 import type { PortalHackathon } from "@/lib/hackathons";
 
 type MarkingCriteriaSectionProps = {
@@ -40,12 +43,41 @@ export function MarkingCriteriaSection({
   onSave,
 }: MarkingCriteriaSectionProps) {
   const [draftCriteria, setDraftCriteria] = useState<JudgingCriterion[]>(criteria);
+  const [criteriaBaseline, setCriteriaBaseline] = useState<JudgingCriterion[]>(criteria);
   const [localMessage, setLocalMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setDraftCriteria(criteria);
+    setCriteriaBaseline(criteria);
     setLocalMessage(null);
   }, [criteria, selectedHackathon.id]);
+
+  const criteriaDraftKey = formDraftStorageKey([
+    "marking-criteria",
+    selectedHackathon.id,
+  ]);
+
+  const {
+    isDirty: isCriteriaDirty,
+    clearDraft: clearCriteriaDraft,
+    pendingRestore: pendingCriteriaRestore,
+    consumePendingRestore: consumeCriteriaRestore,
+  } = useFormDraftPersistence<JudgingCriterion[]>({
+    storageKey: criteriaDraftKey,
+    value: draftCriteria,
+    enabled: !isLoading,
+    baseline: criteriaBaseline,
+    debounceMs: 400,
+  });
+
+  useUnsavedChangesGuard(isCriteriaDirty);
+
+  useEffect(() => {
+    if (!pendingCriteriaRestore) return;
+    setDraftCriteria(pendingCriteriaRestore.value as JudgingCriterion[]);
+    setLocalMessage("Restored unsaved criteria draft from this browser.");
+    consumeCriteriaRestore();
+  }, [pendingCriteriaRestore, consumeCriteriaRestore]);
 
   const totalWeight = useMemo(
     () => draftCriteria.reduce((sum, criterion) => sum + criterion.weight, 0),
@@ -134,6 +166,9 @@ export function MarkingCriteriaSection({
 
     try {
       await onSave(sanitized);
+      setCriteriaBaseline(sanitized);
+      setDraftCriteria(sanitized);
+      clearCriteriaDraft();
       setLocalMessage("Marking criteria saved for this event.");
     } catch {
       setLocalMessage("Failed to save marking criteria.");

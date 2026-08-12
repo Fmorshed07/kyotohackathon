@@ -65,7 +65,8 @@ function matchesFilter(event: HostedHackathon, filter: FilterKey) {
   if (filter === "unpublished") return !event.published;
   if (filter === "past") return event.status === "past";
   if (filter === "host") return Boolean(event.hostEventId);
-  return event.published && event.status !== "past";
+  // Published includes past events that are still visible on /hackathons.
+  return event.published;
 }
 
 function visibilityTone(event: HostedHackathon) {
@@ -143,7 +144,7 @@ export function EventManagementWorkspace({
     () => ({
       all: events.length,
       live: events.filter((event) => event.published && event.status === "active").length,
-      published: events.filter((event) => event.published && event.status !== "past").length,
+      published: events.filter((event) => event.published).length,
       unpublished: events.filter((event) => !event.published).length,
       past: events.filter((event) => event.status === "past").length,
       host: events.filter((event) => Boolean(event.hostEventId)).length,
@@ -211,8 +212,9 @@ export function EventManagementWorkspace({
           <div>
             <p className="dash-eyebrow">Event management</p>
             <h2 className="dash-title">Edit, publish, and control every event</h2>
-            <p className="dash-subtitle">
-              Public listings and host ops drafts in one place — publish, go live, edit details, or hide.
+            <p className="dash-subtitle mt-1 max-w-2xl">
+              Past, live, and upcoming listings stay editable. Publish or unpublish at any lifecycle
+              stage — marking past does not lock the event.
             </p>
           </div>
         </div>
@@ -497,12 +499,15 @@ export function EventManagementWorkspace({
                         <p className="mt-1 font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                           Lifecycle
                         </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Switch freely — past events remain editable and can be published or hidden.
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
                             size="sm"
                             variant={event.status === "active" && event.published ? "default" : "outline"}
-                            disabled={busy || isBusy || (event.status === "active" && event.published)}
+                            disabled={busy || isBusy}
                             className="gap-1.5"
                             onClick={() => void onSetStatus(event.id, "active")}
                           >
@@ -513,7 +518,7 @@ export function EventManagementWorkspace({
                             type="button"
                             size="sm"
                             variant={event.status === "upcoming" ? "default" : "outline"}
-                            disabled={busy || isBusy || event.status === "upcoming"}
+                            disabled={busy || isBusy}
                             className="gap-1.5"
                             onClick={() => void onSetStatus(event.id, "upcoming")}
                           >
@@ -523,7 +528,7 @@ export function EventManagementWorkspace({
                             type="button"
                             size="sm"
                             variant={event.status === "past" ? "default" : "outline"}
-                            disabled={busy || isBusy || event.status === "past"}
+                            disabled={busy || isBusy}
                             className="gap-1.5"
                             onClick={() => void onSetStatus(event.id, "past")}
                           >
