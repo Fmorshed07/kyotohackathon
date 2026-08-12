@@ -18,7 +18,7 @@ const ResourcesGuideSection = () => {
   const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.08 });
 
   return (
-    <section className="relative overflow-hidden px-6 py-20 md:py-28" id="guide">
+    <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-20 md:py-28" id="guide">
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
         <motion.div
@@ -43,7 +43,7 @@ const ResourcesGuideSection = () => {
           <p className="font-display text-xs font-semibold uppercase tracking-[0.32em] text-primary">
             Resources & guide
           </p>
-          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl md:text-6xl">
+          <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight text-foreground sm:text-5xl md:text-6xl">
             Use the platform like a pro
           </h1>
           <p className="mt-5 max-w-2xl font-body text-base text-muted-foreground sm:text-lg">
@@ -54,14 +54,14 @@ const ResourcesGuideSection = () => {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
               to="/signup"
-              className="inline-flex min-w-[200px] items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 font-display text-sm font-semibold text-primary-foreground shadow-[0_0_24px_hsl(199_100%_50%/0.35)] transition hover:brightness-110"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 font-display text-sm font-semibold text-primary-foreground shadow-[0_0_24px_hsl(199_100%_50%/0.35)] transition hover:brightness-110 sm:w-auto sm:min-w-[200px]"
             >
               Get started
               <Rocket className="h-4 w-4" aria-hidden />
             </Link>
             <Link
               to="/dashboard/participant"
-              className="inline-flex min-w-[200px] items-center justify-center gap-2 rounded-lg border border-white/15 px-6 py-3 font-display text-sm font-semibold text-foreground transition hover:bg-white/5"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 px-6 py-3 font-display text-sm font-semibold text-foreground transition hover:bg-white/5 sm:w-auto sm:min-w-[200px]"
             >
               Open portal
               <LayoutDashboard className="h-4 w-4" aria-hidden />

@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "hackathon-tokyo"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

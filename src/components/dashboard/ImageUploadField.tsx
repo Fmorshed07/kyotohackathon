@@ -1,7 +1,15 @@
-import { useRef, useState, type DragEvent, type ChangeEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type ChangeEvent,
+  type SyntheticEvent,
+} from "react";
 import { ImagePlus, Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { normalizeImageFile, validateImageFile } from "@/lib/profileMedia";
 import { cn } from "@/lib/utils";
 
 type ImageUploadFieldProps = {
@@ -10,10 +18,29 @@ type ImageUploadFieldProps = {
   onChange: (url: string) => void;
   onUpload: (file: File) => Promise<string>;
   hint?: string;
+  /** Placeholder drop-zone ratio when empty. Previews adapt to the uploaded image. */
   aspectClassName?: string;
   disabled?: boolean;
   allowUrlPaste?: boolean;
 };
+
+function useNaturalAspectRatio(src: string) {
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    setAspectRatio(null);
+  }, [src]);
+
+  return {
+    aspectRatio,
+    onImageLoad: (event: SyntheticEvent<HTMLImageElement>) => {
+      const { naturalWidth, naturalHeight } = event.currentTarget;
+      if (naturalWidth > 0 && naturalHeight > 0) {
+        setAspectRatio(naturalWidth / naturalHeight);
+      }
+    },
+  };
+}
 
 export function ImageUploadField({
   label,
@@ -30,13 +57,26 @@ export function ImageUploadField({
   const [dragOver, setDragOver] = useState(false);
   const [showUrl, setShowUrl] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const trimmedValue = value.trim();
+  const { aspectRatio, onImageLoad } = useNaturalAspectRatio(trimmedValue);
 
   const processFile = async (file: File | null | undefined) => {
     if (!file || disabled) return;
+    const normalized = normalizeImageFile(file);
+    const validationError = validateImageFile(normalized);
+    if (validationError) {
+      setError(validationError);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
     setUploading(true);
     setError(null);
     try {
-      const url = await onUpload(file);
+      const url = await onUpload(normalized);
+      if (!url?.trim()) {
+        throw new Error("Upload finished without an image URL. Try again.");
+      }
       onChange(url);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Upload failed");
@@ -60,7 +100,7 @@ export function ImageUploadField({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <label className="dash-field-label">{label}</label>
-        {value.trim() ? (
+        {trimmedValue ? (
           <Button
             type="button"
             variant="ghost"
@@ -87,13 +127,21 @@ export function ImageUploadField({
         onDrop={onDrop}
         className={cn(
           "relative overflow-hidden rounded-xl border border-dashed transition",
-          aspectClassName,
+          trimmedValue
+            ? "flex min-h-[8rem] w-full items-center justify-center bg-black/30"
+            : aspectClassName,
           dragOver ? "border-primary bg-primary/10" : "border-white/15 bg-black/20",
           (uploading || disabled) && "pointer-events-none opacity-70"
         )}
       >
-        {value.trim() ? (
-          <img src={value} alt={`${label} preview`} className="h-full w-full object-cover" />
+        {trimmedValue ? (
+          <img
+            src={trimmedValue}
+            alt={`${label} preview`}
+            onLoad={onImageLoad}
+            className="max-h-80 w-auto max-w-full object-contain"
+            style={aspectRatio ? { aspectRatio } : undefined}
+          />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center">
             <ImagePlus className="h-7 w-7 text-muted-foreground" />
@@ -119,7 +167,7 @@ export function ImageUploadField({
           className="gap-1.5"
         >
           {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-          {value.trim() ? "Replace image" : "Upload image"}
+          {trimmedValue ? "Replace image" : "Upload image"}
         </Button>
         {allowUrlPaste ? (
           <Button
@@ -184,9 +232,11 @@ export function GalleryUploadField({
 
   const processFiles = async (files: FileList | File[] | null | undefined) => {
     if (!files || files.length === 0 || disabled) return;
-    const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    const list = Array.from(files)
+      .map((file) => normalizeImageFile(file))
+      .filter((file) => validateImageFile(file) === null);
     if (list.length === 0) {
-      setError("Please choose image files");
+      setError("Please choose JPG, PNG, WebP, or GIF images under 5 MB");
       return;
     }
     const remaining = Math.max(0, maxItems - value.length);
@@ -200,7 +250,9 @@ export function GalleryUploadField({
     try {
       const uploaded: string[] = [];
       for (const file of list.slice(0, remaining)) {
-        uploaded.push(await onUpload(file));
+        const url = await onUpload(file);
+        if (!url?.trim()) throw new Error("Upload finished without an image URL. Try again.");
+        uploaded.push(url);
       }
       onChange([...value, ...uploaded]);
     } catch (cause: unknown) {
@@ -265,28 +317,55 @@ export function GalleryUploadField({
       </div>
 
       {value.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 md:grid-cols-4">
           {value.map((url, index) => (
-            <div
+            <GalleryThumb
               key={`${url}-${index}`}
-              className="group relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-black/30"
-            >
-              <img src={url} alt={`Gallery ${index + 1}`} className="h-full w-full object-cover" />
-              <button
-                type="button"
-                className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/20 bg-black/70 text-white opacity-0 transition group-hover:opacity-100"
-                onClick={() => onChange(value.filter((_, i) => i !== index))}
-                disabled={disabled || uploading}
-                aria-label={`Remove gallery image ${index + 1}`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
+              url={url}
+              index={index}
+              disabled={disabled || uploading}
+              onRemove={() => onChange(value.filter((_, i) => i !== index))}
+            />
           ))}
         </div>
       ) : null}
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </div>
+  );
+}
+
+function GalleryThumb({
+  url,
+  index,
+  disabled,
+  onRemove,
+}: {
+  url: string;
+  index: number;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  const { aspectRatio, onImageLoad } = useNaturalAspectRatio(url);
+
+  return (
+    <div className="group relative flex min-h-[6rem] w-full items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/30">
+      <img
+        src={url}
+        alt={`Gallery ${index + 1}`}
+        onLoad={onImageLoad}
+        className="max-h-48 w-auto max-w-full object-contain"
+        style={aspectRatio ? { aspectRatio } : undefined}
+      />
+      <button
+        type="button"
+        className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/20 bg-black/70 text-white opacity-0 transition group-hover:opacity-100"
+        onClick={onRemove}
+        disabled={disabled}
+        aria-label={`Remove gallery image ${index + 1}`}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

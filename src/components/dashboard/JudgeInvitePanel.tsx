@@ -53,7 +53,8 @@ export function JudgeInvitePanel({
             Judge invite links
           </h2>
           <p className="dash-subtitle">
-            Share a link for direct judge signup — approved automatically with event access.
+            Share a link so judges can join with Google and open that event&apos;s judge dashboard
+            immediately.
           </p>
         </div>
       </div>

@@ -37,13 +37,13 @@ import { sendParticipantEmail, queueParticipantEmail } from "@/lib/participantEm
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import { createJudgeInvite } from "@/lib/portalInvites";
 import {
-  fetchAllHackathonsForAdmin,
   publishAiHackathon,
   publishManualHackathon,
   type AiHackathonDraft,
   type HostedHackathon,
   type ManualHackathonDraft,
 } from "@/lib/aiHackathons";
+import { useAdminHackathonCatalog } from "@/hooks/useAdminHackathonCatalog";
 import {
   calculateTotalFromCriteria,
   DEFAULT_JUDGING_CRITERIA,
@@ -125,18 +125,15 @@ const mapUserProfile = (data: Record<string, unknown>): UserProfile => ({
 export default function AdminDashboardPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
-  const [aiHackathons, setAiHackathons] = useState<HostedHackathon[]>([]);
-  const adminHackathons = useMemo(
-    () => [
-      ...PORTAL_HACKATHONS,
-      ...aiHackathons.filter((event) => !PORTAL_HACKATHONS.some((item) => item.id === event.id)),
-    ],
-    [aiHackathons],
-  );
+  const {
+    catalog: adminHackathons,
+    upsertHostedEvent,
+  } = useAdminHackathonCatalog(db, Boolean(sessionUser && sessionUser.role === "admin"));
   const { selectedHackathonId, selectedHackathon, setSelectedHackathonId } = useHackathonSelection(
     HACKATHON_STORAGE_KEYS.admin,
     undefined,
     adminHackathons,
+    { syncUrl: true, preferCurrent: true },
   );
   const { criteria: judgingCriteria, isLoading: isLoadingCriteria, setCriteria: setJudgingCriteria } =
     useHackathonCriteria(selectedHackathonId);
@@ -173,15 +170,6 @@ export default function AdminDashboardPage() {
   const [judgeInviteUrl, setJudgeInviteUrl] = useState<string | null>(null);
   const [judgeInviteMessage, setJudgeInviteMessage] = useState<string | null>(null);
   const [isCreatingJudgeInvite, setIsCreatingJudgeInvite] = useState(false);
-
-  useEffect(() => {
-    if (!sessionUser || sessionUser.role !== "admin") return;
-    void fetchAllHackathonsForAdmin(db)
-      .then((events) => setAiHackathons(events))
-      .catch((error: unknown) => {
-        console.warn("[admin] Could not load hosted hackathons.", error);
-      });
-  }, [db, sessionUser]);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -763,7 +751,7 @@ export default function AdminDashboardPage() {
   ): Promise<HostedHackathon> => {
     if (!sessionUser) throw new Error("You must be signed in as an admin to create an event.");
     const event = await publishAiHackathon(db, draft, rulebookUrl, sessionUser.id);
-    setAiHackathons((current) => [event, ...current.filter((currentEvent) => currentEvent.id !== event.id)]);
+    upsertHostedEvent(event);
     setSelectedHackathonId(event.id);
     setMessage(`${event.name} was created and published.`);
     return event;
@@ -775,7 +763,7 @@ export default function AdminDashboardPage() {
   ): Promise<HostedHackathon> => {
     if (!sessionUser) throw new Error("You must be signed in as an admin to create an event.");
     const event = await publishManualHackathon(db, draft, rulebookUrl, sessionUser.id);
-    setAiHackathons((current) => [event, ...current.filter((currentEvent) => currentEvent.id !== event.id)]);
+    upsertHostedEvent(event);
     setSelectedHackathonId(event.id);
     setMessage(`${event.name} was manually created and published.`);
     return event;
@@ -1306,6 +1294,7 @@ export default function AdminDashboardPage() {
         top3SubmissionLookup={top3SubmissionLookup}
         platformOpsLive={{
           hackathon: selectedHackathon,
+          hackathons: adminHackathons,
           participants: hackathonUsers.filter((user) => user.role === "participant"),
           submissions: adminSubmissionRows,
           judgingCriteria,

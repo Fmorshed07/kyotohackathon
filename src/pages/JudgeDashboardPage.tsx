@@ -11,13 +11,20 @@ import { formDraftStorageKey } from "@/lib/formDrafts";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { JudgeDashboard } from "@/components/dashboard/JudgeDashboard";
 import {
+  clearJudgeWorkspaceBootstrap,
+  readJudgeWorkspaceBootstrap,
+} from "@/lib/inviteTokens";
+import {
   fetchSubmissionsForHackathon,
   getHackathonsByIds,
   getUserAllowedHackathonIds,
   HACKATHON_STORAGE_KEYS,
   isHackathonId,
+  PORTAL_HACKATHONS,
   type HackathonId,
+  type PortalHackathon,
 } from "@/lib/hackathons";
+import { fetchPortalHackathonCatalog } from "@/lib/aiHackathons";
 import { canAccessStaffDashboard, isStaffRole } from "@/lib/portalRoutes";
 import { buildJudgeStatistics } from "@/lib/judgingStatistics";
 import {
@@ -105,22 +112,54 @@ export default function JudgeDashboardPage() {
 
   const allowedHackathonIds = useMemo<HackathonId[]>(() => {
     if (!sessionUser) return [];
-    return getUserAllowedHackathonIds({
+    const fromSession = getUserAllowedHackathonIds({
       hackathonId: sessionUser.hackathonId && isHackathonId(sessionUser.hackathonId)
         ? sessionUser.hackathonId
         : undefined,
       hackathonIds: (sessionUser.hackathonIds ?? []).filter(isHackathonId),
     });
+    const bootstrap = readJudgeWorkspaceBootstrap();
+    if (bootstrap && !fromSession.includes(bootstrap)) {
+      return [bootstrap, ...fromSession];
+    }
+    return fromSession;
   }, [sessionUser]);
 
+  useEffect(() => {
+    if (!sessionUser) return;
+    const bootstrap = readJudgeWorkspaceBootstrap();
+    if (!bootstrap) return;
+    const fromSession = getUserAllowedHackathonIds({
+      hackathonId: sessionUser.hackathonId && isHackathonId(sessionUser.hackathonId)
+        ? sessionUser.hackathonId
+        : undefined,
+      hackathonIds: (sessionUser.hackathonIds ?? []).filter(isHackathonId),
+    });
+    if (fromSession.includes(bootstrap)) {
+      clearJudgeWorkspaceBootstrap();
+    }
+  }, [sessionUser]);
+
+  const [eventCatalog, setEventCatalog] = useState<PortalHackathon[]>(PORTAL_HACKATHONS);
+
+  useEffect(() => {
+    void fetchPortalHackathonCatalog(db)
+      .then(setEventCatalog)
+      .catch((error: unknown) => {
+        console.warn("[judge] Could not load live event catalog.", error);
+      });
+  }, [db]);
+
   const allowedHackathons = useMemo(
-    () => getHackathonsByIds(allowedHackathonIds),
-    [allowedHackathonIds]
+    () => getHackathonsByIds(allowedHackathonIds, eventCatalog),
+    [allowedHackathonIds, eventCatalog]
   );
 
   const { selectedHackathonId, selectedHackathon, setSelectedHackathonId } = useHackathonSelection(
     HACKATHON_STORAGE_KEYS.judge,
-    allowedHackathonIds
+    allowedHackathonIds,
+    allowedHackathons,
+    { syncUrl: true, preferCurrent: true },
   );
   const canAccessSelectedHackathon = allowedHackathonIds.includes(selectedHackathonId);
   const { criteria: judgingCriteria, isLoading: isLoadingCriteria } =

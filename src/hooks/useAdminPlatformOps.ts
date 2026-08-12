@@ -8,9 +8,11 @@ import {
   getUserHackathonId,
   HACKATHON_STORAGE_KEYS,
   type HackathonId,
+  type PortalHackathon,
 } from "@/lib/hackathons";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
+import { useAdminHackathonCatalog } from "@/hooks/useAdminHackathonCatalog";
 import { calculateTotalFromCriteria } from "@/components/dashboard/judgingCriteria";
 import { sendParticipantEmail } from "@/lib/participantEmail";
 import {
@@ -84,10 +86,36 @@ const mapUserProfile = (data: Record<string, unknown>): UserProfile => ({
   profileUpdatedAt: getStringField(data.profileUpdatedAt),
 });
 
-export function useAdminPlatformOps() {
+type UseAdminPlatformOpsOptions = {
+  /**
+   * When set, skip the live admin catalog and use this list instead
+   * (host-owned / host-ops events).
+   */
+  catalogOverride?: PortalHackathon[];
+  /** localStorage key for the event switcher. */
+  storageKey?: string;
+  /** Clamp selection to these ids when using a scoped catalog. */
+  allowedHackathonIds?: HackathonId[];
+  /** When false, skip the admin catalog subscription (host portal). */
+  useAdminCatalog?: boolean;
+};
+
+export function useAdminPlatformOps(options: UseAdminPlatformOpsOptions = {}) {
+  const {
+    catalogOverride,
+    storageKey = HACKATHON_STORAGE_KEYS.admin,
+    allowedHackathonIds,
+    useAdminCatalog = catalogOverride === undefined,
+  } = options;
+
   const db = getFirestoreDb();
+  const { catalog: adminCatalog } = useAdminHackathonCatalog(db, useAdminCatalog);
+  const eventCatalog = catalogOverride ?? adminCatalog;
   const { selectedHackathonId, selectedHackathon, setSelectedHackathonId } = useHackathonSelection(
-    HACKATHON_STORAGE_KEYS.admin,
+    storageKey,
+    allowedHackathonIds,
+    eventCatalog,
+    { syncUrl: true },
   );
   const { criteria: judgingCriteria } = useHackathonCriteria(selectedHackathonId);
 
@@ -103,6 +131,15 @@ export function useAdminPlatformOps() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (catalogOverride !== undefined && catalogOverride.length === 0) {
+      setUsers([]);
+      setSubmissions([]);
+      setPlatformOps(emptyPlatformOps());
+      setIsLoading(false);
+      setStatusMessage(null);
+      return;
+    }
 
     const load = async () => {
       setIsLoading(true);
@@ -159,7 +196,7 @@ export function useAdminPlatformOps() {
     return () => {
       cancelled = true;
     };
-  }, [db, selectedHackathonId]);
+  }, [catalogOverride, db, selectedHackathonId]);
 
   const hackathonUsers = useMemo(
     () =>
@@ -509,6 +546,7 @@ export function useAdminPlatformOps() {
     selectedHackathonId,
     selectedHackathon,
     setSelectedHackathonId,
+    hackathons: eventCatalog,
     judgingCriteria,
     participants,
     submissionRows,

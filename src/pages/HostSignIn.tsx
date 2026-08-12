@@ -107,7 +107,7 @@ export default function HostSignIn() {
             <div>
               <p className="font-display text-xs font-semibold uppercase tracking-[0.24em] text-primary">Cognisor Event Operations</p>
               <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight md:text-3xl">Host portal</h1>
-              <p className="mt-2 text-sm text-muted-foreground">Create approved events, issue QR tickets, manage judges, and run check-in.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Create approved events, issue QR tickets, manage judges, run check-in, and review submissions & judging marks.</p>
             </div>
           </div>
           <Badge variant="outline" className="w-fit border-primary/40 bg-primary/10 uppercase tracking-[0.14em] text-primary">Approval required</Badge>

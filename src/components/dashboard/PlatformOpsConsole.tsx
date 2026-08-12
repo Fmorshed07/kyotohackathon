@@ -46,6 +46,8 @@ type LiveSubmission = {
 
 export type PlatformOpsLive = {
   hackathon: PortalHackathon;
+  /** Full admin catalog — switcher shows live/upcoming only. */
+  hackathons?: PortalHackathon[];
   participants: LiveParticipant[];
   submissions: LiveSubmission[];
   judgingCriteria: JudgingCriterion[];
@@ -179,6 +181,7 @@ function LivePlatformOpsConsole({ live }: { live: PlatformOpsLive }) {
   const [graphQuery, setGraphQuery] = useState("");
 
   const ops = live.ops ?? emptyPlatformOps();
+  const eventCatalog = live.hackathons?.length ? live.hackathons : PORTAL_HACKATHONS;
   const criteria = live.judgingCriteria.length
     ? live.judgingCriteria
     : [
@@ -381,7 +384,7 @@ function LivePlatformOpsConsole({ live }: { live: PlatformOpsLive }) {
           body: (
             <>
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {PORTAL_HACKATHONS.map((hackathon) => (
+                {eventCatalog.map((hackathon) => (
                   <ChipButton
                     key={hackathon.id}
                     active={live.hackathon.id === hackathon.id}

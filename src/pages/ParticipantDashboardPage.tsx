@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { getDashboardPathForUser } from "@/lib/portalRoutes";
 import { getFirestoreDb } from "@/lib/firebaseClient";
@@ -13,23 +13,24 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ParticipantDashboard } from "@/components/dashboard/ParticipantDashboard";
 import {
   buildParticipantHackathonSummaries,
+  collectAccessibleHackathonIds,
   filterSubmissionsByHackathon,
   getHackathonsByIds,
   getSubmissionHackathonId,
   getUserAllowedHackathonIds,
-  HACKATHON_PUBLIC_URLS,
+  getHackathonPublicUrl,
   HACKATHON_STORAGE_KEYS,
   isHackathonId,
+  nextEnrolledHackathonIds,
+  pickPreferredHackathonId,
   PORTAL_HACKATHONS,
   resolvePortalHackathon,
-  SITE_HACKATHON_ID,
   type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
 import {
   fetchJoinablePortalHackathons,
   fetchPortalHackathonCatalog,
-  getHostedHackathonUrl,
 } from "@/lib/aiHackathons";
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import {
@@ -190,13 +191,16 @@ const sortSubmissionsNewestFirst = (submissions: Submission[]) =>
 
 export default function ParticipantDashboardPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
+  const [searchParams] = useSearchParams();
   const db = getFirestoreDb();
   const [eventCatalog, setEventCatalog] = useState<PortalHackathon[]>(PORTAL_HACKATHONS);
+  const didApplyPreferredEvent = useRef(false);
   const [liveJoinableHackathons, setLiveJoinableHackathons] = useState<PortalHackathon[]>([]);
   const { selectedHackathonId, setSelectedHackathonId } = useHackathonSelection(
     HACKATHON_STORAGE_KEYS.participant,
     undefined,
-    eventCatalog
+    eventCatalog,
+    { preferCurrent: true },
   );
   const selectedHackathon = useMemo(
     () => resolvePortalHackathon(selectedHackathonId, eventCatalog),
@@ -241,28 +245,21 @@ export default function ParticipantDashboardPage() {
     memberNames: data.member_names ?? "",
   });
 
-  const accessibleHackathonIds = useMemo(() => {
-    const ids = new Set<HackathonId>();
+  const requestedHackathonId = useMemo(() => {
+    const value = searchParams.get("hackathon") ?? searchParams.get("event");
+    return value && isHackathonId(value) ? value : null;
+  }, [searchParams]);
 
-    for (const id of enrolledHackathonIds) {
-      if (isHackathonId(id)) ids.add(id);
-    }
-
-    for (const id of sessionUser?.hackathonIds ?? []) {
-      if (isHackathonId(id)) ids.add(id);
-    }
-
-    if (sessionUser?.hackathonId && isHackathonId(sessionUser.hackathonId)) {
-      ids.add(sessionUser.hackathonId);
-    }
-
-    for (const submission of allParticipantSubmissions) {
-      ids.add(getSubmissionHackathonId(submission));
-    }
-
-    // Keep enrolled / submitted events visible even when they are Firebase-only or past.
-    return Array.from(ids);
-  }, [allParticipantSubmissions, enrolledHackathonIds, sessionUser]);
+  const accessibleHackathonIds = useMemo(
+    () =>
+      collectAccessibleHackathonIds({
+        enrolledIds: enrolledHackathonIds,
+        sessionHackathonId: sessionUser?.hackathonId,
+        sessionHackathonIds: sessionUser?.hackathonIds,
+        submissions: allParticipantSubmissions,
+      }),
+    [allParticipantSubmissions, enrolledHackathonIds, sessionUser]
+  );
 
   const accessibleHackathons = useMemo(
     () => getHackathonsByIds(accessibleHackathonIds, eventCatalog),
@@ -315,11 +312,43 @@ export default function ParticipantDashboardPage() {
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
+    if (isLoadingWorkspace) return;
     if (accessibleHackathonIds.length === 0) return;
-    if (accessibleHackathonIds.includes(selectedHackathonId)) return;
-    setSelectedHackathonId(accessibleHackathonIds[0] ?? SITE_HACKATHON_ID);
+
+    if (requestedHackathonId && accessibleHackathonIds.includes(requestedHackathonId)) {
+      didApplyPreferredEvent.current = true;
+      if (selectedHackathonId !== requestedHackathonId) {
+        setSelectedHackathonId(requestedHackathonId);
+      }
+      return;
+    }
+
+    if (didApplyPreferredEvent.current) {
+      if (!accessibleHackathonIds.includes(selectedHackathonId)) {
+        const fallback = pickPreferredHackathonId(accessibleHackathonIds, {
+          primaryId: sessionUser.hackathonId,
+          submissionHackathonIds: allParticipantSubmissions.map(getSubmissionHackathonId),
+        });
+        if (fallback) setSelectedHackathonId(fallback);
+      }
+      return;
+    }
+
+    const preferred = pickPreferredHackathonId(accessibleHackathonIds, {
+      requestedId: requestedHackathonId,
+      storedId: selectedHackathonId,
+      primaryId: sessionUser.hackathonId,
+      submissionHackathonIds: allParticipantSubmissions.map(getSubmissionHackathonId),
+    });
+    didApplyPreferredEvent.current = true;
+    if (preferred && preferred !== selectedHackathonId) {
+      setSelectedHackathonId(preferred);
+    }
   }, [
     accessibleHackathonIds,
+    allParticipantSubmissions,
+    isLoadingWorkspace,
+    requestedHackathonId,
     selectedHackathonId,
     sessionUser,
     setSelectedHackathonId,
@@ -549,8 +578,9 @@ export default function ParticipantDashboardPage() {
         : now,
       updated_at: now,
     };
-    const nextHackathonIds = Array.from(
-      new Set<HackathonId>([...enrolledHackathonIds, selectedHackathonId, SITE_HACKATHON_ID])
+    const nextHackathonIds = nextEnrolledHackathonIds(
+      enrolledHackathonIds,
+      selectedHackathonId
     );
 
     const submissionRef = hasScopedSubmission
@@ -649,7 +679,7 @@ export default function ParticipantDashboardPage() {
     setIsJoiningHackathon(true);
     setSubmissionMessage(null);
     try {
-      const nextHackathonIds = Array.from(new Set<HackathonId>([...enrolledHackathonIds, hackathonId]));
+      const nextHackathonIds = nextEnrolledHackathonIds(enrolledHackathonIds, hackathonId);
       await setDoc(
         doc(db, "users", sessionUser.id),
         {
@@ -887,9 +917,7 @@ export default function ParticipantDashboardPage() {
         selectedHackathon={selectedHackathon}
         hackathonSummaries={hackathonSummaries}
         joinableHackathons={joinableHackathons}
-        publicSiteUrl={
-          HACKATHON_PUBLIC_URLS[selectedHackathonId] ?? getHostedHackathonUrl(selectedHackathonId)
-        }
+        publicSiteUrl={getHackathonPublicUrl(selectedHackathonId)}
         isLoadingWorkspace={isLoadingWorkspace}
         isReadOnly={isReadOnly}
         isJoiningHackathon={isJoiningHackathon}

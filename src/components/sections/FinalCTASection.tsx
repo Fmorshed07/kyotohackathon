@@ -8,7 +8,7 @@ const FinalCTASection = () => {
 
   return (
     <section
-      className="relative flex min-h-[75vh] flex-col items-center justify-center overflow-hidden px-6 py-28"
+      className="relative flex min-h-[70vh] flex-col items-center justify-center overflow-hidden px-4 py-20 sm:px-6 sm:py-28"
       id="cta"
     >
       <div ref={ref} className="absolute inset-0" />
@@ -73,14 +73,14 @@ const FinalCTASection = () => {
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5, delay: 0.32 }}
         >
-          <Link to="/signin" className="btn-poster-cta min-w-[200px]">
+          <Link to="/signin" className="btn-poster-cta w-full max-w-sm sm:w-auto sm:min-w-[200px]">
             Enter portal
           </Link>
           <a
             href="https://www.cognisorai.com"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-w-[200px] items-center justify-center rounded-md border border-white/20 bg-black/40 px-6 py-3.5 font-display text-sm font-medium tracking-[0.1em] text-white backdrop-blur-md transition-colors hover:border-primary/50"
+            className="inline-flex w-full max-w-sm items-center justify-center rounded-md border border-white/20 bg-black/40 px-6 py-3.5 font-display text-sm font-medium tracking-[0.1em] text-white backdrop-blur-md transition-colors hover:border-primary/50 sm:w-auto sm:min-w-[200px]"
           >
             cognisorai.com
           </a>

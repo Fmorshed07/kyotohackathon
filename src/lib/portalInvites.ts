@@ -292,12 +292,13 @@ export async function revokeJudgeInvite(db: Firestore, token: string): Promise<v
 /**
  * Apply a judge invite: approve the account and assign hackathon access.
  * Writes `invite_token` so Firestore rules can verify the open portal invite.
+ * `primaryHackathonId` is the invite's dedicated event (first assigned id).
  */
 export async function redeemJudgeInvite(
   db: Firestore,
   token: string,
   user: { userId: string; email: string; existingHackathonIds?: string[] }
-): Promise<{ hackathonIds: string[] }> {
+): Promise<{ hackathonIds: string[]; primaryHackathonId: string | null }> {
   const invite = await getJudgeInvite(db, token);
   if (!invite || invite.status !== "open") {
     throw new Error("This judge invite is invalid or has been revoked.");
@@ -305,12 +306,16 @@ export async function redeemJudgeInvite(
   if (invite.max_uses != null && invite.use_count >= invite.max_uses) {
     throw new Error("This judge invite has reached its use limit.");
   }
+
+  const primaryHackathonId = invite.hackathon_ids[0] ?? null;
+
   if (invite.used_by?.includes(user.userId)) {
-    return { hackathonIds: invite.hackathon_ids };
+    return { hackathonIds: invite.hackathon_ids, primaryHackathonId };
   }
 
+  // Prefer the invited event as the active workspace, then keep any prior enrollments.
   const nextHackathonIds = Array.from(
-    new Set([...(user.existingHackathonIds ?? []), ...invite.hackathon_ids])
+    new Set([...invite.hackathon_ids, ...(user.existingHackathonIds ?? [])].filter(Boolean))
   );
 
   await setDoc(
@@ -319,7 +324,7 @@ export async function redeemJudgeInvite(
       email: user.email,
       role: "judge",
       judgeApprovalStatus: "approved",
-      hackathon_id: nextHackathonIds[0] ?? invite.hackathon_ids[0],
+      hackathon_id: primaryHackathonId ?? nextHackathonIds[0] ?? null,
       hackathon_ids: nextHackathonIds,
       invite_token: token,
     },
@@ -331,5 +336,5 @@ export async function redeemJudgeInvite(
     used_by: arrayUnion(user.userId),
   });
 
-  return { hackathonIds: nextHackathonIds };
+  return { hackathonIds: nextHackathonIds, primaryHackathonId };
 }

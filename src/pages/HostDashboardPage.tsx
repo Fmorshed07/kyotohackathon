@@ -9,6 +9,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { Activity, Radar } from "lucide-react";
 import { DashboardLayout, sectionClass } from "@/components/dashboard/DashboardLayout";
 import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
 import {
@@ -22,10 +23,12 @@ import { Input } from "@/components/ui/input";
 import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { hostEventsToPortalHackathons } from "@/hooks/useHostOpsCatalog";
 import {
   fetchHackathonForAdmin,
   getHackathonVisibilityLabel,
   getHostedHackathonUrl,
+  hostedToPortalHackathon,
   publishHostEventPublicly,
   setHackathonPublished,
   setHackathonStatus,
@@ -33,7 +36,7 @@ import {
 } from "@/lib/aiHackathons";
 import { formDraftStorageKey } from "@/lib/formDrafts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { type HackathonStatus } from "@/lib/hackathons";
+import { type HackathonStatus, type PortalHackathon } from "@/lib/hackathons";
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import { createJudgeInvite } from "@/lib/portalInvites";
 import {
@@ -55,6 +58,10 @@ import {
   getEventLayoutStyle,
   normalizeAccentHex,
 } from "@/lib/eventBranding";
+import {
+  HostEventJudgingWorkspace,
+  HostJudgingUnavailableNotice,
+} from "@/components/dashboard/HostEventJudgingWorkspace";
 
 const emptyEventForm = emptyHostEventBriefForm;
 
@@ -108,6 +115,8 @@ export default function HostDashboardPage() {
   const [tickets, setTickets] = useState<HostEventTicket[]>([]);
   const [judges, setJudges] = useState<HostEventJudge[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>("");
+  /** Last existing event the host was editing — used to resume from “New draft”. */
+  const [lastEditedEventId, setLastEditedEventId] = useState<string>("");
   const [eventForm, setEventForm] = useState<HostEventBriefForm>(() => emptyEventForm());
   const [ticketForm, setTicketForm] = useState(emptyTicketForm);
   const [judgeForm, setJudgeForm] = useState(emptyJudgeForm);
@@ -131,6 +140,34 @@ export default function HostDashboardPage() {
     [events, selectedEventId],
   );
 
+  const isNewDraftMode = !selectedEventId;
+
+  const ongoingEditEventId = useMemo(() => {
+    if (lastEditedEventId && events.some((event) => event.id === lastEditedEventId)) {
+      return lastEditedEventId;
+    }
+    const sorted = [...events].sort((a, b) =>
+      (b.updated_at || b.created_at || "").localeCompare(a.updated_at || a.created_at || ""),
+    );
+    return sorted[0]?.id ?? "";
+  }, [events, lastEditedEventId]);
+
+  const beginNewDraft = () => {
+    if (selectedEventId) setLastEditedEventId(selectedEventId);
+    setSelectedEventId("");
+    setEventForm(emptyEventForm());
+    setEventFormBaseline(emptyEventForm());
+    setPublicListing(null);
+    setMessage(null);
+  };
+
+  const resumeOngoingEdit = () => {
+    if (!ongoingEditEventId) return;
+    setSelectedEventId(ongoingEditEventId);
+    setLastEditedEventId(ongoingEditEventId);
+    setMessage(null);
+  };
+
   const eventTickets = useMemo(
     () => tickets.filter((ticket) => ticket.event_id === selectedEventId),
     [selectedEventId, tickets],
@@ -140,6 +177,18 @@ export default function HostDashboardPage() {
     () => judges.filter((judge) => judge.event_id === selectedEventId),
     [judges, selectedEventId],
   );
+
+  const hostBoardHackathons = useMemo(
+    (): PortalHackathon[] => hostEventsToPortalHackathons(events),
+    [events],
+  );
+
+  const selectedPortalHackathon = useMemo((): PortalHackathon | null => {
+    if (publicListing) return hostedToPortalHackathon(publicListing);
+    const publicId = selectedEvent?.public_hackathon_id?.trim();
+    if (!publicId) return null;
+    return hostBoardHackathons.find((event) => event.id === publicId) ?? null;
+  }, [publicListing, selectedEvent?.public_hackathon_id, hostBoardHackathons]);
 
   useEffect(() => {
     if (!selectedEvent) {
@@ -270,6 +319,7 @@ export default function HostDashboardPage() {
           judgesSnap.docs.map((item) => mapJudge(item.id, item.data() as Record<string, unknown>)),
         );
         setSelectedEventId((current) => current || nextEvents[0]?.id || "");
+        setLastEditedEventId((current) => current || nextEvents[0]?.id || "");
       } catch (error) {
         setMessage(
           error instanceof Error ? error.message : "Unable to load host dashboard data.",
@@ -697,7 +747,9 @@ export default function HostDashboardPage() {
         label: selectedEvent?.name || "Host judge invite",
       });
       setPortalJudgeInviteUrl(buildInviteUrl("judge", invite.token));
-      setPortalJudgeInviteMessage("Portal invite ready — judges get direct access after Google signup.");
+      setPortalJudgeInviteMessage(
+        "Portal invite ready — judges open the link, sign in with Google, and land on this event’s judge dashboard."
+      );
     } catch (error) {
       setPortalJudgeInviteMessage(
         error instanceof Error ? error.message : "Unable to create portal invite."
@@ -754,9 +806,14 @@ export default function HostDashboardPage() {
   };
 
   return (
-    <DashboardLayout sessionUser={sessionUser} role="host" onSignOut={signOut}>
+    <DashboardLayout
+      sessionUser={sessionUser}
+      role="host"
+      onSignOut={signOut}
+      hackathons={hostBoardHackathons}
+    >
       <div className="space-y-8">
-        <section className={`${sectionClass} p-6`}>
+        <section id="overview" className={`${sectionClass} p-6`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Host portal</p>
@@ -764,7 +821,8 @@ export default function HostDashboardPage() {
                 Event operations
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Create events, publish them publicly, issue QR tickets, run check-in, and manage judges.
+                Create events, publish them publicly, screen applicants, run live operations, issue
+                QR tickets, manage judges, review submissions, and track judging marks.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -773,6 +831,18 @@ export default function HostDashboardPage() {
                   <Link to="/dashboard/admin">Back to admin</Link>
                 </Button>
               ) : null}
+              <Button asChild variant="outline" size="sm" className="gap-1.5">
+                <Link to="/dashboard/host/screening">
+                  <Radar className="h-4 w-4" />
+                  Screening agent
+                </Link>
+              </Button>
+              <Button asChild size="sm" className="gap-1.5">
+                <Link to="/dashboard/host/operations">
+                  <Activity className="h-4 w-4" />
+                  Operations
+                </Link>
+              </Button>
               <Badge variant="outline" className="uppercase tracking-[0.14em]">
                 {sessionUser.role === "admin"
                   ? "Admin"
@@ -819,17 +889,24 @@ export default function HostDashboardPage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                variant="outline"
-                onClick={() => {
-                  setSelectedEventId("");
-                  setEventForm(emptyEventForm());
-                  setEventFormBaseline(emptyEventForm());
-                  setPublicListing(null);
-                  setMessage(null);
-                }}
+                variant={isNewDraftMode ? "default" : "outline"}
+                onClick={beginNewDraft}
                 disabled={isBusy}
               >
                 New draft
+              </Button>
+              <Button
+                type="button"
+                variant={isNewDraftMode ? "outline" : "default"}
+                onClick={resumeOngoingEdit}
+                disabled={isBusy || !ongoingEditEventId}
+                title={
+                  ongoingEditEventId
+                    ? "Continue editing your latest event draft or listing"
+                    : "Create an event first to enable ongoing edit"
+                }
+              >
+                Ongoing edit
               </Button>
             </div>
           </div>
@@ -844,12 +921,12 @@ export default function HostDashboardPage() {
               status: event.status,
             }))}
             onSelectEvent={(eventId) => {
-              setSelectedEventId(eventId);
               if (!eventId) {
-                setEventForm(emptyEventForm());
-                setEventFormBaseline(emptyEventForm());
-                setPublicListing(null);
+                beginNewDraft();
+                return;
               }
+              setSelectedEventId(eventId);
+              setLastEditedEventId(eventId);
             }}
             uploaderId={sessionUser.id}
             disabled={isBusy}
@@ -1132,6 +1209,15 @@ export default function HostDashboardPage() {
             ) : null}
           </div>
         </section>
+
+        {selectedPortalHackathon ? (
+          <HostEventJudgingWorkspace
+            hackathon={selectedPortalHackathon}
+            onMessage={setMessage}
+          />
+        ) : (
+          <HostJudgingUnavailableNotice />
+        )}
       </div>
     </DashboardLayout>
   );

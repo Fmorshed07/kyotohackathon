@@ -7,7 +7,7 @@ const CognisorSection = () => {
   const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.08 });
 
   return (
-    <section className="relative min-h-screen px-6 py-32" id="cognisor">
+    <section className="relative min-h-svh px-4 py-20 sm:px-6 sm:py-28 md:py-32" id="cognisor">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute left-1/2 top-24 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/10 blur-[120px]" />
         <div className="absolute right-0 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-secondary/10 blur-[120px]" />
@@ -37,7 +37,7 @@ const CognisorSection = () => {
           <BrandLogo size="xl" href="https://cognisorai.com" />
         </motion.div>
         <motion.h2
-          className="mt-5 font-display text-5xl font-bold tracking-wide md:text-6xl lg:text-7xl"
+          className="mt-5 font-display text-4xl font-bold tracking-wide sm:text-5xl md:text-6xl lg:text-7xl"
           initial={{ opacity: 0, y: 30 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.8, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}

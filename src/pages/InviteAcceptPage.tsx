@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Scale, Users } from "lucide-react";
 import AnimatedBackground from "@/components/AnimatedBackground";
@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { getHackathonById } from "@/lib/hackathons";
+import { getHackathonById, getJudgeEventWorkspacePath, isHackathonId } from "@/lib/hackathons";
 import {
   clearPendingInvite,
+  getJudgeDashboardPathAfterInvite,
   stashPendingInvite,
 } from "@/lib/inviteTokens";
 import {
@@ -18,7 +19,6 @@ import {
   getTeamInvite,
   redeemJudgeInvite,
 } from "@/lib/portalInvites";
-import { getDashboardPathForUser, participantNeedsOnboarding } from "@/lib/portalRoutes";
 import type { PortalJudgeInvite, TeamInvite } from "@/types/portal";
 
 type InviteKind = "team" | "judge";
@@ -37,6 +37,12 @@ export default function InviteAcceptPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActing, setIsActing] = useState(false);
   const [isLoadingInvite, setIsLoadingInvite] = useState(true);
+  const autoRedeemAttempted = useRef(false);
+
+  const judgePrimaryHackathonId = judgeInvite?.hackathon_ids.find(isHackathonId) ?? null;
+  const judgeDashboardPath = judgePrimaryHackathonId
+    ? getJudgeEventWorkspacePath(judgePrimaryHackathonId)
+    : "/dashboard/judge";
 
   useEffect(() => {
     if (!inviteKind || !token) {
@@ -118,13 +124,13 @@ export default function InviteAcceptPage() {
     setIsActing(true);
     setActionError(null);
     try {
-      await redeemJudgeInvite(db, token, {
+      const result = await redeemJudgeInvite(db, token, {
         userId: sessionUser.id,
         email: sessionUser.email,
         existingHackathonIds: sessionUser.hackathonIds,
       });
       clearPendingInvite("judge");
-      navigate("/dashboard/judge", { replace: true });
+      navigate(getJudgeDashboardPathAfterInvite(result.primaryHackathonId), { replace: true });
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : "Unable to activate judge access."
@@ -133,6 +139,29 @@ export default function InviteAcceptPage() {
       setIsActing(false);
     }
   };
+
+  // Signed-in judges/mentors (or accounts without a role yet) redeem and open the event workspace.
+  useEffect(() => {
+    if (authLoading || isLoadingInvite || inviteKind !== "judge" || !token || !judgeInvite) return;
+    if (!sessionUser) return;
+    const eligible =
+      sessionUser.role === "judge" ||
+      sessionUser.role === "mentor" ||
+      !sessionUser.role;
+    if (!eligible || sessionUser.role === "admin") return;
+    if (autoRedeemAttempted.current || isActing) return;
+    autoRedeemAttempted.current = true;
+    void handleRedeemJudge();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot auto redeem for invite deep links
+  }, [
+    authLoading,
+    isLoadingInvite,
+    inviteKind,
+    token,
+    judgeInvite,
+    sessionUser,
+    isActing,
+  ]);
 
   const goSignUp = () => {
     if (!inviteKind || !token) return;
@@ -225,12 +254,13 @@ export default function InviteAcceptPage() {
             ) : inviteKind === "judge" && judgeInvite ? (
               <>
                 <p className="text-sm text-muted-foreground">
-                  This link grants direct access to the judging portal
+                  This link grants direct access to the judging portal for the assigned event
                   {judgeInvite.label ? ` (${judgeInvite.label})` : ""}.
                 </p>
                 {judgeHackathonLabels.length > 0 ? (
                   <p className="text-sm text-foreground">
-                    Events: {judgeHackathonLabels.join(", ")}
+                    Event{judgeHackathonLabels.length > 1 ? "s" : ""}:{" "}
+                    {judgeHackathonLabels.join(", ")}
                   </p>
                 ) : null}
                 {sessionUser &&
@@ -238,7 +268,7 @@ export default function InviteAcceptPage() {
                   sessionUser.role === "mentor" ||
                   !sessionUser.role) ? (
                   <Button type="button" disabled={isActing} onClick={() => void handleRedeemJudge()}>
-                    {isActing ? "Activating…" : "Open judge portal"}
+                    {isActing ? "Opening event workspace…" : "Open event judge dashboard"}
                   </Button>
                 ) : sessionUser?.role === "admin" ? (
                   <Button asChild>
@@ -259,13 +289,10 @@ export default function InviteAcceptPage() {
                   </div>
                 )}
                 {sessionUser &&
-                participantNeedsOnboarding(sessionUser) === false &&
                 sessionUser.role === "judge" &&
                 sessionUser.judgeApprovalStatus !== "pending" ? (
                   <Button asChild variant="ghost">
-                    <Link to={getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus)}>
-                      Go to dashboard
-                    </Link>
+                    <Link to={judgeDashboardPath}>Go to event dashboard</Link>
                   </Button>
                 ) : null}
               </>

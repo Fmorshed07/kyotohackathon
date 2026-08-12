@@ -295,7 +295,7 @@ const LookingForJobsSection = () => {
               href={PEER_PORTAL_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-poster-cta inline-flex min-w-[240px] items-center justify-center gap-2"
+              className="btn-poster-cta inline-flex w-full max-w-sm items-center justify-center gap-2 sm:w-auto sm:min-w-[240px]"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
@@ -306,7 +306,7 @@ const LookingForJobsSection = () => {
               href={COGNISOR_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-w-[200px] items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-6 py-3.5 font-display text-sm font-medium tracking-[0.12em] text-primary transition-colors hover:bg-primary/20"
+              className="inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-6 py-3.5 font-display text-sm font-medium tracking-[0.12em] text-primary transition-colors hover:bg-primary/20 sm:w-auto sm:min-w-[200px]"
             >
               Visit Cognisor AI
               <ExternalLink className="h-4 w-4" aria-hidden />

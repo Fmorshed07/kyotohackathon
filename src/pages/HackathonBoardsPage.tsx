@@ -16,17 +16,22 @@ import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import {
   buildParticipantHackathonSummaries,
+  collectAccessibleHackathonIds,
   DEFAULT_HACKATHON_ID,
-  getHackathonById,
+  getEventBoardPath,
+  getHackathonsByIds,
+  getParticipantEventWorkspacePath,
   getSubmissionHackathonId,
   getUserAllowedHackathonIds,
   isHackathonId,
+  pickPreferredHackathonId,
   PORTAL_HACKATHONS,
-  SITE_HACKATHON_ID,
+  resolvePortalHackathon,
   submissionBelongsToHackathon,
   type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
+import { fetchPortalHackathonCatalog } from "@/lib/aiHackathons";
 import { getDashboardPathForUser } from "@/lib/portalRoutes";
 import type { Submission } from "@/types/portal";
 import { cn } from "@/lib/utils";
@@ -178,18 +183,19 @@ export default function HackathonBoardsPage() {
   const { sessionUser, loading: authLoading } = usePortalAuth();
   const db = getFirestoreDb();
 
-  const selectedHackathonId: HackathonId =
-    hackathonIdParam && isHackathonId(hackathonIdParam)
-      ? hackathonIdParam
-      : DEFAULT_HACKATHON_ID;
+  const requestedHackathonId: HackathonId | null =
+    hackathonIdParam && isHackathonId(hackathonIdParam) ? hackathonIdParam : null;
 
-  const selectedHackathon = getHackathonById(selectedHackathonId);
+  const [eventCatalog, setEventCatalog] = useState<PortalHackathon[]>(PORTAL_HACKATHONS);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [mySubmissions, setMySubmissions] = useState<Submission[]>([]);
   const [enrolledHackathonIds, setEnrolledHackathonIds] = useState<HackathonId[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "ready" | "submitted" | "draft">("all");
+
+  const selectedHackathonId: HackathonId = requestedHackathonId ?? DEFAULT_HACKATHON_ID;
+  const selectedHackathon = resolvePortalHackathon(selectedHackathonId, eventCatalog);
 
   useEffect(() => {
     if (!sessionUser) return;
@@ -204,33 +210,46 @@ export default function HackathonBoardsPage() {
         hackathon_ids: sessionUser.hackathonIds,
       });
 
+      const catalog = await fetchPortalHackathonCatalog(db).catch(() => PORTAL_HACKATHONS);
+
       // Opt-in board feed: public_projects is readable without private submission access.
-      const boardRows = await getDocs(collection(db, "public_projects"))
-        .then((snapshot) =>
-          snapshot.docs
+      const boardQuery = requestedHackathonId
+        ? getDocs(collection(db, "public_projects"))
+        : Promise.resolve(null);
+
+      const [boardSnapshot, ownSnapshot] = await Promise.all([
+        boardQuery
+          .then((snapshot) => snapshot)
+          .catch(() => null),
+        getDocs(query(collection(db, "submissions"), where("user_id", "==", sessionUser.id))).catch(
+          () => null,
+        ),
+      ]);
+
+      const ownRows = ownSnapshot
+        ? (ownSnapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<Submission, "id">),
+          })) as Submission[])
+        : [];
+
+      const boardRows = boardSnapshot
+        ? boardSnapshot.docs
             .map((docSnap) => mapPublicProject(docSnap.id, docSnap.data() as PublicProjectDoc))
             .filter((project): project is Submission => project != null)
-            .filter((project) => submissionBelongsToHackathon(project, selectedHackathonId))
-            .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")),
-        )
-        .catch(() => [] as Submission[]);
-
-      const ownRows = await getDocs(
-        query(collection(db, "submissions"), where("user_id", "==", sessionUser.id)),
-      )
-        .then(
-          (snapshot) =>
-            snapshot.docs.map((docSnap) => ({
-              id: docSnap.id,
-              ...(docSnap.data() as Omit<Submission, "id">),
-            })) as Submission[],
-        )
-        .catch(() => [] as Submission[]);
+            .filter((project) =>
+              requestedHackathonId
+                ? submissionBelongsToHackathon(project, requestedHackathonId)
+                : false,
+            )
+            .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+        : [];
 
       if (!cancelled) {
+        setEventCatalog(catalog);
         setSubmissions(boardRows);
         setMySubmissions(ownRows);
-        setEnrolledHackathonIds(allowedIds.length > 0 ? allowedIds : []);
+        setEnrolledHackathonIds(allowedIds);
         setIsLoading(false);
       }
     };
@@ -239,28 +258,56 @@ export default function HackathonBoardsPage() {
     return () => {
       cancelled = true;
     };
-  }, [db, selectedHackathonId, sessionUser]);
+  }, [db, requestedHackathonId, sessionUser]);
+
+  const accessibleHackathonIds = useMemo(
+    () =>
+      collectAccessibleHackathonIds({
+        enrolledIds: enrolledHackathonIds,
+        sessionHackathonId: sessionUser?.hackathonId,
+        sessionHackathonIds: sessionUser?.hackathonIds,
+        submissions: mySubmissions,
+      }),
+    [enrolledHackathonIds, mySubmissions, sessionUser],
+  );
 
   const myHackathonSummaries = useMemo(
-    () => buildParticipantHackathonSummaries(mySubmissions, enrolledHackathonIds),
-    [enrolledHackathonIds, mySubmissions],
+    () => buildParticipantHackathonSummaries(mySubmissions, enrolledHackathonIds, eventCatalog),
+    [enrolledHackathonIds, eventCatalog, mySubmissions],
   );
 
   const boardHackathons = useMemo(() => {
-    if (sessionUser?.role === "admin" || sessionUser?.role === "host") {
-      return PORTAL_HACKATHONS;
-    }
+    const catalog =
+      sessionUser?.role === "admin" || sessionUser?.role === "host"
+        ? eventCatalog
+        : getHackathonsByIds(accessibleHackathonIds, eventCatalog);
+    // Boards nav: live + upcoming — past editions stay off the switcher.
+    return catalog.filter(
+      (hackathon) => hackathon.status === "active" || hackathon.status === "upcoming",
+    );
+  }, [accessibleHackathonIds, eventCatalog, sessionUser?.role]);
 
-    const enrolled = new Set(enrolledHackathonIds);
-    if (sessionUser?.role === "participant") {
-      for (const submission of mySubmissions) {
-        enrolled.add(getSubmissionHackathonId(submission));
-      }
-    }
-
-    // Participants, judges, and mentors only see boards for assigned events.
-    return PORTAL_HACKATHONS.filter((hackathon) => enrolled.has(hackathon.id));
-  }, [enrolledHackathonIds, mySubmissions, sessionUser?.role]);
+  const preferredBoardId = useMemo(
+    () =>
+      pickPreferredHackathonId(accessibleHackathonIds, {
+        requestedId: requestedHackathonId,
+        primaryId: sessionUser?.hackathonId,
+        submissionHackathonIds: mySubmissions.map(getSubmissionHackathonId),
+      }) ??
+      (sessionUser?.role === "admin" || sessionUser?.role === "host"
+        ? boardHackathons[0]?.id ??
+          eventCatalog.find((entry) => entry.status === "active" || entry.status === "upcoming")?.id ??
+          null
+        : null),
+    [
+      accessibleHackathonIds,
+      boardHackathons,
+      eventCatalog,
+      mySubmissions,
+      requestedHackathonId,
+      sessionUser,
+    ],
+  );
 
   const ownSubmissionOnBoard = useMemo(
     () =>
@@ -291,7 +338,7 @@ export default function HackathonBoardsPage() {
     });
   }, [searchQuery, statusFilter, submissions]);
 
-  if (authLoading) {
+  if (authLoading || (sessionUser && isLoading)) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Loading boards...</p>
@@ -307,24 +354,22 @@ export default function HackathonBoardsPage() {
     sessionUser.role,
     sessionUser.judgeApprovalStatus,
   );
+  const canBrowseAllBoards = sessionUser.role === "admin" || sessionUser.role === "host";
+  const canViewSelected =
+    canBrowseAllBoards || accessibleHackathonIds.includes(selectedHackathonId);
 
-  // Keep participants and staff on their assigned event boards only.
-  if (
-    (sessionUser.role === "participant" ||
-      sessionUser.role === "judge" ||
-      sessionUser.role === "mentor") &&
-    !isLoading
-  ) {
-    const canViewSelected = boardHackathons.some(
-      (hackathon) => hackathon.id === selectedHackathonId,
-    );
-    if (!canViewSelected) {
-      const fallbackId = boardHackathons[0]?.id;
-      if (fallbackId) {
-        return <Navigate to={`/boards/${fallbackId}`} replace />;
-      }
-      return <Navigate to={dashboardPath} replace />;
+  if (!requestedHackathonId) {
+    if (preferredBoardId) {
+      return <Navigate to={getEventBoardPath(preferredBoardId)} replace />;
     }
+    return <Navigate to={dashboardPath} replace />;
+  }
+
+  if (!canViewSelected) {
+    if (preferredBoardId && preferredBoardId !== requestedHackathonId) {
+      return <Navigate to={getEventBoardPath(preferredBoardId)} replace />;
+    }
+    return <Navigate to={dashboardPath} replace />;
   }
 
   return (
@@ -392,7 +437,7 @@ export default function HackathonBoardsPage() {
                   return (
                     <li key={summary.hackathon.id}>
                       <Link
-                        to={`/boards/${summary.hackathon.id}`}
+                        to={getEventBoardPath(summary.hackathon.id)}
                         className={cn(
                           "block rounded-lg border px-3 py-2.5 transition-colors",
                           isActive
@@ -445,7 +490,7 @@ export default function HackathonBoardsPage() {
                 return (
                   <li key={hackathon.id}>
                     <Link
-                      to={`/boards/${hackathon.id}`}
+                      to={getEventBoardPath(hackathon.id)}
                       className={cn(
                         "flex items-start gap-2 rounded-lg border px-3 py-2.5 transition-colors",
                         isActive
@@ -549,11 +594,23 @@ export default function HackathonBoardsPage() {
                 No projects on this board yet
               </p>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                Opt-in projects for {selectedHackathon.name} will appear here once participants share them.
+                {sessionUser.role === "participant"
+                  ? `Opt-in projects for ${selectedHackathon.name} will appear here once you and other participants share them.`
+                  : `Opt-in projects for ${selectedHackathon.name} will appear here once participants share them. Admins do not submit entries on this board.`}
               </p>
-              <Button asChild className="mt-6">
-                <Link to="/dashboard/participant">Submit your project</Link>
-              </Button>
+              {sessionUser.role === "participant" ? (
+                <Button asChild className="mt-6">
+                  <Link to={getParticipantEventWorkspacePath(selectedHackathonId)}>
+                    Submit your project
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline" className="mt-6">
+                  <Link to={getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus)}>
+                    Back to dashboard
+                  </Link>
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">

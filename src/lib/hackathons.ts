@@ -14,6 +14,12 @@ export type HackathonId = string;
 
 export type HackathonStatus = "active" | "upcoming" | "past";
 
+export const STATUS_ORDER: Record<HackathonStatus, number> = {
+  active: 0,
+  upcoming: 1,
+  past: 2,
+};
+
 export type PortalHackathon = {
   id: HackathonId;
   name: string;
@@ -24,7 +30,10 @@ export type PortalHackathon = {
   status: HackathonStatus;
 };
 
-/** Active hackathon for this site deployment (Impact Kyoto). */
+/**
+ * Site landing edition (Impact Kyoto). Live hosted events (AI Ideathon, etc.)
+ * come from Firestore and merge into dashboards dynamically — do not hardcode them here.
+ */
 export const SITE_HACKATHON_ID: HackathonId = "impact-kyoto";
 
 /** Legacy submissions without `hackathon_id` belong to Impact Tokyo. */
@@ -32,6 +41,7 @@ export const LEGACY_HACKATHON_ID: HackathonId = "impact-tokyo";
 
 export const DEFAULT_HACKATHON_ID = SITE_HACKATHON_ID;
 
+/** Fixed Impact editions only. Hosted events are loaded from the `hackathons` collection. */
 export const PORTAL_HACKATHONS: PortalHackathon[] = [
   {
     id: "impact-kyoto",
@@ -40,7 +50,7 @@ export const PORTAL_HACKATHONS: PortalHackathon[] = [
     eventDate: "4th July 2026",
     location: "Kyoto, Japan",
     theme: "Agentic AI for Japan's Future",
-    status: "active",
+    status: "past",
   },
   {
     id: "impact-tokyo",
@@ -58,7 +68,7 @@ export const PORTAL_HACKATHONS: PortalHackathon[] = [
     eventDate: "Date TBA",
     location: "Dhaka, Bangladesh",
     theme: "AI for Urban Transformation",
-    status: "upcoming",
+    status: "past",
   },
 ];
 
@@ -184,14 +194,164 @@ export async function fetchSubmissionsForHackathon(
 
 export const HACKATHON_STORAGE_KEYS = {
   admin: "portal_selected_hackathon_admin",
+  host: "portal_selected_hackathon_host",
   judge: "portal_selected_hackathon_judge",
   participant: "portal_selected_hackathon_participant",
 } as const;
 
-/** Public event sites participants can open from the dashboard. */
+/** External public sites for legacy Impact editions (hosted events use `/events/:id`). */
 export const HACKATHON_PUBLIC_URLS: Partial<Record<HackathonId, string>> = {
   "impact-tokyo": "https://tokyohacackathon.vercel.app/",
   "impact-dhaka": "https://impactdhaka.vercel.app/",
+};
+
+/** Public URL for any event id — external map when set, otherwise dynamic `/events/:id`. */
+export const getHackathonPublicUrl = (hackathonId: HackathonId) =>
+  HACKATHON_PUBLIC_URLS[hackathonId] ?? `/events/${encodeURIComponent(hackathonId)}`;
+
+export const getEventBoardPath = (hackathonId: HackathonId) =>
+  `/boards/${encodeURIComponent(hackathonId)}`;
+
+export const getParticipantEventWorkspacePath = (hackathonId: HackathonId) =>
+  `/dashboard/participant?hackathon=${encodeURIComponent(hackathonId)}`;
+
+export const getAdminEventWorkspacePath = (hackathonId: HackathonId) =>
+  `/dashboard/admin?hackathon=${encodeURIComponent(hackathonId)}`;
+
+export const getJudgeEventWorkspacePath = (hackathonId: HackathonId) =>
+  `/dashboard/judge?hackathon=${encodeURIComponent(hackathonId)}`;
+
+/** Prefer the live event in a catalog (active → upcoming → first). */
+export const pickDefaultHackathonId = (
+  catalog: PortalHackathon[] = PORTAL_HACKATHONS,
+): HackathonId => {
+  const active = catalog.find((entry) => entry.status === "active");
+  if (active) return active.id;
+  const upcoming = catalog.find((entry) => entry.status === "upcoming");
+  if (upcoming) return upcoming.id;
+  return catalog[0]?.id ?? DEFAULT_HACKATHON_ID;
+};
+
+/**
+ * Admin / ops event switcher catalog: static editions + hosted Firebase events.
+ * Hosted rows win on id collisions so live status/publish state is accurate.
+ */
+export const buildAdminHackathonCatalog = (
+  hosted: PortalHackathon[],
+  portal: PortalHackathon[] = PORTAL_HACKATHONS,
+): PortalHackathon[] => {
+  const merged = mergeHackathonCatalogs(portal, hosted);
+  return [...merged].sort((left, right) => {
+    const byStatus = STATUS_ORDER[left.status] - STATUS_ORDER[right.status];
+    if (byStatus !== 0) return byStatus;
+    return left.name.localeCompare(right.name);
+  });
+};
+
+/** Live + upcoming editions — past events stay out of ops / board switchers. */
+export const isCurrentHackathon = (
+  hackathon: Pick<PortalHackathon, "status">,
+): boolean => hackathon.status === "active" || hackathon.status === "upcoming";
+
+/**
+ * Switcher lists for admin ops, sidebar, and boards.
+ * Keeps `includeId` visible when an admin is still on a past edition.
+ * Returns an empty list when nothing is live/upcoming (no past fallback).
+ */
+export const filterCurrentHackathons = (
+  catalog: PortalHackathon[],
+  options?: { includeId?: HackathonId | null },
+): PortalHackathon[] => {
+  const includeId = options?.includeId;
+  return catalog.filter(
+    (hackathon) => isCurrentHackathon(hackathon) || hackathon.id === includeId,
+  );
+};
+
+/** Enroll the event being saved — never silently add the site default (Impact Kyoto). */
+export const nextEnrolledHackathonIds = (
+  existing: HackathonId[],
+  selected: HackathonId
+): HackathonId[] => {
+  const ids: HackathonId[] = [];
+  const seen = new Set<string>();
+  const push = (candidate: unknown) => {
+    if (typeof candidate !== "string" || !isHackathonId(candidate) || seen.has(candidate)) {
+      return;
+    }
+    seen.add(candidate);
+    ids.push(candidate);
+  };
+  for (const id of existing) push(id);
+  push(selected);
+  return ids;
+};
+
+export type PreferredHackathonOptions = {
+  requestedId?: HackathonId | null;
+  storedId?: HackathonId | null;
+  primaryId?: HackathonId | null;
+  submissionHackathonIds?: HackathonId[];
+};
+
+/**
+ * Pick which event board/workspace to open.
+ * Query/path id wins, then an event the user submitted to (so a stale Kyoto
+ * default cannot hide AI Ideathon work), then stored/primary enrollment.
+ */
+export const pickPreferredHackathonId = (
+  accessibleIds: HackathonId[],
+  options: PreferredHackathonOptions = {}
+): HackathonId | null => {
+  const accessible = Array.from(new Set(accessibleIds.filter(isHackathonId)));
+  if (accessible.length === 0) return null;
+
+  const requested = options.requestedId;
+  if (requested && isHackathonId(requested) && accessible.includes(requested)) {
+    return requested;
+  }
+
+  const submissionIds = (options.submissionHackathonIds ?? []).filter(
+    (id) => isHackathonId(id) && accessible.includes(id)
+  );
+
+  const stored = options.storedId;
+  if (stored && isHackathonId(stored) && accessible.includes(stored)) {
+    const storedHasWork = submissionIds.includes(stored);
+    if (storedHasWork || submissionIds.length === 0) return stored;
+    if (stored === SITE_HACKATHON_ID) return submissionIds[0];
+    return stored;
+  }
+
+  if (submissionIds[0]) return submissionIds[0];
+
+  const primary = options.primaryId;
+  if (primary && isHackathonId(primary) && accessible.includes(primary)) {
+    return primary;
+  }
+
+  return accessible[0];
+};
+
+export const collectAccessibleHackathonIds = (input: {
+  enrolledIds?: HackathonId[];
+  sessionHackathonId?: HackathonId | null;
+  sessionHackathonIds?: HackathonId[];
+  submissions?: Pick<Submission, "hackathon_id">[];
+}): HackathonId[] => {
+  const ids = new Set<HackathonId>();
+  const push = (candidate: unknown) => {
+    if (typeof candidate === "string" && isHackathonId(candidate)) {
+      ids.add(candidate);
+    }
+  };
+  for (const id of input.enrolledIds ?? []) push(id);
+  for (const id of input.sessionHackathonIds ?? []) push(id);
+  push(input.sessionHackathonId);
+  for (const submission of input.submissions ?? []) {
+    push(getSubmissionHackathonId(submission));
+  }
+  return Array.from(ids);
 };
 
 export type ParticipantHackathonSummary = {
@@ -331,12 +491,6 @@ export const getHackathonsByIds = (
     result.push(resolvePortalHackathon(id, catalog));
   }
   return result;
-};
-
-export const STATUS_ORDER: Record<HackathonStatus, number> = {
-  active: 0,
-  upcoming: 1,
-  past: 2,
 };
 
 /** Events new participants can join (excludes past / archived editions). */

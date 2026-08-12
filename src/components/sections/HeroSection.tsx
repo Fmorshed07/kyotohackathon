@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import { PORTAL_HACKATHONS, SITE_HACKATHON_ID } from "@/lib/hackathons";
+import { fetchLivePortalHackathon, getHostedHackathonUrl } from "@/lib/aiHackathons";
+import { getFirestoreDb } from "@/lib/firebaseClient";
+import type { PortalHackathon } from "@/lib/hackathons";
 import { cn } from "@/lib/utils";
 
 type HeroLine = {
@@ -20,21 +22,11 @@ const HERO_LINES: HeroLine[] = [
   { lead: "Impact", trail: "that compounds." },
 ];
 
-type TypePhase =
-  | "typing-lead"
-  | "bridge"
-  | "typing-trail"
-  | "holding"
-  | "scramble"
-  | "deleting"
-  | "gap";
+type CaretLane = "lead" | "trail" | "none";
 
 const HOLD_MS = 2400;
-const BRIDGE_MS = 220;
-const LINE_GAP_MS = 360;
-const SCRAMBLE_TICKS = 7;
-const SCRAMBLE_MS = 38;
-const GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789░▒▓<>/\\|·✦";
+const BRIDGE_MS = 180;
+const LINE_GAP_MS = 320;
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false);
@@ -55,23 +47,15 @@ function jitter(min: number, max: number) {
 }
 
 function typeDelay(char: string, lane: "lead" | "trail") {
-  if (char === "." || char === "!") return jitter(140, 200);
-  if (char === " " || char === ",") return jitter(70, 115);
-  if (lane === "lead") return jitter(38, 72);
-  return jitter(26, 58);
+  if (char === "." || char === "!") return jitter(120, 170);
+  if (char === " " || char === ",") return jitter(55, 95);
+  if (lane === "lead") return jitter(42, 68);
+  return jitter(28, 52);
 }
 
 function deleteDelay(remaining: number) {
-  // Accelerate as more characters disappear
   const rush = Math.min(18, remaining);
-  return Math.max(10, 34 - rush + jitter(0, 8));
-}
-
-function scrambleText(source: string) {
-  return source
-    .split("")
-    .map((ch) => (ch === " " || ch === "." ? ch : GLYPHS[jitter(0, GLYPHS.length - 1)]))
-    .join("");
+  return Math.max(12, 32 - rush + jitter(0, 6));
 }
 
 function HeroCaret({
@@ -99,157 +83,168 @@ function HeroCaret({
   );
 }
 
-function TypedChars({
-  text,
-  className,
-  inkKey,
-}: {
-  text: string;
-  className?: string;
-  inkKey: string;
-}) {
-  if (!text) return null;
-  const head = text.slice(0, -1);
-  const tip = text.slice(-1);
-
-  return (
-    <span className={className}>
-      {head}
-      <span key={`${inkKey}-${text.length}`} className="hero-char-ink inline-block">
-        {tip}
-      </span>
-    </span>
-  );
-}
-
 function HeroTypingHeadline({ active }: { active: boolean }) {
   const reducedMotion = usePrefersReducedMotion();
   const [lineIndex, setLineIndex] = useState(0);
   const [leadText, setLeadText] = useState("");
   const [trailText, setTrailText] = useState("");
-  const [displayTrail, setDisplayTrail] = useState("");
-  const [phase, setPhase] = useState<TypePhase>("typing-lead");
+  const [caretLane, setCaretLane] = useState<CaretLane>("lead");
   const [striking, setStriking] = useState(false);
-  const [scrambleTick, setScrambleTick] = useState(0);
-  const strikeTimer = useRef<number | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+
+  const lineIndexRef = useRef(0);
+  const leadRef = useRef("");
+  const trailRef = useRef("");
+  const timerRef = useRef<number | undefined>(undefined);
+  const strikeTimerRef = useRef<number | undefined>(undefined);
 
   const line = HERO_LINES[lineIndex] ?? HERO_LINES[0];
-  const isTyping = phase === "typing-lead" || phase === "typing-trail";
-  const isBusy = isTyping || phase === "scramble" || phase === "deleting";
+
+  const clearTimer = () => {
+    if (timerRef.current !== undefined) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = undefined;
+    }
+  };
 
   const pulseStrike = () => {
     setStriking(true);
-    window.clearTimeout(strikeTimer.current);
-    strikeTimer.current = window.setTimeout(() => setStriking(false), 90);
+    window.clearTimeout(strikeTimerRef.current);
+    strikeTimerRef.current = window.setTimeout(() => setStriking(false), 90);
+  };
+
+  const setLead = (value: string) => {
+    leadRef.current = value;
+    setLeadText(value);
+  };
+
+  const setTrail = (value: string) => {
+    trailRef.current = value;
+    setTrailText(value);
   };
 
   useEffect(() => {
-    if (!active || reducedMotion) {
-      setLeadText(HERO_LINES[0].lead);
-      setTrailText(HERO_LINES[0].trail);
-      setDisplayTrail(HERO_LINES[0].trail);
-      setPhase("holding");
+    clearTimer();
+    window.clearTimeout(strikeTimerRef.current);
+
+    if (reducedMotion) {
+      lineIndexRef.current = 0;
+      setLineIndex(0);
+      setLead(HERO_LINES[0].lead);
+      setTrail(HERO_LINES[0].trail);
+      setCaretLane("none");
+      setBusy(false);
       return;
     }
-    return () => window.clearTimeout(strikeTimer.current);
-  }, [active, reducedMotion]);
 
-  useEffect(() => {
-    if (!active || reducedMotion) return;
-
-    let timer: number;
-
-    if (phase === "typing-lead") {
-      if (leadText.length < line.lead.length) {
-        const next = line.lead[leadText.length] ?? "";
-        timer = window.setTimeout(() => {
-          pulseStrike();
-          setLeadText(line.lead.slice(0, leadText.length + 1));
-        }, typeDelay(next, "lead"));
-      } else {
-        timer = window.setTimeout(() => setPhase("bridge"), BRIDGE_MS);
-      }
-    } else if (phase === "bridge") {
-      timer = window.setTimeout(() => setPhase("typing-trail"), BRIDGE_MS);
-    } else if (phase === "typing-trail") {
-      if (trailText.length < line.trail.length) {
-        const next = line.trail[trailText.length] ?? "";
-        timer = window.setTimeout(() => {
-          pulseStrike();
-          const nextTrail = line.trail.slice(0, trailText.length + 1);
-          setTrailText(nextTrail);
-          setDisplayTrail(nextTrail);
-        }, typeDelay(next, "trail"));
-      } else {
-        timer = window.setTimeout(() => setPhase("holding"), 40);
-      }
-    } else if (phase === "holding") {
-      timer = window.setTimeout(() => {
-        setScrambleTick(0);
-        setPhase("scramble");
-      }, HOLD_MS);
-    } else if (phase === "scramble") {
-      if (scrambleTick < SCRAMBLE_TICKS) {
-        timer = window.setTimeout(() => {
-          setDisplayTrail(scrambleText(trailText || line.trail));
-          setScrambleTick((tick) => tick + 1);
-          pulseStrike();
-        }, SCRAMBLE_MS + scrambleTick * 4);
-      } else {
-        timer = window.setTimeout(() => {
-          setDisplayTrail(trailText);
-          setPhase("deleting");
-        }, 60);
-      }
-    } else if (phase === "deleting") {
-      if (trailText.length > 0) {
-        timer = window.setTimeout(() => {
-          pulseStrike();
-          const next = trailText.slice(0, -1);
-          setTrailText(next);
-          setDisplayTrail(next);
-        }, deleteDelay(trailText.length));
-      } else if (leadText.length > 0) {
-        timer = window.setTimeout(() => {
-          pulseStrike();
-          setLeadText((t) => t.slice(0, -1));
-        }, deleteDelay(leadText.length) + 4);
-      } else {
-        timer = window.setTimeout(() => setPhase("gap"), 40);
-      }
-    } else if (phase === "gap") {
-      timer = window.setTimeout(() => {
-        setLineIndex((i) => (i + 1) % HERO_LINES.length);
-        setPhase("typing-lead");
-      }, LINE_GAP_MS);
+    if (!active) {
+      setLead("");
+      setTrail("");
+      setCaretLane("lead");
+      setBusy(false);
+      return;
     }
 
-    return () => window.clearTimeout(timer);
-  }, [
-    active,
-    reducedMotion,
-    phase,
-    leadText,
-    trailText,
-    scrambleTick,
-    line.lead,
-    line.trail,
-  ]);
+    // Fresh start whenever the hero becomes active
+    lineIndexRef.current = 0;
+    setLineIndex(0);
+    setLead("");
+    setTrail("");
+    setCaretLane("lead");
+    setBusy(true);
 
-  const showLeadCaret =
-    phase === "typing-lead" ||
-    phase === "bridge" ||
-    phase === "gap" ||
-    (phase === "deleting" && trailText.length === 0);
-  const showTrailCaret =
-    phase === "typing-trail" ||
-    phase === "holding" ||
-    phase === "scramble" ||
-    (phase === "deleting" && trailText.length > 0);
+    const schedule = (fn: () => void, ms: number) => {
+      clearTimer();
+      timerRef.current = window.setTimeout(fn, ms);
+    };
+
+    const typeLead = () => {
+      const current = HERO_LINES[lineIndexRef.current] ?? HERO_LINES[0];
+      const nextLen = leadRef.current.length + 1;
+      if (nextLen <= current.lead.length) {
+        const ch = current.lead[nextLen - 1] ?? "";
+        pulseStrike();
+        setLead(current.lead.slice(0, nextLen));
+        setCaretLane("lead");
+        setBusy(true);
+        schedule(typeLead, typeDelay(ch, "lead"));
+        return;
+      }
+      setCaretLane("lead");
+      schedule(typeTrail, BRIDGE_MS);
+    };
+
+    const typeTrail = () => {
+      const current = HERO_LINES[lineIndexRef.current] ?? HERO_LINES[0];
+      const nextLen = trailRef.current.length + 1;
+      if (nextLen <= current.trail.length) {
+        const ch = current.trail[nextLen - 1] ?? "";
+        pulseStrike();
+        setTrail(current.trail.slice(0, nextLen));
+        setCaretLane("trail");
+        setBusy(true);
+        schedule(typeTrail, typeDelay(ch, "trail"));
+        return;
+      }
+      setCaretLane("trail");
+      setBusy(false);
+      schedule(startDelete, HOLD_MS);
+    };
+
+    const startDelete = () => {
+      setBusy(true);
+      deleteTrail();
+    };
+
+    const deleteTrail = () => {
+      if (trailRef.current.length > 0) {
+        pulseStrike();
+        setTrail(trailRef.current.slice(0, -1));
+        setCaretLane("trail");
+        schedule(deleteTrail, deleteDelay(trailRef.current.length + 1));
+        return;
+      }
+      deleteLead();
+    };
+
+    const deleteLead = () => {
+      if (leadRef.current.length > 0) {
+        pulseStrike();
+        setLead(leadRef.current.slice(0, -1));
+        setCaretLane("lead");
+        schedule(deleteLead, deleteDelay(leadRef.current.length + 1));
+        return;
+      }
+      setCaretLane("lead");
+      schedule(nextLine, LINE_GAP_MS);
+    };
+
+    const nextLine = () => {
+      const next = (lineIndexRef.current + 1) % HERO_LINES.length;
+      lineIndexRef.current = next;
+      setLineIndex(next);
+      setLead("");
+      setTrail("");
+      setCaretLane("lead");
+      setBusy(true);
+      schedule(typeLead, 40);
+    };
+
+    schedule(typeLead, 280);
+
+    return () => {
+      clearTimer();
+      window.clearTimeout(strikeTimerRef.current);
+    };
+  }, [active, reducedMotion]);
+
+  const showLeadCaret = caretLane === "lead";
+  const showTrailCaret = caretLane === "trail";
 
   return (
     <h1
-      className="mt-5 max-w-4xl font-display text-5xl font-semibold leading-[0.92] tracking-[-0.04em] text-white sm:text-6xl md:text-7xl lg:text-8xl"
+      className="notranslate mt-5 max-w-4xl font-display text-[2.35rem] font-semibold leading-[0.95] tracking-[-0.04em] text-white sm:text-6xl md:text-7xl lg:text-8xl"
+      translate="no"
       aria-live="polite"
       aria-atomic="true"
     >
@@ -257,22 +252,12 @@ function HeroTypingHeadline({ active }: { active: boolean }) {
         {line.lead} {line.trail}
       </span>
       <span className="block min-h-[1.05em]" aria-hidden>
-        <span className="text-gradient-cyan">{leadText}</span>
-        <HeroCaret tone="lead" visible={showLeadCaret} striking={striking && showLeadCaret && isBusy} />
+        <span className="text-primary">{leadText}</span>
+        <HeroCaret tone="lead" visible={showLeadCaret} striking={striking && showLeadCaret && busy} />
       </span>
-      <span
-        className={cn(
-          "mt-1 block min-h-[1.05em] font-medium text-white/88 transition-opacity duration-150",
-          phase === "scramble" && "text-primary/80",
-        )}
-        aria-hidden
-      >
-        {phase === "scramble" ? (
-          <span className="hero-scramble tracking-[-0.03em]">{displayTrail}</span>
-        ) : (
-          <TypedChars text={displayTrail} inkKey={`trail-${lineIndex}`} />
-        )}
-        <HeroCaret tone="trail" visible={showTrailCaret} striking={striking && showTrailCaret && isBusy} />
+      <span className="mt-1 block min-h-[1.05em] font-medium text-white/88" aria-hidden>
+        {trailText}
+        <HeroCaret tone="trail" visible={showTrailCaret} striking={striking && showTrailCaret && busy} />
       </span>
     </h1>
   );
@@ -280,7 +265,21 @@ function HeroTypingHeadline({ active }: { active: boolean }) {
 
 const HeroSection = () => {
   const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.1 });
-  const active = PORTAL_HACKATHONS.find((h) => h.id === SITE_HACKATHON_ID) ?? PORTAL_HACKATHONS[0];
+  const [active, setActive] = useState<PortalHackathon | null>(null);
+
+  useEffect(() => {
+    let isCurrent = true;
+    void fetchLivePortalHackathon(getFirestoreDb())
+      .then((event) => {
+        if (isCurrent) setActive(event);
+      })
+      .catch(() => {
+        if (isCurrent) setActive(null);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   return (
     <section className="relative flex min-h-[100svh] flex-col overflow-hidden bg-black">
@@ -310,7 +309,7 @@ const HeroSection = () => {
         aria-hidden
       />
 
-      <div className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-6xl flex-col justify-end px-6 pb-28 pt-28 md:justify-center md:pb-24 md:pt-24 lg:px-8">
+      <div className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-6xl flex-col justify-end px-4 pb-24 pt-24 sm:px-6 sm:pb-28 sm:pt-28 md:justify-center md:pb-24 md:pt-24 lg:px-8">
         <motion.p
           className="font-display text-sm font-medium uppercase tracking-[0.38em] text-white md:text-[15px]"
           initial={{ opacity: 0, y: 16 }}
@@ -325,7 +324,8 @@ const HeroSection = () => {
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.9, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
         >
-          <HeroTypingHeadline active={isVisible} />
+          {/* Always run once mounted — scroll reveal only drives the fade-in wrapper */}
+          <HeroTypingHeadline active />
         </motion.div>
 
         <motion.p
@@ -346,36 +346,42 @@ const HeroSection = () => {
         >
           <Link
             to="/signin"
-            className="btn-poster-cta inline-flex min-w-[190px] items-center justify-center gap-2"
+            className="btn-poster-cta inline-flex w-full min-w-0 items-center justify-center gap-2 sm:w-auto sm:min-w-[190px]"
           >
             Enter portal
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
-            to="/hackathons"
-            className="inline-flex min-w-[190px] items-center justify-center rounded-md border border-white/18 bg-black/40 px-6 py-3.5 font-display text-sm font-medium tracking-[0.1em] text-white backdrop-blur-md transition-colors hover:border-primary/45 hover:bg-black/60"
+            to={active ? getHostedHackathonUrl(active.id) : "/hackathons"}
+            className="inline-flex w-full min-w-0 items-center justify-center rounded-md border border-white/18 bg-black/40 px-6 py-3.5 font-display text-sm font-medium tracking-[0.1em] text-white backdrop-blur-md transition-colors hover:border-primary/45 hover:bg-black/60 sm:w-auto sm:min-w-[190px]"
           >
-            Browse events
+            {active?.status === "active" ? "Open live event" : "Browse events"}
           </Link>
           <a
             href="#host"
-            className="inline-flex min-w-[190px] items-center justify-center rounded-md border border-white/18 bg-black/40 px-6 py-3.5 font-display text-sm font-medium tracking-[0.1em] text-white backdrop-blur-md transition-colors hover:border-primary/45 hover:bg-black/60"
+            className="inline-flex w-full min-w-0 items-center justify-center rounded-md border border-white/18 bg-black/40 px-6 py-3.5 font-display text-sm font-medium tracking-[0.1em] text-white backdrop-blur-md transition-colors hover:border-primary/45 hover:bg-black/60 sm:w-auto sm:min-w-[190px]"
           >
             Host an event
           </a>
         </motion.div>
 
-        <motion.p
-          className="mt-12 font-mono text-[11px] uppercase tracking-[0.2em] text-white/40"
-          initial={{ opacity: 0 }}
-          animate={isVisible ? { opacity: 1 } : {}}
-          transition={{ duration: 0.5, delay: 0.45 }}
-        >
-          Live ·{" "}
-          <Link to="/hackathons" className="text-primary/90 underline-offset-4 hover:underline">
-            {active.name}
-          </Link>
-        </motion.p>
+        {active ? (
+          <motion.p
+            className="mt-12 font-mono text-[11px] uppercase tracking-[0.2em] text-white/40"
+            initial={{ opacity: 0 }}
+            animate={isVisible ? { opacity: 1 } : {}}
+            transition={{ duration: 0.5, delay: 0.45 }}
+          >
+            {active.status === "active" ? "Live" : "Upcoming"}{" "}
+            ·{" "}
+            <Link
+              to={getHostedHackathonUrl(active.id)}
+              className="text-primary/90 underline-offset-4 hover:underline"
+            >
+              {active.name}
+            </Link>
+          </motion.p>
+        ) : null}
       </div>
     </section>
   );

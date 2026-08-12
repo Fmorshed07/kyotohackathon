@@ -150,6 +150,8 @@ const App = () => (
           <Route path="/dashboard/admin/operations" element={<AdminProtectedRoute><PlatformOperationsPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/events" element={<AdminProtectedRoute><EventManagementPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/host" element={<HostProtectedRoute><HostDashboardPage /></HostProtectedRoute>} />
+          <Route path="/dashboard/host/screening" element={<HostProtectedRoute><ScreeningAgentPage /></HostProtectedRoute>} />
+          <Route path="/dashboard/host/operations" element={<HostProtectedRoute><PlatformOperationsPage /></HostProtectedRoute>} />
           <Route path="/boards" element={<ProtectedRoute><HackathonBoardsPage /></ProtectedRoute>} />
           <Route path="/boards/:hackathonId" element={<ProtectedRoute><HackathonBoardsPage /></ProtectedRoute>} />
           <Route path="/projects" element={<ProjectGalleryPage />} />

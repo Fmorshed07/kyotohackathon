@@ -1,6 +1,11 @@
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
-import { getAuth, type Auth } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  getAuth,
+  setPersistence,
+  type Auth,
+} from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 
@@ -15,10 +20,16 @@ const firebaseConfig = {
 };
 
 function assertFirebaseConfig(): void {
-  const missing = Object.entries(firebaseConfig)
-    .filter(([, value]) => !value)
-    .map(([key]) => key);
+  const required = [
+    "apiKey",
+    "authDomain",
+    "projectId",
+    "storageBucket",
+    "messagingSenderId",
+    "appId",
+  ] as const;
 
+  const missing = required.filter((key) => !firebaseConfig[key]);
   if (missing.length > 0) {
     throw new Error(
       `[Firebase] Missing environment variables: ${missing.join(", ")}. Configure them in .env.local.`,
@@ -31,6 +42,7 @@ let firebaseAnalytics: Analytics | null = null;
 let firebaseAuth: Auth | null = null;
 let firebaseDb: Firestore | null = null;
 let firebaseStorage: FirebaseStorage | null = null;
+let authPersistenceReady: Promise<void> | null = null;
 
 function getAppInstance(): FirebaseApp {
   if (firebaseApp) return firebaseApp;
@@ -52,8 +64,20 @@ export async function getFirebaseAnalytics(): Promise<Analytics | null> {
 
 export const getFirebaseAuth = (): Auth => {
   if (firebaseAuth) return firebaseAuth;
-  firebaseAuth = getAuth(getAppInstance());
+  const auth = getAuth(getAppInstance());
+  if (typeof window !== "undefined" && !authPersistenceReady) {
+    authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch(() => {
+      // Fall back to default in-memory persistence if local storage is blocked.
+    });
+  }
+  firebaseAuth = auth;
   return firebaseAuth;
+};
+
+/** Resolves once auth persistence has been configured (best-effort). */
+export const ensureAuthPersistence = (): Promise<void> => {
+  getFirebaseAuth();
+  return authPersistenceReady ?? Promise.resolve();
 };
 
 export const getFirestoreDb = (): Firestore => {
@@ -64,6 +88,12 @@ export const getFirestoreDb = (): Firestore => {
 
 export const getFirebaseStorage = (): FirebaseStorage => {
   if (firebaseStorage) return firebaseStorage;
-  firebaseStorage = getStorage(getAppInstance());
+  const app = getAppInstance();
+  const bucket = firebaseConfig.storageBucket?.trim();
+  // Bind the configured bucket explicitly (*.firebasestorage.app names need this).
+  firebaseStorage = bucket ? getStorage(app, `gs://${bucket}`) : getStorage(app);
   return firebaseStorage;
 };
+
+export const getFirebaseProjectId = () => firebaseConfig.projectId?.trim() || "";
+export const getFirebaseStorageBucket = () => firebaseConfig.storageBucket?.trim() || "";

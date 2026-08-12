@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select";
 import {
   PORTAL_HACKATHONS,
+  filterCurrentHackathons,
+  resolvePortalHackathon,
   type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
@@ -21,6 +23,8 @@ type HackathonSelectorProps = {
   onSelect: (hackathonId: HackathonId) => void;
   hackathons?: PortalHackathon[];
   compact?: boolean;
+  /** When true (default), hide past editions from the switcher. */
+  currentOnly?: boolean;
 };
 
 const statusLabel: Record<PortalHackathon["status"], string> = {
@@ -49,8 +53,19 @@ export function HackathonSelector({
   onSelect,
   hackathons = PORTAL_HACKATHONS,
   compact = false,
+  currentOnly = false,
 }: HackathonSelectorProps) {
-  const selected = hackathons.find((hackathon) => hackathon.id === selectedHackathonId);
+  const options = (() => {
+    const base = currentOnly
+      ? filterCurrentHackathons(hackathons, { includeId: selectedHackathonId })
+      : hackathons;
+    // Radix Select throws if `value` has no matching SelectItem — keep the
+    // current pick visible even when the live catalog is still hydrating.
+    if (base.some((entry) => entry.id === selectedHackathonId)) return base;
+    return [resolvePortalHackathon(selectedHackathonId, hackathons), ...base];
+  })();
+  const selected = options.find((hackathon) => hackathon.id === selectedHackathonId)
+    ?? resolvePortalHackathon(selectedHackathonId, hackathons);
 
   return (
     <div className={compact ? "w-full min-w-0" : "w-full max-w-xl"}>
@@ -58,8 +73,8 @@ export function HackathonSelector({
         <SelectTrigger
           className={
             compact
-              ? "h-auto min-h-11 w-full border-border bg-card py-2.5 text-base sm:min-h-12 sm:text-lg"
-              : "h-auto min-h-[4.5rem] w-full border-border bg-card py-3 text-base sm:text-lg"
+              ? "h-auto min-h-11 w-full border-white/10 bg-white/[0.04] py-2.5 text-base hover:bg-white/[0.06] sm:min-h-12 sm:text-lg"
+              : "h-auto min-h-[4.5rem] w-full border-white/10 bg-white/[0.04] py-3 text-base hover:bg-white/[0.06] sm:text-lg"
           }
         >
           <SelectValue placeholder="Choose hackathon">
@@ -83,7 +98,7 @@ export function HackathonSelector({
           </SelectValue>
         </SelectTrigger>
         <SelectContent className="max-h-[min(70vh,420px)]">
-          {hackathons.map((hackathon) => (
+          {options.map((hackathon) => (
             <SelectItem key={hackathon.id} value={hackathon.id} className="py-3">
               <div className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2">

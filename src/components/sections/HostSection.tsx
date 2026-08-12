@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { fetchPublishedHackathons, getHostedHackathonUrl } from "@/lib/aiHackathons";
+import { getFirestoreDb } from "@/lib/firebaseClient";
 import { cn } from "@/lib/utils";
 
 type GlobalHackathon = {
@@ -27,48 +29,21 @@ type GlobalHackathon = {
   format: "online" | "hybrid" | "in-person";
   focus: string;
   contact: string;
+  status: "active" | "upcoming" | "past" | "submitted";
+  hubUrl: string;
   source: "featured" | "submitted";
 };
 
-type HostFormState = Omit<GlobalHackathon, "id" | "source">;
+type HostFormState = Omit<GlobalHackathon, "id" | "source" | "status" | "hubUrl">;
 
 const HOSTED_HACKATHONS_STORAGE_KEY = "cognisor_global_hosted_hackathons";
 
-const featuredHackathons: GlobalHackathon[] = [
-  {
-    id: "featured-kyoto",
-    name: "Impact Kyoto 2026",
-    organizer: "Cognisor AI",
-    location: "Kyoto, Japan",
-    dates: "4 July 2026",
-    format: "hybrid",
-    focus: "Agentic AI for Japan's future",
-    contact: "Portal open",
-    source: "featured",
-  },
-  {
-    id: "featured-dhaka",
-    name: "Impact Dhaka 2026",
-    organizer: "Cognisor AI",
-    location: "Dhaka, Bangladesh",
-    dates: "Date TBA",
-    format: "in-person",
-    focus: "AI for urban transformation",
-    contact: "Coming soon",
-    source: "featured",
-  },
-  {
-    id: "featured-global",
-    name: "Global Builder Sprint",
-    organizer: "Community hosts",
-    location: "Remote",
-    dates: "Rolling",
-    format: "online",
-    focus: "AI prototypes with measurable social impact",
-    contact: "Accepting hosts",
-    source: "featured",
-  },
-];
+const inferFormat = (location: string, formatHint?: string): GlobalHackathon["format"] => {
+  const haystack = `${location} ${formatHint ?? ""}`.toLowerCase();
+  if (/\b(online|virtual|remote)\b/.test(haystack)) return "online";
+  if (/\bhybrid\b/.test(haystack)) return "hybrid";
+  return "in-person";
+};
 
 const emptyFormState: HostFormState = {
   name: "",
@@ -102,19 +77,25 @@ const readSubmittedHackathons = (): GlobalHackathon[] => {
       return [];
     }
 
-    return parsed.filter((event): event is GlobalHackathon => {
-      return (
-        typeof event?.id === "string" &&
-        typeof event?.name === "string" &&
-        typeof event?.organizer === "string" &&
-        typeof event?.location === "string" &&
-        typeof event?.dates === "string" &&
-        typeof event?.focus === "string" &&
-        typeof event?.contact === "string" &&
-        ["online", "hybrid", "in-person"].includes(event?.format) &&
-        event?.source === "submitted"
-      );
-    });
+    return parsed
+      .filter((event): event is GlobalHackathon => {
+        return (
+          typeof event?.id === "string" &&
+          typeof event?.name === "string" &&
+          typeof event?.organizer === "string" &&
+          typeof event?.location === "string" &&
+          typeof event?.dates === "string" &&
+          typeof event?.focus === "string" &&
+          typeof event?.contact === "string" &&
+          ["online", "hybrid", "in-person"].includes(event?.format) &&
+          event?.source === "submitted"
+        );
+      })
+      .map((event) => ({
+        ...event,
+        status: "submitted" as const,
+        hubUrl: typeof event.hubUrl === "string" ? event.hubUrl : "/host/signin",
+      }));
   } catch {
     return [];
   }
@@ -124,15 +105,56 @@ const HostSection = () => {
   const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.12 });
   const [formState, setFormState] = useState<HostFormState>(emptyFormState);
   const [submittedHackathons, setSubmittedHackathons] = useState<GlobalHackathon[]>([]);
+  const [featuredHackathons, setFeaturedHackathons] = useState<GlobalHackathon[]>([]);
   const [submissionMessage, setSubmissionMessage] = useState("");
 
   useEffect(() => {
     setSubmittedHackathons(readSubmittedHackathons());
   }, []);
 
+  useEffect(() => {
+    let isCurrent = true;
+    void fetchPublishedHackathons(getFirestoreDb())
+      .then((events) => {
+        if (!isCurrent) return;
+        const liveFirst = [...events].sort((left, right) => {
+          const rank = { active: 0, upcoming: 1, past: 2 } as const;
+          return rank[left.status] - rank[right.status];
+        });
+        setFeaturedHackathons(
+          liveFirst.slice(0, 6).map((event) => ({
+            id: event.id,
+            name: event.name,
+            organizer: event.organizerName || (event.hostEventId ? "Community host" : "Cognisor AI"),
+            location: event.location,
+            dates: event.eventDate,
+            format: inferFormat(event.location, event.format),
+            focus: event.theme || event.tagline || event.summary,
+            contact:
+              event.status === "active"
+                ? "Portal open"
+                : event.status === "past"
+                  ? "Completed"
+                  : "Coming soon",
+            status: event.status,
+            hubUrl: getHostedHackathonUrl(event.id),
+            source: "featured" as const,
+          })),
+        );
+      })
+      .catch(() => {
+        if (isCurrent) setFeaturedHackathons([]);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  const liveFeaturedCount = featuredHackathons.filter((event) => event.status === "active").length;
+
   const globalHackathons = useMemo(
     () => [...submittedHackathons, ...featuredHackathons],
-    [submittedHackathons],
+    [submittedHackathons, featuredHackathons],
   );
 
   const updateField = (field: keyof HostFormState, value: string) => {
@@ -151,6 +173,8 @@ const HostSection = () => {
       format: formState.format,
       focus: formState.focus.trim(),
       contact: formState.contact.trim(),
+      status: "submitted",
+      hubUrl: "/host/signin",
       source: "submitted",
     };
 
@@ -212,18 +236,25 @@ const HostSection = () => {
               <Link to="/host/signin">Request host access</Link>
             </Button>
 
-            <div className="mt-10">
+              <div className="mt-10">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <h3 className="font-display text-xl font-semibold tracking-tight text-foreground">
                   Global live hackathons
                 </h3>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/35 bg-primary/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-primary">
                   <Sparkles className="h-3.5 w-3.5" />
-                  {globalHackathons.length} live
+                  {liveFeaturedCount > 0
+                    ? `${liveFeaturedCount} live`
+                    : `${globalHackathons.length} listed`}
                 </span>
               </div>
 
               <div className="grid gap-3">
+                {globalHackathons.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-white/15 bg-card/40 px-4 py-5 text-sm text-muted-foreground">
+                    Published events will appear here as they go live.
+                  </p>
+                ) : null}
                 {globalHackathons.map((hackathon, index) => (
                   <motion.article
                     key={hackathon.id}
@@ -231,7 +262,9 @@ const HostSection = () => {
                       "rounded-lg border bg-card/60 p-4 backdrop-blur-md",
                       hackathon.source === "submitted"
                         ? "border-primary/35"
-                        : "border-white/[0.08]",
+                        : hackathon.status === "active"
+                          ? "border-primary/30"
+                          : "border-white/[0.08]",
                     )}
                     initial={{ opacity: 0, y: 16 }}
                     animate={isVisible ? { opacity: 1, y: 0 } : {}}
@@ -240,14 +273,26 @@ const HostSection = () => {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="font-display text-lg font-semibold tracking-tight text-foreground">
-                          {hackathon.name}
+                          {hackathon.source === "featured" ? (
+                            <Link to={hackathon.hubUrl} className="transition-colors hover:text-primary">
+                              {hackathon.name}
+                            </Link>
+                          ) : (
+                            hackathon.name
+                          )}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
                           Hosted by {hackathon.organizer}
                         </p>
                       </div>
                       <span className="w-fit rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs text-muted-foreground">
-                        {hackathon.source === "submitted" ? "Submitted live" : "Featured"}
+                        {hackathon.source === "submitted"
+                          ? "Local preview"
+                          : hackathon.status === "active"
+                            ? "Live"
+                            : hackathon.status === "upcoming"
+                              ? "Upcoming"
+                              : "Past"}
                       </span>
                     </div>
 
@@ -273,6 +318,17 @@ const HostSection = () => {
                         {hackathon.contact}
                       </span>
                     </div>
+
+                    {hackathon.source === "featured" ? (
+                      <div className="mt-4">
+                        <Link
+                          to={hackathon.hubUrl}
+                          className="font-display text-xs font-semibold tracking-wide text-primary transition-opacity hover:opacity-80"
+                        >
+                          Open event hub →
+                        </Link>
+                      </div>
+                    ) : null}
                   </motion.article>
                 ))}
               </div>

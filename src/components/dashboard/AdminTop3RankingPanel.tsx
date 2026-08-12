@@ -147,7 +147,7 @@ export function AdminTop3RankingPanel({
           </span>
           <div className="min-w-0">
             <p className="dash-eyebrow">Judge ballots</p>
-            <h2 className="dash-title">Top 3 idea ranking</h2>
+            <h2 className="dash-title">Top 3 ballots</h2>
             <p className="dash-subtitle">
               Aggregated judge ballots for {selectedHackathon.name}. Points: 1st = 3, 2nd = 2, 3rd = 1.
             </p>

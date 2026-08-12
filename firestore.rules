@@ -158,11 +158,19 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/host_events/$(eventId)).data.owner_id == request.auth.uid;
     }
 
+    function ownsHackathon(hackathonId) {
+      return hackathonId is string
+        && hackathonId.size() > 0
+        && exists(/databases/$(database)/documents/hackathons/$(hackathonId))
+        && get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.createdBy == request.auth.uid;
+    }
+
     match /users/{userId} {
       allow create: if (isPortalAdminAccount() && request.auth.uid == userId)
         || (hasPendingAdminGrant() && request.auth.uid == userId)
         || canCreateOwnPortalAccount(userId);
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Approved hosts need participant/judge emails for submissions & mark check.
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isApprovedHost());
       allow update: if isAdmin()
         || (hasPendingAdminGrant() && request.auth.uid == userId)
         || canUpdateOwnProfile(userId)
@@ -235,11 +243,24 @@ service cloud.firestore {
         || isApprovedStaff()
         || isApprovedHost()
         || (isSignedIn() && resource.data.user_id == request.auth.uid);
-      allow create: if isSignedIn() && (request.auth.uid == request.resource.data.user_id || isAdmin());
+      allow create: if isSignedIn() && (
+        request.auth.uid == request.resource.data.user_id
+        || isAdmin()
+        || (
+          isApprovedHost()
+          && request.resource.data.keys().hasAll(["user_id", "hackathon_id"])
+          && ownsHackathon(request.resource.data.hackathon_id)
+        )
+      );
       allow update: if isSignedIn() && (
         request.auth.uid == resource.data.user_id
         || isApprovedStaff()
         || isAdmin()
+        || (
+          isApprovedHost()
+          && resource.data.hackathon_id is string
+          && ownsHackathon(resource.data.hackathon_id)
+        )
         || (
           // Teammate accepting an invite: only membership fields + invite proof token.
           request.resource.data.diff(resource.data).affectedKeys()
@@ -252,7 +273,12 @@ service cloud.firestore {
           && request.resource.data.user_id == resource.data.user_id
         )
       );
-      allow delete: if isAdmin();
+      allow delete: if isAdmin()
+        || (
+          isApprovedHost()
+          && resource.data.hackathon_id is string
+          && ownsHackathon(resource.data.hackathon_id)
+        );
     }
 
     // Looking-for-teammates board: signed-in participants can browse and post.
@@ -373,8 +399,14 @@ service cloud.firestore {
     }
 
     match /hackathon_ops/{hackathonId} {
-      allow read: if isSignedIn() && (isAdmin() || isApprovedStaff());
-      allow write: if isAdmin();
+      // Admins + staff (read). Approved hosts can run screening/ops on events they own.
+      allow read: if isSignedIn() && (
+        isAdmin()
+        || isApprovedStaff()
+        || (isApprovedHost() && ownsHackathon(hackathonId))
+      );
+      allow write: if isAdmin()
+        || (isApprovedHost() && ownsHackathon(hackathonId));
     }
 
     match /admin_grants/{grantEmail} {
@@ -395,15 +427,20 @@ service cloud.firestore {
           && rankingId.matches('^' + request.auth.uid + '_.*');
       }
 
-      allow get: if isSignedIn() && (isAdmin() || isOwnRankingDoc());
-      allow list: if isAdmin();
+      allow get: if isSignedIn() && (isAdmin() || isOwnRankingDoc() || isApprovedHost());
+      allow list: if isAdmin() || isApprovedHost();
       allow create: if isApprovedStaff()
         && request.resource.data.judge_id == request.auth.uid
         && rankingId == request.resource.data.judge_id + '_' + request.resource.data.hackathon_id;
       allow update: if isApprovedStaff()
         && resource.data.judge_id == request.auth.uid
         && request.resource.data.judge_id == request.auth.uid;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin()
+        || (
+          isApprovedHost()
+          && resource.data.hackathon_id is string
+          && ownsHackathon(resource.data.hackathon_id)
+        );
     }
   }
 }

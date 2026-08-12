@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { ScrollRevealMotion } from "@/components/ScrollRevealMotion";
 import { CriteriaOverviewStats } from "@/components/dashboard/JudgingStatsPanel";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
-import { SITE_HACKATHON_ID } from "@/lib/hackathons";
+import { fetchLivePortalHackathon } from "@/lib/aiHackathons";
+import { getFirestoreDb } from "@/lib/firebaseClient";
+import { SITE_HACKATHON_ID, type HackathonId } from "@/lib/hackathons";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 
 function CriterionCard({ criterion, index }: { criterion: JudgingCriterion; index: number }) {
@@ -51,8 +54,23 @@ function CriterionCard({ criterion, index }: { criterion: JudgingCriterion; inde
 }
 
 const JudgingSection = () => {
-  const { criteria, isLoading } = useHackathonCriteria(SITE_HACKATHON_ID);
+  const [criteriaHackathonId, setCriteriaHackathonId] = useState<HackathonId>(SITE_HACKATHON_ID);
+  const { criteria, isLoading } = useHackathonCriteria(criteriaHackathonId);
   const totalWeight = criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchLivePortalHackathon(getFirestoreDb())
+      .then((event) => {
+        if (!cancelled && event) setCriteriaHackathonId(event.id);
+      })
+      .catch(() => {
+        // Keep Kyoto fallback criteria when no live event is published.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const { ref: headerRef, isVisible: headerVisible } = useScrollReveal<HTMLDivElement>({
     threshold: 0.2,

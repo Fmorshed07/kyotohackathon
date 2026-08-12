@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Scale } from "lucide-react";
+import { ClipboardCheck, Scale } from "lucide-react";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
+import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
 import { getTeamAccentStyle, getCriterionAccentStyle } from "@/components/dashboard/judgeDashboardAccents";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { AdminSubmissionRow } from "@/components/dashboard/AdminDashboard";
 import type { PortalHackathon } from "@/lib/hackathons";
+import { matchesSearchQuery } from "@/lib/submissionSearch";
 import { cn } from "@/lib/utils";
 
 type AdminJudgeMarksPanelProps = {
@@ -15,6 +18,11 @@ type AdminJudgeMarksPanelProps = {
 };
 
 type JudgeMark = AdminSubmissionRow["judgeMarks"][number];
+type MarkCheckFilter = "all" | "scored" | "awaiting";
+
+function hasAnyScore(row: AdminSubmissionRow) {
+  return row.judgeMarks.some((mark) => typeof mark.score === "number");
+}
 
 function JudgeMarkCard({
   mark,
@@ -106,16 +114,30 @@ function SubmissionMarksCard({
 }) {
   const accent = getTeamAccentStyle(submission.title ?? submission.participantEmail);
   const scoredCount = submission.judgeMarks.filter((m) => typeof m.score === "number").length;
+  const awaiting = !hasAnyScore(submission);
 
   return (
     <article className={cn("overflow-hidden rounded-xl border", accent.panel)}>
       <header className="border-b border-white/10 px-4 py-4 sm:px-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">{submission.participantEmail}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs text-muted-foreground">{submission.participantEmail}</p>
+              {awaiting ? (
+                <Badge
+                  variant="outline"
+                  className="border-amber-400/40 bg-amber-500/10 text-[10px] uppercase tracking-[0.1em] text-amber-200"
+                >
+                  Awaiting scores
+                </Badge>
+              ) : null}
+            </div>
             <h3 className={cn("mt-0.5 text-base font-semibold sm:text-lg", accent.teamName)}>
               {submission.title || "Untitled Project"}
             </h3>
+            {submission.teamName ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">{submission.teamName}</p>
+            ) : null}
             {submission.shortDescription ? (
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                 {submission.shortDescription}
@@ -132,7 +154,7 @@ function SubmissionMarksCard({
               </p>
             </div>
             <Badge variant="secondary" className="text-[10px] uppercase tracking-[0.1em]">
-              {scoredCount}/{submission.judgeMarks.length} judges
+              {scoredCount}/{Math.max(submission.judgeMarks.length, scoredCount)} judges
             </Badge>
           </div>
         </div>
@@ -168,26 +190,46 @@ export function AdminJudgeMarksPanel({
   judgingCriteria,
   isLoading,
 }: AdminJudgeMarksPanelProps) {
-  const scoredSubmissions = submissions.filter((row) =>
-    row.judgeMarks.some((mark) => typeof mark.score === "number")
-  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<MarkCheckFilter>("all");
+
+  const scoredSubmissions = submissions.filter(hasAnyScore);
+  const awaitingSubmissions = submissions.filter((row) => !hasAnyScore(row));
   const totalMarks = submissions.reduce(
     (total, row) => total + row.judgeMarks.filter((m) => typeof m.score === "number").length,
     0
   );
+
+  const filteredSubmissions = submissions.filter((row) => {
+    if (filter === "scored" && !hasAnyScore(row)) return false;
+    if (filter === "awaiting" && hasAnyScore(row)) return false;
+    return matchesSearchQuery(searchQuery, [
+      row.title,
+      row.teamName,
+      row.participantEmail,
+      row.shortDescription,
+      ...row.judgeMarks.map((mark) => mark.judgeEmail),
+    ]);
+  });
+
+  const filterOptions: Array<{ id: MarkCheckFilter; label: string; count: number }> = [
+    { id: "all", label: "All", count: submissions.length },
+    { id: "scored", label: "Scored", count: scoredSubmissions.length },
+    { id: "awaiting", label: "Awaiting", count: awaitingSubmissions.length },
+  ];
 
   return (
     <section className={`${sectionClass} overflow-hidden p-0`} id="judge-marks">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
         <div className="flex items-start gap-3">
           <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
-            <Scale className="h-4 w-4" />
+            <ClipboardCheck className="h-4 w-4" />
           </span>
           <div>
-            <p className="dash-eyebrow">Scoring breakdown</p>
-            <h2 className="dash-title">Judge marks by project</h2>
+            <p className="dash-eyebrow">Mark check</p>
+            <h2 className="dash-title">Judging mark check</h2>
             <p className="dash-subtitle">
-              See which judge scored each project for {selectedHackathon.name}.
+              Verify each judge’s scores and criterion breakdown for {selectedHackathon.name}.
             </p>
           </div>
         </div>
@@ -200,19 +242,57 @@ export function AdminJudgeMarksPanel({
       </div>
 
       <div className="space-y-5 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SubmissionSearchInput
+            id="judge-mark-check-search"
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search project, team, participant, or judge…"
+            className="w-full sm:max-w-md"
+          />
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="tablist"
+            aria-label="Mark check filters"
+          >
+            {filterOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                role="tab"
+                aria-selected={filter === option.id}
+                onClick={() => setFilter(option.id)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] transition-colors",
+                  filter === option.id
+                    ? "border-primary/40 bg-primary/15 text-primary"
+                    : "border-white/10 bg-muted/15 text-muted-foreground hover:border-primary/30 hover:text-primary"
+                )}
+              >
+                {option.label}
+                <span className="font-mono tabular-nums opacity-80">{option.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading judge marks…</p>
         ) : submissions.length === 0 ? (
+          <p className="dash-empty">No submissions yet for {selectedHackathon.name}.</p>
+        ) : filteredSubmissions.length === 0 ? (
           <p className="dash-empty">
-            No submissions yet for {selectedHackathon.name}.
-          </p>
-        ) : scoredSubmissions.length === 0 ? (
-          <p className="dash-empty">
-            No judge marks recorded yet. Scores will appear here as judges submit them.
+            {searchQuery.trim()
+              ? "No projects match this search."
+              : filter === "awaiting"
+                ? "Every project has at least one judge mark."
+                : filter === "scored"
+                  ? "No judge marks recorded yet. Scores appear here as judges submit them."
+                  : "No projects to show."}
           </p>
         ) : (
           <div className="grid gap-5">
-            {scoredSubmissions.map((submission) => (
+            {filteredSubmissions.map((submission) => (
               <SubmissionMarksCard
                 key={submission.id}
                 submission={submission}
@@ -222,19 +302,20 @@ export function AdminJudgeMarksPanel({
           </div>
         )}
 
-        {!isLoading && submissions.length > scoredSubmissions.length ? (
+        {!isLoading && filter === "all" && !searchQuery.trim() && awaitingSubmissions.length > 0 ? (
           <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Awaiting scores
-            </p>
+            <div className="flex items-center gap-2">
+              <Scale className="h-4 w-4 text-muted-foreground" aria-hidden />
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Awaiting scores · {awaitingSubmissions.length}
+              </p>
+            </div>
             <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-              {submissions
-                .filter((row) => !row.judgeMarks.some((m) => typeof m.score === "number"))
-                .map((row) => (
-                  <li key={row.id}>
-                    {row.title || "Untitled Project"} · {row.participantEmail}
-                  </li>
-                ))}
+              {awaitingSubmissions.map((row) => (
+                <li key={row.id}>
+                  {row.title || "Untitled Project"} · {row.participantEmail}
+                </li>
+              ))}
             </ul>
           </div>
         ) : null}

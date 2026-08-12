@@ -41,6 +41,8 @@ type LiveSubmission = {
 
 export type LiveOpsWorkspaceProps = {
   hackathon: PortalHackathon;
+  /** Full admin catalog (static editions + hosted events). */
+  hackathons?: PortalHackathon[];
   participants: LiveParticipant[];
   submissions: LiveSubmission[];
   judgingCriteria: JudgingCriterion[];
@@ -112,6 +114,7 @@ const Panel = ({
 
 export function LiveOpsWorkspace({
   hackathon,
+  hackathons = PORTAL_HACKATHONS,
   participants,
   submissions,
   judgingCriteria,
@@ -233,7 +236,7 @@ export function LiveOpsWorkspace({
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {PORTAL_HACKATHONS.map((entry) => (
+          {hackathons.map((entry) => (
             <ChipButton
               key={entry.id}
               active={hackathon.id === entry.id}

@@ -36,10 +36,11 @@ import { getPeopleProfileCompleteness } from "@/components/dashboard/PeopleProfi
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
 import { TeamInvitePanel } from "@/components/dashboard/TeamInvitePanel";
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
-import type {
-  HackathonId,
-  ParticipantHackathonSummary,
-  PortalHackathon,
+import {
+  getEventBoardPath,
+  type HackathonId,
+  type ParticipantHackathonSummary,
+  type PortalHackathon,
 } from "@/lib/hackathons";
 import type { Submission, TeamMemberRecord, TeammatePost } from "@/types/portal";
 
@@ -263,7 +264,7 @@ export function ParticipantDashboard({
             </div>
           </div>
           <Button asChild variant="outline" className="shrink-0">
-            <Link to={`/boards/${selectedHackathon.id}`}>
+            <Link to={getEventBoardPath(selectedHackathon.id)}>
               Open board
               <ExternalLink className="ml-1.5 h-4 w-4" />
             </Link>
@@ -323,7 +324,7 @@ export function ParticipantDashboard({
                       {isSelected ? "Working here" : "Open workspace"}
                     </Button>
                     <Button asChild size="sm" variant="ghost">
-                      <Link to={`/boards/${summary.hackathon.id}`}>
+                      <Link to={getEventBoardPath(summary.hackathon.id)}>
                         Event board
                         <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                       </Link>
@@ -874,7 +875,7 @@ export function ParticipantDashboard({
             )}
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline" size="lg">
-                <Link to={`/boards/${selectedHackathon.id}`}>
+                <Link to={getEventBoardPath(selectedHackathon.id)}>
                   Open {selectedHackathon.shortName} board
                   <ExternalLink className="ml-1.5 h-4 w-4" />
                 </Link>

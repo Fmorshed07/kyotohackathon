@@ -5,11 +5,12 @@ import { DashboardLayout, sectionClass } from "@/components/dashboard/DashboardL
 import { EventManagementWorkspace } from "@/components/dashboard/EventManagementWorkspace";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
+import { useAdminHackathonCatalog } from "@/hooks/useAdminHackathonCatalog";
 import { HACKATHON_STORAGE_KEYS, PORTAL_HACKATHONS, type HackathonStatus } from "@/lib/hackathons";
 import {
   deleteHostedHackathon,
-  fetchAllHackathonsForAdmin,
   mergePortalCatalogIntoEvents,
+  portalHackathonAsHosted,
   publishHostEventPublicly,
   setHackathonPublished,
   setHackathonStatus,
@@ -28,58 +29,71 @@ import { Button } from "@/components/ui/button";
 export default function EventManagementPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
-  const [events, setEvents] = useState<HostedHackathon[]>([]);
+  const {
+    hostedEvents: events,
+    catalog: adminHackathons,
+    isLoading: isCatalogLoading,
+    setHostedEvents: setEvents,
+  } = useAdminHackathonCatalog(db, Boolean(sessionUser && sessionUser.role === "admin"));
   const [hostEvents, setHostEvents] = useState<HostEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isHostLoading, setIsHostLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
   const [busyEventId, setBusyEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const listingEvents = mergePortalCatalogIntoEvents(events);
-
-  const adminHackathons = [
-    ...PORTAL_HACKATHONS,
-    ...events.filter((event) => !PORTAL_HACKATHONS.some((item) => item.id === event.id)),
-  ];
+  const isLoading = isCatalogLoading || isHostLoading;
 
   const { selectedHackathonId, setSelectedHackathonId } = useHackathonSelection(
     HACKATHON_STORAGE_KEYS.admin,
     undefined,
     adminHackathons,
+    { syncUrl: true },
   );
 
-  const reloadEvents = useCallback(async (options?: { silent?: boolean }) => {
-    if (!options?.silent) setIsLoading(true);
+  const reloadHostEvents = useCallback(async () => {
+    setIsHostLoading(true);
     try {
-      const [nextEvents, nextHostEvents] = await Promise.all([
-        fetchAllHackathonsForAdmin(db),
-        fetchAllHostEventsForAdmin(db),
-      ]);
-      setEvents(nextEvents);
-      setHostEvents(nextHostEvents);
+      setHostEvents(await fetchAllHostEventsForAdmin(db));
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Could not load events.");
+      setStatusMessage(error instanceof Error ? error.message : "Could not load host events.");
     } finally {
-      if (!options?.silent) setIsLoading(false);
+      setIsHostLoading(false);
     }
   }, [db]);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
-    void reloadEvents();
-  }, [reloadEvents, sessionUser]);
+    void reloadHostEvents();
+  }, [reloadHostEvents, sessionUser]);
+
+  const patchLocalEvent = (eventId: string, patch: Partial<HostedHackathon>) => {
+    setEvents((current) => {
+      const existing = current.find((event) => event.id === eventId);
+      if (existing) {
+        return current.map((event) =>
+          event.id === eventId ? { ...event, ...patch } : event,
+        );
+      }
+      const portal = PORTAL_HACKATHONS.find((entry) => entry.id === eventId);
+      if (!portal) return current;
+      return [{ ...portalHackathonAsHosted(portal), ...patch, id: eventId }, ...current];
+    });
+  };
 
   const runMutation = async (
     eventId: string,
     action: () => Promise<void>,
     successMessage: string,
+    optimistic?: Partial<HostedHackathon>,
   ) => {
     setIsBusy(true);
     setBusyEventId(eventId);
     setStatusMessage(null);
+    if (optimistic) patchLocalEvent(eventId, optimistic);
     try {
       await action();
-      await reloadEvents({ silent: true });
+      await reloadHostEvents();
       setStatusMessage(successMessage);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Could not update the event.");
@@ -95,6 +109,7 @@ export default function EventManagementPage() {
       eventId,
       () => setHackathonPublished(db, eventId, true),
       `${event?.name ?? "Event"} is now published.`,
+      { published: true },
     );
   };
 
@@ -104,6 +119,7 @@ export default function EventManagementPage() {
       eventId,
       () => setHackathonPublished(db, eventId, false),
       `${event?.name ?? "Event"} was unpublished and is hidden from the public site.`,
+      { published: false },
     );
   };
 
@@ -115,6 +131,10 @@ export default function EventManagementPage() {
       eventId,
       () => setHackathonStatus(db, eventId, status),
       `${event?.name ?? "Event"} ${label}.`,
+      {
+        status,
+        ...(status === "active" ? { published: true } : {}),
+      },
     );
   };
 
@@ -124,6 +144,7 @@ export default function EventManagementPage() {
       eventId,
       () => updateHostedHackathon(db, eventId, patch),
       `${event?.name ?? "Event"} details saved.`,
+      patch,
     );
   };
 
@@ -131,7 +152,10 @@ export default function EventManagementPage() {
     const event = listingEvents.find((item) => item.id === eventId);
     return runMutation(
       eventId,
-      () => deleteHostedHackathon(db, eventId),
+      async () => {
+        await deleteHostedHackathon(db, eventId);
+        setEvents((current) => current.filter((item) => item.id !== eventId));
+      },
       `${event?.name ?? "Event"} was removed from the public directory.`,
     );
   };
@@ -220,7 +244,7 @@ export default function EventManagementPage() {
           isBusy={isBusy}
           busyEventId={busyEventId}
           statusMessage={statusMessage}
-          onRefresh={() => reloadEvents()}
+          onRefresh={reloadHostEvents}
           onPublish={handlePublish}
           onUnpublish={handleUnpublish}
           onSetStatus={handleSetStatus}

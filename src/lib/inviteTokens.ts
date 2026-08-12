@@ -1,5 +1,12 @@
 /** URL-safe invite tokens for team + judge portal links. */
 
+import {
+  getJudgeEventWorkspacePath,
+  HACKATHON_STORAGE_KEYS,
+  isHackathonId,
+  type HackathonId,
+} from "@/lib/hackathons";
+
 export function createInviteToken(byteLength = 16): string {
   const bytes = new Uint8Array(byteLength);
   crypto.getRandomValues(bytes);
@@ -16,6 +23,8 @@ export function buildInviteUrl(kind: "team" | "judge", token: string, origin = w
 
 export const PENDING_TEAM_INVITE_KEY = "cognisor_pending_team_invite";
 export const PENDING_JUDGE_INVITE_KEY = "cognisor_pending_judge_invite";
+/** Bridges invite redeem → judge dashboard until Firestore session catches up. */
+export const JUDGE_WORKSPACE_BOOTSTRAP_KEY = "cognisor_judge_workspace_bootstrap";
 
 export function stashPendingInvite(kind: "team" | "judge", token: string) {
   const key = kind === "team" ? PENDING_TEAM_INVITE_KEY : PENDING_JUDGE_INVITE_KEY;
@@ -42,4 +51,40 @@ export function clearPendingInvite(kind: "team" | "judge") {
   } catch {
     // ignore
   }
+}
+
+export function stashJudgeWorkspaceBootstrap(hackathonId: string) {
+  if (!isHackathonId(hackathonId)) return;
+  try {
+    sessionStorage.setItem(JUDGE_WORKSPACE_BOOTSTRAP_KEY, hackathonId);
+    window.localStorage.setItem(HACKATHON_STORAGE_KEYS.judge, hackathonId);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+export function readJudgeWorkspaceBootstrap(): HackathonId | null {
+  try {
+    const value = sessionStorage.getItem(JUDGE_WORKSPACE_BOOTSTRAP_KEY);
+    return value && isHackathonId(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearJudgeWorkspaceBootstrap() {
+  try {
+    sessionStorage.removeItem(JUDGE_WORKSPACE_BOOTSTRAP_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** Open the judge dashboard pinned to the invite's dedicated event. */
+export function getJudgeDashboardPathAfterInvite(primaryHackathonId: string | null | undefined) {
+  if (primaryHackathonId && isHackathonId(primaryHackathonId)) {
+    stashJudgeWorkspaceBootstrap(primaryHackathonId);
+    return getJudgeEventWorkspacePath(primaryHackathonId);
+  }
+  return "/dashboard/judge";
 }

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CalendarDays, ChevronDown, MapPin } from "lucide-react";
+import { ChevronDown, MapPin } from "lucide-react";
 import PreviousHackathonsLivePreview from "@/components/PreviousHackathonsLivePreview";
 import {
+  fetchPortalHackathonCatalog,
   fetchPublishedHackathons,
   getHostedHackathonUrl,
   type HostedHackathon,
@@ -31,6 +32,8 @@ type HackathonBoard = PortalHackathon & {
   builders: number;
   prize: string;
   format: string;
+  hubUrl: string;
+  isHosted: boolean;
 };
 
 const CATEGORIES: BoardCategory[] = [
@@ -44,8 +47,8 @@ const CATEGORIES: BoardCategory[] = [
 ];
 
 const BOARD_META: Record<
-  PortalHackathon["id"],
-  Omit<HackathonBoard, keyof PortalHackathon>
+  string,
+  Omit<HackathonBoard, keyof PortalHackathon | "hubUrl" | "isHosted">
 > = {
   "impact-kyoto": {
     organizer: "Cognisor",
@@ -53,7 +56,7 @@ const BOARD_META: Record<
     categories: ["Agentic AI", "Public services", "Healthcare", "Education"],
     tags: ["#Agents", "#LangGraph", "#Japan", "#Impact"],
     builders: 48,
-    prize: "Portal live",
+    prize: "Completed",
     format: "Hybrid",
   },
   "impact-tokyo": {
@@ -71,9 +74,77 @@ const BOARD_META: Record<
     categories: ["Urban", "Public services", "Climate"],
     tags: ["#Mobility", "#City", "#PublicAI", "#Sprint"],
     builders: 36,
-    prize: "Coming soon",
+    prize: "Completed",
     format: "In-person",
   },
+};
+
+const portalIds = new Set(PORTAL_HACKATHONS.map((entry) => entry.id));
+
+const statusPrize = (status: PortalHackathon["status"]) =>
+  status === "past" ? "Completed" : status === "active" ? "Portal live" : "Coming soon";
+
+const defaultBoardMeta = (
+  hackathon: PortalHackathon,
+): Omit<HackathonBoard, keyof PortalHackathon | "hubUrl" | "isHosted"> => {
+  const initials =
+    hackathon.shortName
+      .split(/\s+/)
+      .map((part) => part[0] ?? "")
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "EV";
+  return {
+    organizer: "Cognisor",
+    organizerInitials: initials,
+    categories: ["Agentic AI"],
+    tags: [`#${hackathon.shortName.replace(/\s+/g, "")}`],
+    builders: 24,
+    prize: statusPrize(hackathon.status),
+    format: "See event",
+  };
+};
+
+const toBoard = (
+  hackathon: PortalHackathon,
+  hosted?: HostedHackathon | null,
+): HackathonBoard => {
+  const base = BOARD_META[hackathon.id] ?? defaultBoardMeta(hackathon);
+  const isHosted = Boolean(
+    hosted &&
+      !portalIds.has(hackathon.id) &&
+      (hosted.hostEventId || hosted.createdManually || hosted.aiGenerated),
+  );
+  const initials =
+    hosted?.organizerName
+      ?.split(/\s+/)
+      .map((part) => part[0] ?? "")
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || base.organizerInitials;
+
+  return {
+    ...hackathon,
+    ...base,
+    status: hackathon.status,
+    name: hackathon.name,
+    eventDate: hackathon.eventDate,
+    location: hackathon.location,
+    theme: hackathon.theme || hosted?.tagline || hosted?.summary || base.prize,
+    organizer: hosted?.organizerName?.trim() || (isHosted ? "Community host" : base.organizer),
+    organizerInitials: initials,
+    format: hosted?.format?.trim() || base.format,
+    prize: statusPrize(hackathon.status),
+    hubUrl: getHostedHackathonUrl(hackathon.id),
+    isHosted,
+  };
+};
+
+const sortByLifecycle = (left: PortalHackathon, right: PortalHackathon) => {
+  const rank = { active: 0, upcoming: 1, past: 2 } as const;
+  const byStatus = rank[left.status] - rank[right.status];
+  if (byStatus !== 0) return byStatus;
+  return left.name.localeCompare(right.name);
 };
 
 const statusLabel: Record<PortalHackathon["status"], string> = {
@@ -95,11 +166,6 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "builders", label: "Most builders" },
 ];
 
-const boards: HackathonBoard[] = PORTAL_HACKATHONS.map((hackathon) => ({
-  ...hackathon,
-  ...BOARD_META[hackathon.id],
-}));
-
 const getCityFromLocation = (location: string) => {
   const normalized = location.trim();
   if (!normalized) return "To be confirmed";
@@ -112,17 +178,27 @@ const HackathonsSection = () => {
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("default");
   const [sortOpen, setSortOpen] = useState(false);
-  const [publishedEvents, setPublishedEvents] = useState<HostedHackathon[]>([]);
+  const [boards, setBoards] = useState<HackathonBoard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isCurrent = true;
-    void fetchPublishedHackathons(getFirestoreDb())
-      .then((events) => {
-        if (isCurrent) setPublishedEvents(events);
-      })
-      .catch(() => {
-        if (isCurrent) setPublishedEvents([]);
-      });
+    const db = getFirestoreDb();
+
+    void Promise.all([
+      fetchPortalHackathonCatalog(db).catch(() => [] as PortalHackathon[]),
+      fetchPublishedHackathons(db).catch(() => [] as HostedHackathon[]),
+    ]).then(([catalog, events]) => {
+      if (!isCurrent) return;
+      const hostedById = new Map(events.map((event) => [event.id, event]));
+      // Prefer Firestore catalog; if both fail, show static Impact editions so the page isn't blank.
+      const source = catalog.length > 0 ? catalog : PORTAL_HACKATHONS;
+      const nextBoards = [...source]
+        .sort(sortByLifecycle)
+        .map((entry) => toBoard(entry, hostedById.get(entry.id) ?? null));
+      setBoards(nextBoards);
+      setIsLoading(false);
+    });
     return () => {
       isCurrent = false;
     };
@@ -145,11 +221,11 @@ const HackathonsSection = () => {
   };
 
   const cityOptions = useMemo(
-    () => Array.from(new Set([
-      ...boards.map((board) => getCityFromLocation(board.location)),
-      ...publishedEvents.map((event) => getCityFromLocation(event.location)),
-    ])).sort((left, right) => left.localeCompare(right)),
-    [publishedEvents],
+    () =>
+      Array.from(new Set(boards.map((board) => getCityFromLocation(board.location)))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [boards],
   );
 
   const filteredBoards = useMemo(() => {
@@ -179,24 +255,19 @@ const HackathonsSection = () => {
         const upcomingRank = { upcoming: 0, active: 1, past: 2 } as const;
         return upcomingRank[a.status] - upcomingRank[b.status];
       }
-      return 0;
+      // Default: live → upcoming → past
+      return statusRank[a.status] - statusRank[b.status] || a.name.localeCompare(b.name);
     });
-  }, [selectedCategories, selectedCities, sortMode]);
+  }, [boards, selectedCategories, selectedCities, sortMode]);
 
-  const filteredPublishedEvents = useMemo(
-    () => selectedCities.length === 0
-      ? publishedEvents
-      : publishedEvents.filter((event) => selectedCities.includes(getCityFromLocation(event.location))),
-    [publishedEvents, selectedCities],
-  );
-
-  const resultCount = filteredBoards.length + filteredPublishedEvents.length;
+  const resultCount = filteredBoards.length;
+  const liveCount = boards.filter((board) => board.status === "active").length;
   const hasActiveFilters = selectedCategories.length > 0 || selectedCities.length > 0;
 
   const sortLabel = SORT_OPTIONS.find((option) => option.value === sortMode)?.label ?? "Default";
 
   return (
-    <section id="hackathons" className="relative px-6 py-16 md:py-24">
+    <section id="hackathons" className="relative px-4 py-14 sm:px-6 md:py-24">
       <div className="pointer-events-none absolute inset-x-0 top-0 horizon-flare opacity-40" />
       <div
         className="pointer-events-none absolute inset-0 -z-10"
@@ -219,153 +290,10 @@ const HackathonsSection = () => {
             Hackathons
           </h1>
           <p className="mt-4 max-w-xl font-body text-base text-muted-foreground sm:text-lg">
-            Browse every Cognisor Impact event — filter by track, sort the board, and open the live
-            portal when you are ready to build.
+            Live hosted events and Impact editions in one board — filter by track, sort by status,
+            and open the event hub when you are ready to build.
           </p>
         </motion.div>
-
-        {publishedEvents.length > 0 ? (
-          <section className="mt-10" aria-labelledby="published-events-heading">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="font-display text-xs font-semibold uppercase tracking-[0.24em] text-primary">
-                  Live organiser hubs
-                </p>
-                <h2 id="published-events-heading" className="mt-2 font-display text-2xl font-semibold text-foreground sm:text-3xl">
-                  Unique event experiences
-                </h2>
-              </div>
-              <p className="font-body text-sm text-muted-foreground">
-                Each hub carries its own look, schedule, and registration path.
-              </p>
-            </div>
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredPublishedEvents.map((event, index) => {
-                const accent = event.accentColor || "#00A3FF";
-                const hero = event.bannerImageUrl || event.coverImageUrl;
-                return (
-                  <motion.article
-                    key={event.id}
-                    initial={{ opacity: 0, y: 18 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.45, delay: Math.min(index * 0.05, 0.3) }}
-                    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-card/80 shadow-[var(--surface-elevated)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-white/25"
-                    style={{
-                      ["--primary" as string]: undefined,
-                      boxShadow: `0 0 0 1px color-mix(in srgb, ${accent} 25%, transparent), var(--surface-elevated)`,
-                    }}
-                  >
-                    <div className="relative h-44 overflow-hidden bg-[#0a0c10]">
-                      {hero ? (
-                        <img
-                          src={hero}
-                          alt=""
-                          className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div
-                          className="absolute inset-0"
-                          style={{
-                            background: `radial-gradient(ellipse at top right, ${accent}55, transparent 55%), linear-gradient(160deg, #0b1018, #050608)`,
-                          }}
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
-                      <div className="absolute left-4 top-4 flex flex-wrap items-center gap-2">
-                        {event.logoUrl ? (
-                          <img
-                            src={event.logoUrl}
-                            alt=""
-                            className="h-9 w-9 rounded-md border border-white/20 object-cover shadow-lg"
-                          />
-                        ) : null}
-                        <span
-                          className="rounded-full border px-2.5 py-1 font-body text-[11px] font-semibold uppercase tracking-[0.12em] backdrop-blur"
-                          style={{
-                            borderColor: `${accent}66`,
-                            backgroundColor: `${accent}22`,
-                            color: accent,
-                          }}
-                        >
-                          {event.status === "active" ? "Live now" : event.status}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-5">
-                      {event.organizerName ? (
-                        <p className="font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {event.organizerName}
-                        </p>
-                      ) : (
-                        <p className="font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {event.hostEventId ? "Hosted event" : event.createdManually ? "Organiser-built" : "AI-assisted"}
-                        </p>
-                      )}
-                      <h3
-                        className="mt-2 font-display text-2xl font-semibold tracking-tight text-foreground"
-                        style={
-                          event.fontPreset
-                            ? ({
-                                fontFamily:
-                                  event.fontPreset === "editorial"
-                                    ? '"Fraunces", Georgia, serif'
-                                    : event.fontPreset === "signal"
-                                      ? '"Syne", system-ui, sans-serif'
-                                      : event.fontPreset === "atelier"
-                                        ? '"Instrument Serif", Georgia, serif'
-                                        : undefined,
-                              } as CSSProperties)
-                            : undefined
-                        }
-                      >
-                        {event.name}
-                      </h3>
-                      <p className="mt-2 line-clamp-2 font-body text-sm leading-relaxed text-muted-foreground">
-                        {event.tagline || event.theme || event.summary}
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 font-body text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1.5">
-                          <CalendarDays className="h-3.5 w-3.5" style={{ color: accent }} />
-                          {event.eventDate}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5" style={{ color: accent }} />
-                          {event.location}
-                        </span>
-                      </div>
-                      <div className="mt-5 flex flex-wrap items-center gap-3">
-                        <Link
-                          to={getHostedHackathonUrl(event.id)}
-                          className="inline-flex items-center justify-center rounded-xl px-3.5 py-2 font-display text-xs font-semibold tracking-wide transition-colors"
-                          style={{
-                            border: `1px solid ${accent}80`,
-                            backgroundColor: `${accent}22`,
-                            color: accent,
-                          }}
-                        >
-                          Open event hub
-                        </Link>
-                        {event.lumaUrl ? (
-                          <a
-                            href={event.lumaUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-body text-xs font-semibold hover:underline"
-                            style={{ color: accent }}
-                          >
-                            Register
-                          </a>
-                        ) : null}
-                      </div>
-                    </div>
-                  </motion.article>
-                );
-              })}
-            </div>
-            {filteredPublishedEvents.length === 0 ? <p className="mt-5 rounded-xl border border-dashed border-white/15 bg-card/40 px-5 py-4 text-sm text-muted-foreground">No published event hubs match the selected city.</p> : null}
-          </section>
-        ) : null}
 
         <div className="mt-12 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
           <motion.aside
@@ -378,10 +306,20 @@ const HackathonsSection = () => {
               Total
             </p>
             <p className="mt-1 font-display text-2xl font-semibold tracking-tight text-foreground">
-              {resultCount}{" "}
-              <span className="text-base font-medium text-muted-foreground">{hasActiveFilters ? "matching events" : "Hackathons"}</span>
+              {isLoading ? "…" : resultCount}{" "}
+              <span className="text-base font-medium text-muted-foreground">
+                {hasActiveFilters ? "matching events" : "Hackathons"}
+              </span>
             </p>
-            {hasActiveFilters ? <p className="mt-1 font-body text-xs text-muted-foreground">of {boards.length + publishedEvents.length} total events</p> : null}
+            {hasActiveFilters ? (
+              <p className="mt-1 font-body text-xs text-muted-foreground">
+                of {boards.length} total events
+              </p>
+            ) : liveCount > 0 ? (
+              <p className="mt-1 font-body text-xs text-primary">
+                {liveCount} live now
+              </p>
+            ) : null}
 
             <div className="my-5 h-px bg-white/[0.08]" />
 
@@ -538,10 +476,14 @@ const HackathonsSection = () => {
             </motion.div>
 
             <div className="space-y-3">
-              {filteredBoards.length === 0 ? (
+              {isLoading ? (
+                <div className="rounded-2xl border border-dashed border-white/15 bg-card/40 px-6 py-10 text-center">
+                  <p className="font-body text-sm text-muted-foreground">Loading live events…</p>
+                </div>
+              ) : filteredBoards.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-white/15 bg-card/40 px-6 py-10 text-center">
                   <p className="font-body text-sm text-muted-foreground">
-                    No hackathons match these categories.
+                    No hackathons match these filters.
                   </p>
                 </div>
               ) : (
@@ -593,7 +535,7 @@ const HackathonsSection = () => {
                       <div className="flex min-w-0 flex-1 flex-col justify-center gap-3 px-5 py-5">
                         <div>
                           <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 font-body text-[11px] text-muted-foreground">
-                            {board.categories[0]}
+                            {board.isHosted ? "Hosted event" : board.categories[0]}
                           </span>
                           <h2 className="mt-2 font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                             {board.name}
@@ -645,17 +587,20 @@ const HackathonsSection = () => {
                         <p className="text-center font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl">
                           {board.prize}
                         </p>
-                        {board.status === "active" ? (
+                        {board.status === "active" || board.status === "upcoming" || board.isHosted ? (
                           <Link
-                            to="/signin"
+                            to={board.hubUrl}
                             className="inline-flex items-center justify-center rounded-xl border border-primary/50 bg-primary/15 px-3 py-2 text-center font-display text-xs font-semibold tracking-wide text-primary transition-colors hover:bg-primary/25"
                           >
-                            Open board
+                            {board.status === "active" ? "Open hub" : "View event"}
                           </Link>
                         ) : (
-                          <span className="text-center font-body text-[11px] text-muted-foreground/80">
-                            In portal
-                          </span>
+                          <Link
+                            to={board.hubUrl}
+                            className="text-center font-body text-[11px] text-muted-foreground/80 transition-colors hover:text-primary"
+                          >
+                            Event page
+                          </Link>
                         )}
                       </div>
                     </div>

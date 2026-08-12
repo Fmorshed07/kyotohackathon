@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Activity,
-  BarChart3,
   CalendarCheck2,
   ExternalLink,
   Github,
@@ -34,15 +33,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
-import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { getHackathonById, PORTAL_HACKATHONS, type PortalHackathon, type HackathonId } from "@/lib/hackathons";
 import type { AdminGrantRecord } from "@/lib/adminGrants";
 import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
-import { MarkingCriteriaSection } from "@/components/dashboard/MarkingCriteriaSection";
-import { AdminTop3RankingPanel } from "@/components/dashboard/AdminTop3RankingPanel";
-import { AdminTop3MarksPanel } from "@/components/dashboard/AdminTop3MarksPanel";
-import { AdminJudgeMarksPanel } from "@/components/dashboard/AdminJudgeMarksPanel";
-import { AdminSubmissionsPanel } from "@/components/dashboard/AdminSubmissionsPanel";
+import { AdminJudgingSection } from "@/components/dashboard/AdminJudgingSection";
 import { PlatformOpsConsole, type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole";
 import { AiHackathonLauncher } from "@/components/dashboard/AiHackathonLauncher";
 import { ManualHackathonLauncher } from "@/components/dashboard/ManualHackathonLauncher";
@@ -1005,95 +999,26 @@ export function AdminDashboard({
         </div>
       </section>
 
-      <MarkingCriteriaSection
+      <AdminJudgingSection
         selectedHackathon={selectedHackathon}
-        criteria={judgingCriteria}
-        isLoading={isLoadingCriteria}
-        isSaving={isSavingCriteria}
-        onSave={onSaveCriteria}
-      />
-
-      <section className={`${sectionClass}`} id="analytics">
-        <div className="mb-5 flex items-start gap-3 border-b border-white/10 pb-4">
-          <span className="dash-icon-chip" aria-hidden>
-            <BarChart3 className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="dash-eyebrow">Analytics</p>
-            <h2 className="dash-title">Judging statistics</h2>
-            <p className="dash-subtitle">
-              Live scoring analytics for {selectedHackathon.name}.
-            </p>
-          </div>
-        </div>
-        <JudgingStatsPanel
-          isLoading={isLoadingSubmissions}
-          completionRate={analytics.completionRate}
-          criterionAverages={analytics.criterionAverages}
-          title="Event scoring overview"
-          description="Aggregated across all judges and submissions for this hackathon."
-          stats={[
-            { label: "Submissions", value: String(analytics.totalSubmissions), highlight: true },
-            { label: "Scored", value: String(analytics.scoredSubmissions) },
-            { label: "Pending", value: String(analytics.unscoredSubmissions) },
-            {
-              label: "Avg score",
-              value: analytics.averageScore != null ? analytics.averageScore.toFixed(1) : "—",
-            },
-            { label: "Teams", value: String(analytics.teamsCount) },
-            { label: "Judge marks", value: String(analytics.totalJudgeMarks) },
-            { label: "Judges active", value: String(analytics.activeJudgeCount) },
-            {
-              label: "Judges registered",
-              value: isLoadingUsers ? "—" : String(analytics.registeredJudgeCount),
-            },
-            {
-              label: "Top project",
-              value:
-                analytics.highestProjectScore != null
-                  ? analytics.highestProjectScore.toFixed(1)
-                  : "—",
-            },
-            {
-              label: "Lowest project",
-              value:
-                analytics.lowestProjectScore != null ? analytics.lowestProjectScore.toFixed(1) : "—",
-            },
-          ]}
-        />
-      </section>
-
-      <AdminTop3MarksPanel
-        selectedHackathon={selectedHackathon}
-        submissions={submissions}
-        isLoading={isLoadingSubmissions}
-      />
-
-      <AdminTop3RankingPanel
-        selectedHackathon={selectedHackathon}
-        summary={top3RankingSummary}
-        isLoading={isLoadingTop3Rankings || isLoadingSubmissions}
-        submissionLookup={top3SubmissionLookup}
-      />
-
-      <AdminJudgeMarksPanel
-        selectedHackathon={selectedHackathon}
-        submissions={submissions}
         judgingCriteria={judgingCriteria}
-        isLoading={isLoadingSubmissions}
-      />
-
-      <AdminSubmissionsPanel
-        selectedHackathon={selectedHackathon}
+        isLoadingCriteria={isLoadingCriteria}
+        isSavingCriteria={isSavingCriteria}
+        onSaveCriteria={onSaveCriteria}
         participants={participants}
         submissions={submissions}
-        isLoading={isLoadingSubmissions}
+        isLoadingSubmissions={isLoadingSubmissions}
+        isLoadingUsers={isLoadingUsers}
+        analytics={analytics}
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}
         newSubmission={newSubmission}
         onNewSubmissionChange={setNewSubmission}
         onCreateSubmission={onCreateSubmission}
         onDeleteSubmission={onDeleteSubmission}
+        top3RankingSummary={top3RankingSummary}
+        isLoadingTop3Rankings={isLoadingTop3Rankings}
+        top3SubmissionLookup={top3SubmissionLookup}
       />
 
       {onCreateJudgeInvite && onToggleJudgeInviteHackathon && onJudgeInviteLabelChange ? (

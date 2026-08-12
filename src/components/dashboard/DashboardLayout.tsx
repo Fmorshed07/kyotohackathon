@@ -31,10 +31,12 @@ import {
   Server,
   Mail,
   ChevronDown,
+  ClipboardCheck,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { useState, type ReactNode } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
 import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +72,9 @@ import {
 import { HackathonSelector } from "@/components/dashboard/HackathonSelector";
 import {
   PORTAL_HACKATHONS,
+  filterCurrentHackathons,
+  getEventBoardPath,
+  getHackathonPublicUrl,
   getHackathonsByIds,
   getUserAllowedHackathonIds,
   type HackathonId,
@@ -125,39 +130,84 @@ const roleThemes: Record<
 const menuButtonClass =
   "group/nav dash-nav-item h-10 sm:h-11 hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/15 data-[active=true]:font-medium data-[active=true]:text-primary";
 
+/**
+ * Multi-line sidebar rows: SidebarMenuButton defaults to overflow-hidden +
+ * [&>span:last-child]:truncate (nowrap). Keep overflow clipped (no neon bleed) but
+ * allow the label stack to wrap so dates stay readable.
+ */
+const multiLineMenuButtonClass =
+  `${menuButtonClass} !h-auto min-h-11 items-center py-2.5 [&>span:last-child]:!overflow-hidden [&>span:last-child]:!whitespace-normal [&>span:last-child]:min-w-0`;
+
 const navIconClass = "dash-nav-icon group-hover/nav:text-primary";
+
+/** Keep long hosted-event ranges readable in the narrow sidebar. */
+const formatNavEventDate = (eventDate: string) => {
+  const trimmed = eventDate.trim();
+  if (!trimmed) return "";
+  const parts = trimmed.split(/\s+[–—-]\s+/);
+  if (parts.length < 2) return trimmed;
+  const start = parts[0] ?? "";
+  const end = parts[1] ?? "";
+  const startDay = start.match(/^([A-Za-z]{3}\s+\d{1,2})/);
+  const endDay = end.match(/^([A-Za-z]{3}\s+\d{1,2})/);
+  const year = end.match(/\b(20\d{2})\b/)?.[1] ?? start.match(/\b(20\d{2})\b/)?.[1];
+  if (startDay && endDay && year) {
+    return `${startDay[1]}–${endDay[1]}, ${year}`;
+  }
+  return start;
+};
 
 const groupLabelClass = "dash-nav-label !text-primary/70";
 
+const ADMIN_HOME = "/dashboard/admin";
+
 const ADMIN_OPERATE: NavItem[] = [
-  { href: "#overview", label: "Overview", icon: LayoutDashboard },
+  { href: `${ADMIN_HOME}#overview`, label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/admin/screening", label: "Screening agent", icon: Radar },
   { href: "/dashboard/admin/operations", label: "Operations", icon: Activity },
   { href: "/dashboard/admin/events", label: "Event management", icon: CalendarCheck2 },
-  { href: "/dashboard/admin#platform", label: "Platform", icon: Server },
+  { href: `${ADMIN_HOME}#platform`, label: "Platform", icon: Server },
 ];
 
 const ADMIN_CREATE: NavItem[] = [
-  { href: "#ai-event-builder", label: "AI event builder", icon: Wand2 },
-  { href: "#manual-event-builder", label: "Manual event", icon: PenLine },
+  { href: `${ADMIN_HOME}#ai-event-builder`, label: "AI event builder", icon: Wand2 },
+  { href: `${ADMIN_HOME}#manual-event-builder`, label: "Manual event", icon: PenLine },
   { href: "/dashboard/host", label: "Host ops", icon: Ticket, toHost: true },
 ];
 
 const ADMIN_PEOPLE: NavItem[] = [
-  { href: "#manage-participants", label: "Participants", icon: Users },
-  { href: "#manage-judges", label: "Judges", icon: Scale },
-  { href: "#manage-hosts", label: "Host approvals", icon: UserCog },
-  { href: "#judge-invites", label: "Judge invites", icon: Mail },
+  { href: `${ADMIN_HOME}#manage-participants`, label: "Participants", icon: Users },
+  { href: `${ADMIN_HOME}#manage-judges`, label: "Judges", icon: Scale },
+  { href: `${ADMIN_HOME}#manage-hosts`, label: "Host approvals", icon: UserCog },
+  { href: `${ADMIN_HOME}#judge-invites`, label: "Judge invites", icon: Mail },
+  { href: `${ADMIN_HOME}#host-analytics`, label: "Host analytics", icon: ChartColumn },
 ];
 
 const ADMIN_SCORING: NavItem[] = [
-  { href: "#judge-marks", label: "Judge marks", icon: Gavel },
-  { href: "#submission-marks", label: "Submissions", icon: ClipboardList },
-  { href: "#analytics", label: "Analytics", icon: BarChart3 },
-  { href: "#host-analytics", label: "Host analytics", icon: ChartColumn },
-  { href: "#top-3-marks", label: "Top 3 marks", icon: Medal },
-  { href: "#top-3-ranking", label: "Top 3 ranking", icon: Trophy },
+  { href: `${ADMIN_HOME}#judging`, label: "Judging overview", icon: Gavel },
+  { href: `${ADMIN_HOME}#marking-criteria`, label: "Criteria", icon: ListChecks },
+  { href: `${ADMIN_HOME}#analytics`, label: "Analytics", icon: BarChart3 },
+  { href: `${ADMIN_HOME}#judge-marks`, label: "Mark check", icon: ClipboardCheck },
+  { href: `${ADMIN_HOME}#top-3-marks`, label: "Top 3 by score", icon: Medal },
+  { href: `${ADMIN_HOME}#top-3-ranking`, label: "Top 3 ballots", icon: Trophy },
+  { href: `${ADMIN_HOME}#submission-marks`, label: "Submissions", icon: ClipboardList },
 ];
+
+function scrollToHashId(id: string) {
+  const target = document.getElementById(id);
+  if (!target) return false;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  return true;
+}
+
+function scheduleHashScroll(id: string) {
+  const attempts = [0, 80, 250, 500];
+  for (const delay of attempts) {
+    window.setTimeout(() => {
+      scrollToHashId(id);
+    }, delay);
+  }
+}
 
 function MobileSidebarClose() {
   const { isMobile, setOpenMobile } = useSidebar();
@@ -207,6 +257,9 @@ function DashboardNavLink({
   onNavigate: () => void;
   external?: boolean;
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   if (external) {
     return (
       <a
@@ -221,11 +274,34 @@ function DashboardNavLink({
     );
   }
 
-  if (href.startsWith("#")) {
+  const hashIndex = href.indexOf("#");
+  const hasHash = hashIndex >= 0;
+  const pathPart = hasHash ? href.slice(0, hashIndex) : href;
+  const hashId = hasHash ? href.slice(hashIndex + 1) : "";
+
+  // In-page section links (and /dashboard/admin#section from other admin routes).
+  if (hasHash && hashId) {
     const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
-      const target = document.getElementById(href.slice(1));
-      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const targetPath = pathPart || location.pathname;
+      const onTargetPage = targetPath === location.pathname;
+
+      if (onTargetPage && scrollToHashId(hashId)) {
+        window.history.replaceState(null, "", `${location.pathname}${location.search}#${hashId}`);
+        onNavigate();
+        return;
+      }
+
+      if (onTargetPage) {
+        // Section may still be mounting — keep URL in sync and retry scroll.
+        window.history.replaceState(null, "", `${location.pathname}${location.search}#${hashId}`);
+        scheduleHashScroll(hashId);
+        onNavigate();
+        return;
+      }
+
+      navigate(`${targetPath}#${hashId}`);
+      scheduleHashScroll(hashId);
       onNavigate();
     };
 
@@ -241,6 +317,25 @@ function DashboardNavLink({
       {children}
     </Link>
   );
+}
+
+/** When landing on /dashboard/admin#judging or /dashboard/host#tickets, scroll once the section exists. */
+function AdminHashScroll() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (
+      !location.pathname.startsWith("/dashboard/admin") &&
+      location.pathname !== "/dashboard/host"
+    ) {
+      return;
+    }
+    const id = location.hash.replace(/^#/, "").trim();
+    if (!id) return;
+    scheduleHashScroll(id);
+  }, [location.hash, location.pathname]);
+
+  return null;
 }
 
 function NavMenuItems({
@@ -359,18 +454,26 @@ function DashboardLayoutContent({
   const userInitial = (sessionUser.email?.[0] ?? "?").toUpperCase();
 
   // Participants, judges, and mentors only see boards for their assigned events.
-  // Admins keep the full catalog.
-  const boardHackathons =
-    role === "admin"
-      ? PORTAL_HACKATHONS
-      : hackathons && hackathons.length > 0
-        ? hackathons
+  // Admins use the live catalog passed from the dashboard (includes hosted events).
+  // Boards nav: active + upcoming so live hosted events stay reachable.
+  const catalogHackathons =
+    hackathons && hackathons.length > 0
+      ? hackathons
+      : role === "admin"
+        ? PORTAL_HACKATHONS
         : getHackathonsByIds(
             getUserAllowedHackathonIds({
               hackathonId: sessionUser.hackathonId,
               hackathonIds: sessionUser.hackathonIds,
             }),
           );
+  const boardHackathons = catalogHackathons.filter(
+    (hackathon) => hackathon.status === "active" || hackathon.status === "upcoming",
+  );
+  // Ops switcher: live/upcoming only (keep the current selection visible if it's past).
+  const switcherHackathons = filterCurrentHackathons(catalogHackathons, {
+    includeId: selectedHackathonId,
+  });
 
   const closeMobileNav = () => {
     if (isMobile) {
@@ -439,7 +542,7 @@ function DashboardLayoutContent({
                 defaultOpen
               />
               <CollapsibleNavSection
-                label="Scoring"
+                label="Judging"
                 items={ADMIN_SCORING}
                 onNavigate={closeMobileNav}
                 defaultOpen={false}
@@ -449,7 +552,10 @@ function DashboardLayoutContent({
             <NavSection label="Dashboard">
               <SidebarMenuItem>
                 <SidebarMenuButton asChild className={menuButtonClass}>
-                  <DashboardNavLink href="#overview" onNavigate={closeMobileNav}>
+                  <DashboardNavLink
+                    href={role === "host" ? "/dashboard/host#overview" : "#overview"}
+                    onNavigate={closeMobileNav}
+                  >
                     <LayoutDashboard className={navIconClass} />
                     <span>Overview</span>
                   </DashboardNavLink>
@@ -542,7 +648,32 @@ function DashboardLayoutContent({
                 <>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#event-details" onNavigate={closeMobileNav}>
+                      <DashboardNavLink
+                        href="/dashboard/host/screening"
+                        onNavigate={closeMobileNav}
+                      >
+                        <Radar className={navIconClass} />
+                        <span>Screening agent</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink
+                        href="/dashboard/host/operations"
+                        onNavigate={closeMobileNav}
+                      >
+                        <Activity className={navIconClass} />
+                        <span>Operations</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink
+                        href="/dashboard/host#event-details"
+                        onNavigate={closeMobileNav}
+                      >
                         <CalendarRange className={navIconClass} />
                         <span>Event details</span>
                       </DashboardNavLink>
@@ -550,7 +681,7 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#tickets" onNavigate={closeMobileNav}>
+                      <DashboardNavLink href="/dashboard/host#tickets" onNavigate={closeMobileNav}>
                         <Ticket className={navIconClass} />
                         <span>Tickets & QR</span>
                       </DashboardNavLink>
@@ -558,17 +689,9 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#check-in" onNavigate={closeMobileNav}>
-                        <ClipboardList className={navIconClass} />
+                      <DashboardNavLink href="/dashboard/host#check-in" onNavigate={closeMobileNav}>
+                        <ClipboardCheck className={navIconClass} />
                         <span>Check-in</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#judges" onNavigate={closeMobileNav}>
-                        <Scale className={navIconClass} />
-                        <span>Judges</span>
                       </DashboardNavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -577,67 +700,94 @@ function DashboardLayoutContent({
             </NavSection>
           )}
 
-          {role !== "host" && (
-            <NavSection label="Boards">
-              {role === "admin" && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={menuButtonClass}>
-                    <DashboardNavLink href="/boards" onNavigate={closeMobileNav}>
-                      <LayoutGrid className={navIconClass} />
-                      <span>All boards</span>
-                    </DashboardNavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {boardHackathons.map((hackathon) => (
-                <SidebarMenuItem key={hackathon.id}>
-                  <SidebarMenuButton asChild className={menuButtonClass}>
-                    <DashboardNavLink
-                      href={`/boards/${hackathon.id}`}
-                      onNavigate={closeMobileNav}
-                    >
-                      <CalendarRange className={navIconClass} />
-                      <span className="flex min-w-0 flex-col items-start gap-0.5">
-                        <span className="truncate">{hackathon.shortName} Board</span>
-                        <span className="dash-nav-meta">{hackathon.eventDate}</span>
-                      </span>
-                    </DashboardNavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {(role === "participant" || isStaffDashboard) &&
-              boardHackathons.length === 0 ? (
-                <SidebarMenuItem>
-                  <p className="px-2 py-2 text-xs text-muted-foreground">
-                    {role === "participant"
-                      ? "Your event board appears here after you register for a hackathon."
-                      : "Assigned event boards appear here after an admin grants you access."}
-                  </p>
-                </SidebarMenuItem>
-              ) : null}
+          {role === "host" && (
+            <NavSection label="Scoring">
+              <NavMenuItems
+                items={[
+                  { href: "/dashboard/host#judges", label: "Judges", icon: Scale },
+                  { href: "/dashboard/host#judging", label: "Judging", icon: Gavel },
+                  { href: "/dashboard/host#judge-marks", label: "Mark check", icon: ClipboardCheck },
+                  { href: "/dashboard/host#submission-marks", label: "Submissions", icon: ClipboardList },
+                  { href: "/dashboard/host#marking-criteria", label: "Criteria", icon: ListChecks },
+                  { href: "/dashboard/host#analytics", label: "Analytics", icon: BarChart3 },
+                  { href: "/dashboard/host#top-3-marks", label: "Top 3 by score", icon: Medal },
+                  { href: "/dashboard/host#top-3-ranking", label: "Top 3 ballots", icon: Trophy },
+                ]}
+                onNavigate={closeMobileNav}
+              />
             </NavSection>
           )}
 
-          {(role === "admin" || isStaffDashboard || role === "participant") &&
-            hackathons &&
+          <NavSection label="Boards">
+            {role === "admin" && (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className={menuButtonClass}>
+                  <DashboardNavLink href="/boards" onNavigate={closeMobileNav}>
+                    <LayoutGrid className={navIconClass} />
+                    <span>All boards</span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {boardHackathons.map((hackathon) => (
+              <SidebarMenuItem key={hackathon.id}>
+                <SidebarMenuButton asChild className={multiLineMenuButtonClass}>
+                  <DashboardNavLink
+                    href={getEventBoardPath(hackathon.id)}
+                    onNavigate={closeMobileNav}
+                  >
+                    <CalendarRange className={navIconClass} />
+                    <span className="flex min-w-0 flex-col items-start gap-0.5">
+                      <span className="w-full truncate">{hackathon.shortName} Board</span>
+                      <span className="dash-nav-meta w-full">
+                        {formatNavEventDate(hackathon.eventDate)}
+                      </span>
+                    </span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+            {(role === "participant" || isStaffDashboard) &&
+            boardHackathons.length === 0 ? (
+              <SidebarMenuItem>
+                <p className="px-2 py-2 text-xs text-muted-foreground">
+                  {role === "participant"
+                    ? "Your event board appears here after you register for a hackathon."
+                    : "Assigned event boards appear here after an admin grants you access."}
+                </p>
+              </SidebarMenuItem>
+            ) : null}
+            {role === "host" && boardHackathons.length === 0 ? (
+              <SidebarMenuItem>
+                <p className="px-2 py-2 text-xs text-muted-foreground">
+                  Event boards appear here after you publish an event.
+                </p>
+              </SidebarMenuItem>
+            ) : null}
+          </NavSection>
+
+          {(role === "admin" || isStaffDashboard || role === "participant" || role === "host") &&
+            switcherHackathons.length > 0 &&
             selectedHackathonId &&
             onHackathonChange && (
               <NavSection label="Hackathons">
-                {hackathons.map((hackathon) => {
+                {switcherHackathons.map((hackathon) => {
                   const isActive = hackathon.id === selectedHackathonId;
                   return (
                     <SidebarMenuItem key={hackathon.id}>
                       <SidebarMenuButton
                         isActive={isActive}
-                        className={`!h-auto min-h-11 py-2.5 ${menuButtonClass}`}
+                        className={multiLineMenuButtonClass}
                         onClick={() => handleHackathonChange(hackathon.id)}
                       >
                         <CalendarRange className={navIconClass} />
                         <span className="flex min-w-0 flex-col items-start gap-0.5">
-                          <span className="truncate font-medium tracking-tight">
+                          <span className="w-full truncate font-medium tracking-tight">
                             {hackathon.shortName}
                           </span>
-                          <span className="dash-nav-meta">{hackathon.eventDate}</span>
+                          <span className="dash-nav-meta w-full">
+                            {formatNavEventDate(hackathon.eventDate)}
+                          </span>
                         </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -670,7 +820,14 @@ function DashboardLayoutContent({
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild className={menuButtonClass}>
-                <DashboardNavLink href="/hackathons" onNavigate={closeMobileNav}>
+                <DashboardNavLink
+                  href={
+                    selectedHackathonId
+                      ? getHackathonPublicUrl(selectedHackathonId)
+                      : "/hackathons"
+                  }
+                  onNavigate={closeMobileNav}
+                >
                   <Sparkles className={navIconClass} />
                   <span>Event site</span>
                 </DashboardNavLink>
@@ -769,12 +926,12 @@ function DashboardLayoutContent({
               </p>
             </div>
           </div>
-          {(role === "admin" || isStaffDashboard || role === "participant") &&
+          {(role === "admin" || isStaffDashboard || role === "participant" || role === "host") &&
             hackathons &&
             selectedHackathonId &&
             onHackathonChange && (
               <HackathonSelector
-                hackathons={hackathons}
+                hackathons={switcherHackathons.length > 0 ? switcherHackathons : hackathons}
                 selectedHackathonId={selectedHackathonId}
                 onSelect={onHackathonChange}
                 compact
@@ -840,6 +997,7 @@ function DashboardLayoutContent({
 export function DashboardLayout(props: DashboardLayoutProps) {
   return (
     <SidebarProvider className="min-h-svh h-auto">
+      <AdminHashScroll />
       <DashboardLayoutContent {...props} />
     </SidebarProvider>
   );

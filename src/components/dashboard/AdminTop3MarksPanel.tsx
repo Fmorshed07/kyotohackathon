@@ -102,9 +102,9 @@ export function AdminTop3MarksPanel({
           </span>
           <div className="min-w-0">
             <p className="dash-eyebrow">Score leaderboard</p>
-            <h2 className="dash-title">Top 3 teams by marks</h2>
+            <h2 className="dash-title">Top 3 by average score</h2>
             <p className="dash-subtitle">
-              Highest average judge scores for {selectedHackathon.name}.
+              Highest average judge marks for {selectedHackathon.name}.
             </p>
           </div>
         </div>

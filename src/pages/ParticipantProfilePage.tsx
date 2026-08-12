@@ -19,8 +19,8 @@ import {
   getUserAllowedHackathonIds,
   HACKATHON_STORAGE_KEYS,
   isHackathonId,
+  pickPreferredHackathonId,
   PORTAL_HACKATHONS,
-  SITE_HACKATHON_ID,
   type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
@@ -195,7 +195,11 @@ export default function ParticipantProfilePage() {
     if (!sessionUser || sessionUser.role !== "participant") return;
     if (accessibleHackathonIds.length === 0) return;
     if (accessibleHackathonIds.includes(selectedHackathonId)) return;
-    setSelectedHackathonId(accessibleHackathonIds[0] ?? SITE_HACKATHON_ID);
+    const fallback = pickPreferredHackathonId(accessibleHackathonIds, {
+      storedId: selectedHackathonId,
+      primaryId: sessionUser.hackathonId,
+    });
+    if (fallback) setSelectedHackathonId(fallback);
   }, [accessibleHackathonIds, selectedHackathonId, sessionUser, setSelectedHackathonId]);
 
   useEffect(() => {

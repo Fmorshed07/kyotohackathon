@@ -42,7 +42,7 @@ const ParticipantsSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen overflow-hidden px-6 py-32" id="participants">
+    <section className="relative min-h-svh overflow-hidden px-4 py-20 sm:px-6 sm:py-28 md:py-32" id="participants">
       <motion.div
         className="absolute inset-0 -z-10"
         initial={{ opacity: 0 }}

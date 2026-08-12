@@ -1,7 +1,24 @@
-import { collection, doc, deleteDoc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch, type Firestore } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  deleteDoc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+  type Firestore,
+  type Unsubscribe,
+} from "firebase/firestore";
 import { getFirebaseAuth } from "@/lib/firebaseClient";
 import {
   PORTAL_HACKATHONS,
+  STATUS_ORDER,
+  buildAdminHackathonCatalog,
+  getHackathonPublicUrl,
   isJoinableHackathon,
   mergeHackathonCatalogs,
   sortJoinableHackathons,
@@ -422,7 +439,7 @@ function asHostedHackathon(
     createdAt: event.createdAt?.trim() || "",
     createdBy: event.createdBy?.trim() || "",
     aiGenerated: event.aiGenerated === true,
-    createdManually: event.aiGenerated !== true,
+    createdManually: event.createdManually === true || (event.aiGenerated !== true && Boolean(event.hostEventId)),
     hostEventId: typeof event.hostEventId === "string" ? event.hostEventId : undefined,
     organizerName: typeof event.organizerName === "string" ? event.organizerName.trim() : "",
     logoUrl: externalUrl(event.logoUrl),
@@ -451,14 +468,105 @@ export async function fetchAiHackathons(db: Firestore): Promise<HostedHackathon[
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-/** Admin-only: includes unpublished drafts and hidden events. */
-export async function fetchAllHackathonsForAdmin(db: Firestore): Promise<HostedHackathon[]> {
-  const snapshot = await getDocs(collection(db, "hackathons"));
+function mapAdminHackathonDocs(
+  docs: Array<{ id: string; data: () => Record<string, unknown> }>,
+  options?: { requirePublished?: boolean },
+): HostedHackathon[] {
   return sortHostedHackathons(
-    snapshot.docs
-      .map((snapshot) => asHostedHackathon(snapshot.id, snapshot.data(), { requirePublished: false }))
+    docs
+      .map((docSnap) =>
+        asHostedHackathon(docSnap.id, docSnap.data() as Record<string, unknown>, options),
+      )
       .filter((event): event is HostedHackathon => event !== null),
   );
+}
+
+/**
+ * List queries silently omit docs the client cannot read (e.g. unpublished when
+ * admin claim is slow). Always re-fetch portal editions by id so Mark past /
+ * Unpublish on Kyoto/Tokyo/Dhaka still reach the admin UI.
+ */
+async function mergePortalEditionOverrides(
+  db: Firestore,
+  events: HostedHackathon[],
+): Promise<HostedHackathon[]> {
+  const portalDocs = await Promise.all(
+    PORTAL_HACKATHONS.map((portal) => fetchHackathonForAdmin(db, portal.id)),
+  );
+  const byId = new Map(events.map((event) => [event.id, event]));
+  for (const portalDoc of portalDocs) {
+    if (portalDoc) byId.set(portalDoc.id, portalDoc);
+  }
+  return sortHostedHackathons([...byId.values()]);
+}
+
+/** Admin-only: includes unpublished drafts and hidden events. */
+export async function fetchAllHackathonsForAdmin(db: Firestore): Promise<HostedHackathon[]> {
+  let listed: HostedHackathon[] = [];
+  try {
+    const snapshot = await getDocs(collection(db, "hackathons"));
+    listed = mapAdminHackathonDocs(snapshot.docs, { requirePublished: false });
+  } catch (error) {
+    // Non-admin list rules only allow published docs — fall back so switchers still work.
+    console.warn("[hackathons] Full admin list failed; loading published events only.", error);
+    listed = await fetchPublishedHackathons(db);
+  }
+  return mergePortalEditionOverrides(db, listed);
+}
+
+/**
+ * Live admin catalog: any create / publish / status change in Firestore
+ * appears in the event switcher without a page reload.
+ */
+export function subscribeAllHackathonsForAdmin(
+  db: Firestore,
+  onChange: (events: HostedHackathon[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  let cancelled = false;
+
+  const publish = (events: HostedHackathon[]) => {
+    void mergePortalEditionOverrides(db, events)
+      .then((merged) => {
+        if (!cancelled) onChange(merged);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        // Still surface the list we have rather than blanking the UI.
+        onChange(events);
+        onError?.(
+          error instanceof Error ? error : new Error("Could not merge portal editions."),
+        );
+      });
+  };
+
+  const unsubscribe = onSnapshot(
+    collection(db, "hackathons"),
+    (snapshot) => {
+      publish(mapAdminHackathonDocs(snapshot.docs, { requirePublished: false }));
+    },
+    (error) => {
+      console.warn("[hackathons] Live admin list failed; falling back to one-shot fetch.", error);
+      onError?.(error);
+      void fetchAllHackathonsForAdmin(db)
+        .then((events) => {
+          if (!cancelled) onChange(events);
+        })
+        .catch((fallbackError: unknown) => {
+          if (cancelled) return;
+          onError?.(
+            fallbackError instanceof Error
+              ? fallbackError
+              : new Error("Could not load hosted hackathons."),
+          );
+        });
+    },
+  );
+
+  return () => {
+    cancelled = true;
+    unsubscribe();
+  };
 }
 
 export type HostedHackathonUpdate = Partial<
@@ -651,18 +759,96 @@ export function hostedToPortalHackathon(event: HostedHackathon): PortalHackathon
   };
 }
 
-/** Full name catalog for dashboard switchers (static boards + published Firebase events). */
+/**
+ * Load a portal edition for the public catalog. Unpublished docs are not
+ * readable to anonymous users (Firestore get rules) — treat permission errors
+ * as "unpublished / omit" instead of failing the whole catalog fetch.
+ */
+async function fetchPortalEditionForPublicCatalog(
+  db: Firestore,
+  id: string,
+): Promise<HostedHackathon | null | "unreadable"> {
+  try {
+    return await fetchHackathonForAdmin(db, id);
+  } catch {
+    return "unreadable";
+  }
+}
+
+/**
+ * Public name catalog: published Firebase rows win.
+ * Portal editions that exist in Firestore but are unpublished are omitted
+ * so home / boards / sign-in never show a stale Active Kyoto stub.
+ */
 export async function fetchPortalHackathonCatalog(db: Firestore): Promise<PortalHackathon[]> {
-  const published = await fetchPublishedHackathons(db);
-  return mergeHackathonCatalogs(
-    PORTAL_HACKATHONS,
-    published.map(hostedToPortalHackathon),
+  const [published, ...portalDocs] = await Promise.all([
+    fetchPublishedHackathons(db),
+    ...PORTAL_HACKATHONS.map((portal) => fetchPortalEditionForPublicCatalog(db, portal.id)),
+  ]);
+
+  const publishedById = new Map(
+    published.map((event) => [event.id, hostedToPortalHackathon(event)] as const),
   );
+  const catalog: PortalHackathon[] = [];
+
+  for (let index = 0; index < PORTAL_HACKATHONS.length; index += 1) {
+    const portal = PORTAL_HACKATHONS[index];
+    const doc = portalDocs[index];
+    if (doc === "unreadable") {
+      // Exists but unpublished (or otherwise not publicly readable) — omit.
+      publishedById.delete(portal.id);
+      continue;
+    }
+    if (doc) {
+      if (!doc.published) continue;
+      catalog.push(hostedToPortalHackathon(doc));
+      publishedById.delete(portal.id);
+      continue;
+    }
+    catalog.push(portal);
+    publishedById.delete(portal.id);
+  }
+
+  for (const event of publishedById.values()) {
+    catalog.push(event);
+  }
+
+  return [...catalog].sort((left, right) => {
+    const byStatus = STATUS_ORDER[left.status] - STATUS_ORDER[right.status];
+    if (byStatus !== 0) return byStatus;
+    return left.name.localeCompare(right.name);
+  });
+}
+
+/** Live event for hero / marketing: prefer published `active`, then joinable. */
+export async function fetchLivePortalHackathon(db: Firestore): Promise<PortalHackathon | null> {
+  const published = await fetchPublishedHackathons(db);
+  const active = published.find((event) => event.status === "active");
+  if (active) return hostedToPortalHackathon(active);
+
+  const createdAtById: Record<string, string> = {};
+  for (const event of published) {
+    createdAtById[event.id] = event.createdAt;
+  }
+  const joinable = sortJoinableHackathons(
+    published.filter(isJoinableHackathon).map(hostedToPortalHackathon),
+    createdAtById,
+  );
+  return joinable[0] ?? null;
+}
+
+/**
+ * Dashboard switchers: Firestore status/name overwrite static portal stubs
+ * so admin header badges match Go live / Mark past / Unpublish.
+ * Sorted active → upcoming → past so live events (e.g. AI Ideathon) surface first.
+ */
+export function buildAdminPortalCatalog(events: HostedHackathon[]): PortalHackathon[] {
+  return buildAdminHackathonCatalog(events.map(hostedToPortalHackathon));
 }
 
 /**
  * Events participants can join at signup / onboarding / dashboard.
- * Temporarily limited to AI Ideathon listings only (hide Kyoto/Dhaka catalog boards).
+ * Follows admin publish + lifecycle (active / upcoming only).
  */
 export async function fetchJoinablePortalHackathons(db: Firestore): Promise<PortalHackathon[]> {
   const published = await fetchPublishedHackathons(db);
@@ -671,12 +857,8 @@ export async function fetchJoinablePortalHackathons(db: Firestore): Promise<Port
     createdAtById[event.id] = event.createdAt;
   }
 
-  const ideathons = published
-    .filter(isJoinableHackathon)
-    .filter(isAiIdeathonEvent)
-    .map(hostedToPortalHackathon);
-
-  return sortJoinableHackathons(ideathons, createdAtById);
+  const joinable = published.filter(isJoinableHackathon).map(hostedToPortalHackathon);
+  return sortJoinableHackathons(joinable, createdAtById);
 }
 
 /** Signup / join pickers: match published AI Ideathon events by id or name. */
@@ -751,7 +933,7 @@ export async function deleteHostedHackathon(db: Firestore, id: string): Promise<
 }
 
 export function getHostedHackathonUrl(id: string) {
-  return `/events/${encodeURIComponent(id)}`;
+  return getHackathonPublicUrl(id);
 }
 
 export function getHackathonVisibilityLabel(event: Pick<HostedHackathon, "published" | "status">) {

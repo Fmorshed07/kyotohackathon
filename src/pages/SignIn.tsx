@@ -12,6 +12,7 @@ import { getDashboardPathForUser, isStaffRole, participantNeedsOnboarding } from
 import { consumePendingAdminGrant, hasPendingAdminGrant } from "@/lib/adminGrants";
 import {
   clearPendingInvite,
+  getJudgeDashboardPathAfterInvite,
   readPendingInvite,
   stashPendingInvite,
 } from "@/lib/inviteTokens";
@@ -97,13 +98,14 @@ const roleCopy: Record<
 > = {
   participant: {
     signupHint:
-      "Anyone can join AI Ideathon. Sign up with Google, confirm the event in onboarding, then open your participant dashboard.",
+      "Anyone can join an open Cognisor event. Sign up with Google, confirm the event in onboarding, then open your participant dashboard.",
     signinHint: "Log in with Google to open your participant workspace.",
-    headerSignup: "Join AI Ideathon",
+    headerSignup: "Join an open event",
     headerSignin: "Welcome back",
   },
   judge: {
-    signupHint: "Register as a judge. Accounts require admin approval before you can score submissions.",
+    signupHint:
+      "Register as a judge. Invite links approve you automatically; otherwise an admin must approve access.",
     signinHint: "Log in with Google to open your judging workspace.",
     headerSignup: "Join as a judge",
     headerSignin: "Welcome back, judge",
@@ -149,6 +151,9 @@ export default function SignIn() {
   const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const hasJudgeInvite =
+    Boolean(searchInvite?.trim()) || Boolean(readPendingInvite("judge"));
 
   useEffect(() => {
     if (searchInvite?.trim()) {
@@ -315,13 +320,15 @@ export default function SignIn() {
                   (value): value is string => typeof value === "string"
                 )
               : [];
-            await redeemJudgeInvite(db, pendingJudgeInviteOnSignIn, {
+            const redeemResult = await redeemJudgeInvite(db, pendingJudgeInviteOnSignIn, {
               userId: user.uid,
               email: user.email ?? "",
               existingHackathonIds: existingIds,
             });
             clearPendingInvite("judge");
-            navigate("/dashboard/judge", { replace: true });
+            navigate(getJudgeDashboardPathAfterInvite(redeemResult.primaryHackathonId), {
+              replace: true,
+            });
             return;
           } catch {
             // Fall through to normal dashboard routing.
@@ -465,13 +472,15 @@ export default function SignIn() {
           const existingIds = Array.isArray(existingData.hackathon_ids)
             ? existingData.hackathon_ids.filter((value): value is string => typeof value === "string")
             : [];
-          await redeemJudgeInvite(db, pendingJudgeInvite, {
+          const redeemResult = await redeemJudgeInvite(db, pendingJudgeInvite, {
             userId: user.uid,
             email: user.email ?? "",
             existingHackathonIds: existingIds,
           });
           clearPendingInvite("judge");
-          navigate("/dashboard/judge", { replace: true });
+          navigate(getJudgeDashboardPathAfterInvite(redeemResult.primaryHackathonId), {
+            replace: true,
+          });
           return;
         } catch (inviteError) {
           setAuthError(
@@ -690,7 +699,9 @@ export default function SignIn() {
                     ? authRole === "participant"
                       ? "You'll pick from the latest open events in onboarding, land in your dashboard, and can switch or join more events there."
                       : authRole === "judge"
-                        ? "Judge accounts need admin approval before scoring."
+                        ? hasJudgeInvite
+                          ? "This invite approves you automatically and opens the assigned event’s judge dashboard."
+                          : "Judge accounts need admin approval before scoring."
                         : "Host accounts need admin approval before running events."
                     : `Log in to your ${authRole} account.`}
                 </p>
@@ -699,7 +710,9 @@ export default function SignIn() {
               {(authRole === "judge" || authRole === "host") && mode === "signup" ? (
                 <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
                   {authRole === "judge"
-                    ? "After signup, an admin must approve your judge account before you can access scoring tools."
+                    ? hasJudgeInvite
+                      ? "Continue with Google to join as an approved judge for the invited event."
+                      : "After signup, an admin must approve your judge account before you can access scoring tools."
                     : "After signup, an admin must approve your host account before you can create events, issue tickets, or manage check-in."}
                 </div>
               ) : null}
@@ -723,7 +736,9 @@ export default function SignIn() {
 
               <p className="border-t border-border/40 pt-4 text-[0.7rem] text-muted-foreground">
                 Participant accounts are active immediately — choose your event during onboarding.
-                Judge and host accounts need admin approval.{" "}
+                {hasJudgeInvite && authRole === "judge"
+                  ? " Judge invite links skip admin approval and open the event workspace."
+                  : " Judge and host accounts need admin approval."}{" "}
                 <Link to="/admin" className="underline underline-offset-2 hover:text-foreground">
                   Admin
                 </Link>

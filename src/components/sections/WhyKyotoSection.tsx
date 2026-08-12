@@ -6,7 +6,7 @@ const WhyKyotoSection = () => {
   const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.2 });
 
   return (
-    <section className="relative min-h-[70vh] overflow-hidden px-6 py-32" id="why-kyoto">
+    <section className="relative min-h-[70vh] overflow-hidden px-4 py-20 sm:px-6 sm:py-28 md:py-32" id="why-kyoto">
       <motion.div
         className="absolute inset-0 -z-10"
         initial={{ opacity: 0 }}

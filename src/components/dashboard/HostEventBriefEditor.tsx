@@ -344,7 +344,7 @@ export function HostEventBriefEditor({
             />
           </label>
           <label className="space-y-1.5 sm:col-span-2">
-            <span className={fieldLabel}>Load existing draft</span>
+            <span className={fieldLabel}>Choose draft or ongoing edit</span>
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={selectedEventId}
@@ -621,9 +621,11 @@ export function HostEventBriefEditor({
         >
           <div className="relative min-h-[140px] overflow-hidden border-b border-white/10">
             {heroImage ? (
-              <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
-            ) : null}
-            <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--card))] via-[hsl(var(--card)/0.7)] to-transparent" />
+              <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.25),transparent_50%)]" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--card))] via-[hsl(var(--card)/0.55)] to-transparent" />
             <div className="relative px-5 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">Live public preview</p>
               <p className="mt-1 text-sm text-muted-foreground">

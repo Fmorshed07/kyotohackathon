@@ -1,33 +1,40 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    function isImageUnderLimit() {
-      return request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+    function isSignedIn() {
+      return request.auth != null;
     }
 
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isImageUnderLimit() {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|jpg|png|webp|gif)');
+    }
+
+    // Profile avatars
     match /profile-avatars/{userId}/{fileName} {
       allow read: if true;
-      allow create, update: if request.auth != null
-        && request.auth.uid == userId
-        && isImageUnderLimit();
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if isOwner(userId) && isImageUnderLimit();
+      allow delete: if isOwner(userId);
     }
 
+    // Profile banners / galleries AND participant project cover/gallery images
     match /profile-media/{userId}/{fileName} {
       allow read: if true;
-      allow create, update: if request.auth != null
-        && request.auth.uid == userId
-        && isImageUnderLimit();
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if isOwner(userId) && isImageUnderLimit();
+      allow delete: if isOwner(userId);
     }
 
+    // Host/admin event branding (cover, banner, gallery, guest, logo)
     match /event-media/{userId}/{fileName} {
       allow read: if true;
-      allow create, update: if request.auth != null
-        && request.auth.uid == userId
-        && isImageUnderLimit();
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if isOwner(userId) && isImageUnderLimit();
+      allow delete: if isOwner(userId);
     }
   }
 }
