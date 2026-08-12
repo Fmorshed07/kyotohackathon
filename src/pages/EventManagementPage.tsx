@@ -7,11 +7,20 @@ import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { HACKATHON_STORAGE_KEYS, PORTAL_HACKATHONS, type HackathonStatus } from "@/lib/hackathons";
 import {
+  deleteHostedHackathon,
   fetchAllHackathonsForAdmin,
+  publishHostEventPublicly,
   setHackathonPublished,
   setHackathonStatus,
+  unpublishHostEventPublicly,
+  updateHostedHackathon,
   type HostedHackathon,
+  type HostedHackathonUpdate,
 } from "@/lib/aiHackathons";
+import {
+  fetchAllHostEventsForAdmin,
+  type HostEvent,
+} from "@/lib/hostEvents";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { Button } from "@/components/ui/button";
 
@@ -19,6 +28,7 @@ export default function EventManagementPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
   const [events, setEvents] = useState<HostedHackathon[]>([]);
+  const [hostEvents, setHostEvents] = useState<HostEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
   const [busyEventId, setBusyEventId] = useState<string | null>(null);
@@ -38,8 +48,12 @@ export default function EventManagementPage() {
   const reloadEvents = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) setIsLoading(true);
     try {
-      const next = await fetchAllHackathonsForAdmin(db);
-      setEvents(next);
+      const [nextEvents, nextHostEvents] = await Promise.all([
+        fetchAllHackathonsForAdmin(db),
+        fetchAllHostEventsForAdmin(db),
+      ]);
+      setEvents(nextEvents);
+      setHostEvents(nextHostEvents);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Could not load events.");
     } finally {
@@ -101,6 +115,55 @@ export default function EventManagementPage() {
     );
   };
 
+  const handleSaveEvent = (eventId: string, patch: HostedHackathonUpdate) => {
+    const event = events.find((item) => item.id === eventId);
+    return runMutation(
+      eventId,
+      () => updateHostedHackathon(db, eventId, patch),
+      `${event?.name ?? "Event"} details saved.`,
+    );
+  };
+
+  const handleDeleteEvent = (eventId: string) => {
+    const event = events.find((item) => item.id === eventId);
+    return runMutation(
+      eventId,
+      () => deleteHostedHackathon(db, eventId),
+      `${event?.name ?? "Event"} was removed from the public directory.`,
+    );
+  };
+
+  const handlePublishHostEvent = (hostEventId: string) => {
+    const hostEvent = hostEvents.find((item) => item.id === hostEventId);
+    if (!hostEvent || !sessionUser) {
+      setStatusMessage("Host event not found.");
+      return;
+    }
+    return runMutation(
+      hostEventId,
+      async () => {
+        // Keep the public listing owned by the host so host re-publish stays allowed.
+        await publishHostEventPublicly(db, hostEvent, hostEvent.owner_id || sessionUser.id);
+      },
+      `${hostEvent.name || "Host event"} is now on the public directory.`,
+    );
+  };
+
+  const handleUnpublishHostEvent = (hostEventId: string) => {
+    const hostEvent = hostEvents.find((item) => item.id === hostEventId);
+    if (!hostEvent) {
+      setStatusMessage("Host event not found.");
+      return;
+    }
+    return runMutation(
+      hostEventId,
+      async () => {
+        await unpublishHostEventPublicly(db, hostEvent);
+      },
+      `${hostEvent.name || "Host event"} was unpublished.`,
+    );
+  };
+
   if (authLoading) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
@@ -141,18 +204,27 @@ export default function EventManagementPage() {
             Operations
           </Link>
         </Button>
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Link to="/dashboard/host">Host portal</Link>
+        </Button>
       </div>
 
       <section className={sectionClass}>
         <EventManagementWorkspace
           events={events}
+          hostEvents={hostEvents}
           isLoading={isLoading}
           isBusy={isBusy}
           busyEventId={busyEventId}
           statusMessage={statusMessage}
+          onRefresh={() => reloadEvents()}
           onPublish={handlePublish}
           onUnpublish={handleUnpublish}
           onSetStatus={handleSetStatus}
+          onSaveEvent={handleSaveEvent}
+          onDeleteEvent={handleDeleteEvent}
+          onPublishHostEvent={handlePublishHostEvent}
+          onUnpublishHostEvent={handleUnpublishHostEvent}
         />
       </section>
     </DashboardLayout>

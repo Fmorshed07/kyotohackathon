@@ -34,8 +34,10 @@ import {
 } from "@/lib/judgeTop3Rankings";
 import { buildAdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { sendParticipantEmail, queueParticipantEmail } from "@/lib/participantEmail";
+import { buildInviteUrl } from "@/lib/inviteTokens";
+import { createJudgeInvite } from "@/lib/portalInvites";
 import {
-  fetchAiHackathons,
+  fetchAllHackathonsForAdmin,
   publishAiHackathon,
   publishManualHackathon,
   type AiHackathonDraft,
@@ -166,13 +168,18 @@ export default function AdminDashboardPage() {
   const [activeOpsProjectId, setActiveOpsProjectId] = useState<string | null>(null);
   const [opsRubric, setOpsRubric] = useState<Record<string, number>>({});
   const [opsCopilotNote, setOpsCopilotNote] = useState("Select a submission, then run the copilot.");
+  const [judgeInviteLabel, setJudgeInviteLabel] = useState("");
+  const [judgeInviteHackathonIds, setJudgeInviteHackathonIds] = useState<HackathonId[]>([]);
+  const [judgeInviteUrl, setJudgeInviteUrl] = useState<string | null>(null);
+  const [judgeInviteMessage, setJudgeInviteMessage] = useState<string | null>(null);
+  const [isCreatingJudgeInvite, setIsCreatingJudgeInvite] = useState(false);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
-    void fetchAiHackathons(db)
+    void fetchAllHackathonsForAdmin(db)
       .then((events) => setAiHackathons(events))
       .catch((error: unknown) => {
-        console.warn("[admin] Could not load AI-created hackathons.", error);
+        console.warn("[admin] Could not load hosted hackathons.", error);
       });
   }, [db, sessionUser]);
 
@@ -321,6 +328,12 @@ export default function AdminDashboardPage() {
       cancelled = true;
     };
   }, [sessionUser, db, selectedHackathonId]);
+
+  useEffect(() => {
+    setJudgeInviteHackathonIds((current) =>
+      current.includes(selectedHackathonId) ? current : [selectedHackathonId]
+    );
+  }, [selectedHackathonId]);
 
   const getUserEmail = (identifier: string | null | undefined) => {
     if (!identifier) return null;
@@ -766,6 +779,32 @@ export default function AdminDashboardPage() {
     setSelectedHackathonId(event.id);
     setMessage(`${event.name} was manually created and published.`);
     return event;
+  };
+
+  const handleCreateJudgeInvite = async () => {
+    if (!sessionUser) return;
+    if (judgeInviteHackathonIds.length === 0) {
+      setJudgeInviteMessage("Select at least one event.");
+      return;
+    }
+    setIsCreatingJudgeInvite(true);
+    setJudgeInviteMessage(null);
+    try {
+      const invite = await createJudgeInvite(db, {
+        createdBy: sessionUser.id,
+        createdByEmail: sessionUser.email,
+        hackathonIds: judgeInviteHackathonIds,
+        label: judgeInviteLabel,
+      });
+      setJudgeInviteUrl(buildInviteUrl("judge", invite.token));
+      setJudgeInviteMessage("Judge invite link ready — share for direct portal access.");
+    } catch (error: unknown) {
+      setJudgeInviteMessage(
+        error instanceof Error ? error.message : "Unable to create judge invite."
+      );
+    } finally {
+      setIsCreatingJudgeInvite(false);
+    }
   };
 
   const handleGrantAdminAccess = async () => {
@@ -1228,6 +1267,7 @@ export default function AdminDashboardPage() {
     >
       <AdminDashboard
         selectedHackathon={selectedHackathon}
+        hackathons={adminHackathons}
         judgingCriteria={judgingCriteria}
         isLoadingCriteria={isLoadingCriteria}
         isSavingCriteria={isSavingCriteria}
@@ -1290,6 +1330,20 @@ export default function AdminDashboardPage() {
         }}
         onCreateAiHackathon={handleCreateAiHackathon}
         onCreateManualHackathon={handleCreateManualHackathon}
+        judgeInviteLabel={judgeInviteLabel}
+        onJudgeInviteLabelChange={setJudgeInviteLabel}
+        judgeInviteHackathonIds={judgeInviteHackathonIds}
+        onToggleJudgeInviteHackathon={(hackathonId) => {
+          setJudgeInviteHackathonIds((current) =>
+            current.includes(hackathonId)
+              ? current.filter((id) => id !== hackathonId)
+              : [...current, hackathonId]
+          );
+        }}
+        judgeInviteUrl={judgeInviteUrl}
+        judgeInviteMessage={judgeInviteMessage}
+        isCreatingJudgeInvite={isCreatingJudgeInvite}
+        onCreateJudgeInvite={handleCreateJudgeInvite}
       />
     </DashboardLayout>
   );

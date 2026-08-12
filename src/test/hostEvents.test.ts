@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createTicketCode, createTicketQrPayload, extractTicketCode } from "@/lib/hostEvents";
+import {
+  buildHostEventSummary,
+  createTicketCode,
+  createTicketQrPayload,
+  extractTicketCode,
+  normalizeFocusAreas,
+} from "@/lib/hostEvents";
 
 describe("host ticket helpers", () => {
   it("creates a compact ticket code", () => {
@@ -12,5 +18,31 @@ describe("host ticket helpers", () => {
 
     expect(extractTicketCode(payload)).toBe(code);
     expect(extractTicketCode(code.toLowerCase())).toBe(code);
+  });
+});
+
+describe("host event brief helpers", () => {
+  it("normalizes focus areas from comma text", () => {
+    expect(normalizeFocusAreas("Education, Healthcare\nFinance")).toEqual([
+      "Education",
+      "Healthcare",
+      "Finance",
+    ]);
+  });
+
+  it("builds a structured public summary with hierarchy markers", () => {
+    const summary = buildHostEventSummary({
+      name: "AI Ideathon 2026",
+      tagline: "Build AI Solutions That Solve Real World Problems",
+      description: "A three-day online ideathon.",
+      highlightNote: "Late registration is open.",
+      theme: "AI for Real World Impact",
+      focusAreas: ["Education", "Healthcare"],
+    });
+
+    expect(summary).toContain("Build AI Solutions That Solve Real World Problems");
+    expect(summary).toContain("**Late registration is open.**");
+    expect(summary).toContain("### Theme");
+    expect(summary).toContain("- Education");
   });
 });

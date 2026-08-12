@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CalendarDays, ChevronDown, MapPin } from "lucide-react";
@@ -229,54 +229,139 @@ const HackathonsSection = () => {
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="font-display text-xs font-semibold uppercase tracking-[0.24em] text-primary">
-                  Published by organisers
+                  Live organiser hubs
                 </p>
                 <h2 id="published-events-heading" className="mt-2 font-display text-2xl font-semibold text-foreground sm:text-3xl">
-                  Explore event hubs
+                  Unique event experiences
                 </h2>
               </div>
               <p className="font-body text-sm text-muted-foreground">
-                Schedules, judging criteria, requirements, and rules included.
+                Each hub carries its own look, schedule, and registration path.
               </p>
             </div>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              {filteredPublishedEvents.map((event) => (
-                <article
-                  key={event.id}
-                  className="overflow-hidden rounded-2xl border border-primary/20 bg-card/75 shadow-[var(--surface-elevated)] backdrop-blur transition-colors hover:border-primary/50"
-                >
-                  {event.coverImageUrl ? <img src={event.coverImageUrl} alt={`${event.name} cover`} className="h-40 w-full object-cover" loading="lazy" /> : null}
-                  <div className="p-5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 font-body text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
-                        {event.status === "active" ? "Live now" : event.status}
-                      </span>
-                      <span className="font-body text-xs text-muted-foreground">
-                        {event.createdManually ? "Organiser-built" : "AI-assisted setup"}
-                      </span>
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredPublishedEvents.map((event, index) => {
+                const accent = event.accentColor || "#00A3FF";
+                const hero = event.bannerImageUrl || event.coverImageUrl;
+                return (
+                  <motion.article
+                    key={event.id}
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, delay: Math.min(index * 0.05, 0.3) }}
+                    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-card/80 shadow-[var(--surface-elevated)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-white/25"
+                    style={{
+                      ["--primary" as string]: undefined,
+                      boxShadow: `0 0 0 1px color-mix(in srgb, ${accent} 25%, transparent), var(--surface-elevated)`,
+                    }}
+                  >
+                    <div className="relative h-44 overflow-hidden bg-[#0a0c10]">
+                      {hero ? (
+                        <img
+                          src={hero}
+                          alt=""
+                          className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            background: `radial-gradient(ellipse at top right, ${accent}55, transparent 55%), linear-gradient(160deg, #0b1018, #050608)`,
+                          }}
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+                      <div className="absolute left-4 top-4 flex flex-wrap items-center gap-2">
+                        {event.logoUrl ? (
+                          <img
+                            src={event.logoUrl}
+                            alt=""
+                            className="h-9 w-9 rounded-md border border-white/20 object-cover shadow-lg"
+                          />
+                        ) : null}
+                        <span
+                          className="rounded-full border px-2.5 py-1 font-body text-[11px] font-semibold uppercase tracking-[0.12em] backdrop-blur"
+                          style={{
+                            borderColor: `${accent}66`,
+                            backgroundColor: `${accent}22`,
+                            color: accent,
+                          }}
+                        >
+                          {event.status === "active" ? "Live now" : event.status}
+                        </span>
+                      </div>
                     </div>
-                    <h3 className="mt-4 font-display text-2xl font-semibold tracking-tight text-foreground">
-                      {event.name}
-                    </h3>
-                    <p className="mt-2 line-clamp-2 font-body text-sm leading-relaxed text-muted-foreground">
-                      {event.summary || event.theme}
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 font-body text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-primary" />{event.eventDate}</span>
-                      <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-primary" />{event.location}</span>
-                    </div>
-                    <div className="mt-5 flex flex-wrap items-center gap-3">
-                      <Link
-                        to={getHostedHackathonUrl(event.id)}
-                        className="inline-flex items-center justify-center rounded-xl border border-primary/50 bg-primary/15 px-3.5 py-2 font-display text-xs font-semibold tracking-wide text-primary transition-colors hover:bg-primary/25"
+                    <div className="p-5">
+                      {event.organizerName ? (
+                        <p className="font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          {event.organizerName}
+                        </p>
+                      ) : (
+                        <p className="font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          {event.hostEventId ? "Hosted event" : event.createdManually ? "Organiser-built" : "AI-assisted"}
+                        </p>
+                      )}
+                      <h3
+                        className="mt-2 font-display text-2xl font-semibold tracking-tight text-foreground"
+                        style={
+                          event.fontPreset
+                            ? ({
+                                fontFamily:
+                                  event.fontPreset === "editorial"
+                                    ? '"Fraunces", Georgia, serif'
+                                    : event.fontPreset === "signal"
+                                      ? '"Syne", system-ui, sans-serif'
+                                      : event.fontPreset === "atelier"
+                                        ? '"Instrument Serif", Georgia, serif'
+                                        : undefined,
+                              } as CSSProperties)
+                            : undefined
+                        }
                       >
-                        Open event hub
-                      </Link>
-                      {event.lumaUrl ? <a href={event.lumaUrl} target="_blank" rel="noreferrer" className="font-body text-xs font-semibold text-primary hover:underline">Live event / Luma</a> : null}
+                        {event.name}
+                      </h3>
+                      <p className="mt-2 line-clamp-2 font-body text-sm leading-relaxed text-muted-foreground">
+                        {event.tagline || event.theme || event.summary}
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 font-body text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5">
+                          <CalendarDays className="h-3.5 w-3.5" style={{ color: accent }} />
+                          {event.eventDate}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5" style={{ color: accent }} />
+                          {event.location}
+                        </span>
+                      </div>
+                      <div className="mt-5 flex flex-wrap items-center gap-3">
+                        <Link
+                          to={getHostedHackathonUrl(event.id)}
+                          className="inline-flex items-center justify-center rounded-xl px-3.5 py-2 font-display text-xs font-semibold tracking-wide transition-colors"
+                          style={{
+                            border: `1px solid ${accent}80`,
+                            backgroundColor: `${accent}22`,
+                            color: accent,
+                          }}
+                        >
+                          Open event hub
+                        </Link>
+                        {event.lumaUrl ? (
+                          <a
+                            href={event.lumaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-body text-xs font-semibold hover:underline"
+                            style={{ color: accent }}
+                          >
+                            Register
+                          </a>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </article>
-              ))}
+                  </motion.article>
+                );
+              })}
             </div>
             {filteredPublishedEvents.length === 0 ? <p className="mt-5 rounded-xl border border-dashed border-white/15 bg-card/40 px-5 py-4 text-sm text-muted-foreground">No published event hubs match the selected city.</p> : null}
           </section>

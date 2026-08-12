@@ -66,6 +66,43 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admin_grants/$(request.auth.token.email.lower()));
     }
 
+    function openJudgeInvitePath(token) {
+      return /databases/$(database)/documents/portal_invites/$(token);
+    }
+
+    function hasOpenJudgeInvite(token) {
+      return token is string
+        && token.size() > 8
+        && exists(openJudgeInvitePath(token))
+        && get(openJudgeInvitePath(token)).data.status == "open"
+        && get(openJudgeInvitePath(token)).data.type == "judge";
+    }
+
+    function canCreateJudgeViaInvite(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == "judge"
+        && request.resource.data.judgeApprovalStatus == "approved"
+        && request.resource.data.keys().hasAll(["invite_token"])
+        && hasOpenJudgeInvite(request.resource.data.invite_token);
+    }
+
+    // New or pending judges redeeming a portal invite get approved + hackathon access.
+    function canRedeemJudgeInvite(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == "judge"
+        && request.resource.data.judgeApprovalStatus == "approved"
+        && request.resource.data.keys().hasAll(["invite_token"])
+        && hasOpenJudgeInvite(request.resource.data.invite_token)
+        && (
+          !("role" in resource.data)
+          || resource.data.role == null
+          || resource.data.role == ""
+          || resource.data.role == "judge"
+        );
+    }
+
     function canCreateOwnPortalAccount(userId) {
       return isSignedIn()
         && request.auth.uid == userId
@@ -75,6 +112,7 @@ service cloud.firestore {
             (request.resource.data.role == "judge" || request.resource.data.role == "mentor")
             && request.resource.data.judgeApprovalStatus == "pending"
           )
+          || canCreateJudgeViaInvite(userId)
           || (
             request.resource.data.role == "host"
             && request.resource.data.hostApprovalStatus == "pending"
@@ -128,7 +166,8 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (hasPendingAdminGrant() && request.auth.uid == userId)
         || canUpdateOwnProfile(userId)
-        || canClaimParticipantRole(userId);
+        || canClaimParticipantRole(userId)
+        || canRedeemJudgeInvite(userId);
       allow delete: if isAdmin();
     }
 
@@ -201,8 +240,92 @@ service cloud.firestore {
         request.auth.uid == resource.data.user_id
         || isApprovedStaff()
         || isAdmin()
+        || (
+          // Teammate accepting an invite: only membership fields + invite proof token.
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["member_names", "team_members", "join_invite_token"])
+          && request.resource.data.keys().hasAll(["join_invite_token"])
+          && request.resource.data.join_invite_token is string
+          && exists(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token))
+          && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.status == "open"
+          && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.submission_id == submissionId
+          && request.resource.data.user_id == resource.data.user_id
+        )
       );
       allow delete: if isAdmin();
+    }
+
+    // Looking-for-teammates board: signed-in participants can browse and post.
+    match /teammate_posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.author_email is string
+        && request.resource.data.looking_for is string
+        && request.resource.data.hackathon_id is string;
+      allow update, delete: if isSignedIn()
+        && (resource.data.user_id == request.auth.uid || isAdmin());
+    }
+
+    // Tokenized team invite links (document id == token).
+    match /team_invites/{token} {
+      allow get: if true;
+      allow list: if isSignedIn() && (isAdmin() || resource.data.owner_id == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.owner_id == request.auth.uid
+        && request.resource.data.submission_id is string
+        && request.resource.data.type == "team";
+      allow update: if isSignedIn() && (
+        isAdmin()
+        || resource.data.owner_id == request.auth.uid
+        || (
+          resource.data.status == "open"
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["use_count"])
+          && request.resource.data.use_count == resource.data.use_count + 1
+        )
+      );
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.owner_id == request.auth.uid);
+    }
+
+    // Linked teammates who joined via invite.
+    match /team_memberships/{membershipId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.invite_token is string
+        && exists(/databases/$(database)/documents/team_invites/$(request.resource.data.invite_token))
+        && get(/databases/$(database)/documents/team_invites/$(request.resource.data.invite_token)).data.status == "open"
+        && get(/databases/$(database)/documents/team_invites/$(request.resource.data.invite_token)).data.submission_id
+          == request.resource.data.submission_id;
+      allow delete: if isSignedIn() && (
+        isAdmin()
+        || resource.data.user_id == request.auth.uid
+        || resource.data.owner_id == request.auth.uid
+      );
+      allow update: if isAdmin();
+    }
+
+    // Judge portal invite links (document id == token). Anyone with the link can resolve it.
+    match /portal_invites/{token} {
+      allow get: if true;
+      allow list: if isSignedIn() && (isAdmin() || isApprovedHost());
+      allow create: if isAdmin()
+        || (
+          isApprovedHost()
+          && request.resource.data.created_by == request.auth.uid
+          && request.resource.data.type == "judge"
+        );
+      allow update: if isSignedIn() && (
+        isAdmin()
+        || (isApprovedHost() && resource.data.created_by == request.auth.uid)
+        || (
+          resource.data.status == "open"
+          && resource.data.type == "judge"
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["use_count", "used_by"])
+        )
+      );
+      allow delete: if isAdmin()
+        || (isApprovedHost() && resource.data.created_by == request.auth.uid);
     }
 
     // A minimal public copy is created only by a participant who opts their project into the gallery.
@@ -217,14 +340,36 @@ service cloud.firestore {
 
     match /hackathon_criteria/{hackathonId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || (
+        isApprovedHost()
+        && exists(/databases/$(database)/documents/hackathons/$(hackathonId))
+        && get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.createdBy == request.auth.uid
+      );
     }
 
-    // Public pages can load only events explicitly published by an admin.
+    // Public pages load published events. Approved hosts can publish/update their own listings.
     match /hackathons/{hackathonId} {
-      allow get: if resource.data.published == true || isAdmin();
+      allow get: if resource.data.published == true
+        || isAdmin()
+        || (isApprovedHost() && resource.data.createdBy == request.auth.uid);
       allow list: if resource.data.published == true || isAdmin();
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() || (
+        isApprovedHost()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.hostEventId is string
+        && request.resource.data.hostEventId.size() > 0
+        && ownsHostEvent(request.resource.data.hostEventId)
+      );
+      allow update: if isAdmin() || (
+        isApprovedHost()
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdBy == resource.data.createdBy
+        && (
+          !("hostEventId" in resource.data)
+          || request.resource.data.hostEventId == resource.data.hostEventId
+        )
+      );
+      allow delete: if isAdmin();
     }
 
     match /hackathon_ops/{hackathonId} {

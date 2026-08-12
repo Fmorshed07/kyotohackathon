@@ -10,6 +10,7 @@ import PlatformSection from "@/components/sections/PlatformSection";
 import FeaturePreviewSection from "@/components/sections/FeaturePreviewSection";
 import CognisorSection from "@/components/sections/CognisorSection";
 import CommunitySection from "@/components/sections/CommunitySection";
+import LookingForJobsSection from "@/components/sections/LookingForJobsSection";
 import FinalCTASection from "@/components/sections/FinalCTASection";
 
 const Index = () => {
@@ -41,6 +42,7 @@ const Index = () => {
           <PlatformSection />
           <CognisorSection />
           <CommunitySection />
+          <LookingForJobsSection />
           <FinalCTASection />
         </main>
       </motion.div>

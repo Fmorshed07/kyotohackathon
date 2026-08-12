@@ -31,6 +31,13 @@ export type UserProfile = {
   onboardingCompletedAt?: string | null;
 };
 
+export type TeamMemberRecord = {
+  user_id: string;
+  name: string;
+  email: string;
+  joined_at: string;
+};
+
 export type Submission = {
   id: string;
   user_id: string;
@@ -38,6 +45,8 @@ export type Submission = {
   title: string | null;
   team_name?: string | null;
   member_names?: string | null;
+  /** Linked portal accounts that joined via invite link. */
+  team_members?: TeamMemberRecord[] | null;
   short_description: string | null;
   project_url: string | null;
   submission_pdf_url: string | null;
@@ -54,6 +63,52 @@ export type Submission = {
   judge_notes_by_judge?: Record<string, string> | null;
   judge_criteria_scores?: Record<string, number | null> | null;
   judge_criteria_scores_by_judge?: Record<string, Record<string, number | null>> | null;
+};
+
+/** Public “looking for teammates” post visible on every participant dashboard. */
+export type TeammatePost = {
+  id: string;
+  user_id: string;
+  hackathon_id: string;
+  author_name: string;
+  author_email: string;
+  /** Roles / skills the poster wants on their team. */
+  looking_for: string;
+  message: string;
+  /** What the poster brings (optional). */
+  skills?: string | null;
+  status: "open" | "closed";
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeamInvite = {
+  id: string;
+  token: string;
+  submission_id: string;
+  owner_id: string;
+  hackathon_id: string;
+  team_name: string;
+  owner_name: string;
+  owner_email: string;
+  status: "open" | "revoked";
+  created_at: string;
+  max_uses?: number | null;
+  use_count: number;
+};
+
+export type PortalJudgeInvite = {
+  id: string;
+  token: string;
+  hackathon_ids: string[];
+  created_by: string;
+  created_by_email?: string | null;
+  label?: string | null;
+  status: "open" | "revoked";
+  created_at: string;
+  max_uses?: number | null;
+  use_count: number;
+  used_by?: string[] | null;
 };
 
 export type Top3RankSlot = "first" | "second" | "third";

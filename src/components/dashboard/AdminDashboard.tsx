@@ -46,6 +46,7 @@ import { AdminSubmissionsPanel } from "@/components/dashboard/AdminSubmissionsPa
 import { PlatformOpsConsole, type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole";
 import { AiHackathonLauncher } from "@/components/dashboard/AiHackathonLauncher";
 import { ManualHackathonLauncher } from "@/components/dashboard/ManualHackathonLauncher";
+import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { AdminTop3RankingSummary } from "@/lib/judgeTop3Rankings";
 import type { HostApprovalStatus, JudgeApprovalStatus, PortalRole, UserProfile } from "@/types/portal";
@@ -96,6 +97,8 @@ type AdminAnalytics = AdminJudgingStatistics;
 
 type AdminDashboardProps = {
   selectedHackathon: PortalHackathon;
+  /** Dynamic event list for staff access grants (portal + hosted). */
+  hackathons?: PortalHackathon[];
   judgingCriteria: JudgingCriterion[];
   isLoadingCriteria: boolean;
   isSavingCriteria: boolean;
@@ -144,6 +147,14 @@ type AdminDashboardProps = {
     draft: ManualHackathonDraft,
     rulebookUrl: string,
   ) => Promise<HostedHackathon>;
+  judgeInviteLabel?: string;
+  onJudgeInviteLabelChange?: (value: string) => void;
+  judgeInviteHackathonIds?: HackathonId[];
+  onToggleJudgeInviteHackathon?: (hackathonId: HackathonId) => void;
+  judgeInviteUrl?: string | null;
+  judgeInviteMessage?: string | null;
+  isCreatingJudgeInvite?: boolean;
+  onCreateJudgeInvite?: () => Promise<void>;
 };
 
 const roleBadgeVariant: Record<PortalRole, "default" | "secondary" | "outline"> = {
@@ -539,7 +550,7 @@ function UserManagementTable({
                           </Badge>
                         ) : isStaffRole(user.role) ? (
                           <div className="flex min-w-[200px] flex-wrap gap-1.5">
-                            {PORTAL_HACKATHONS.map((hackathon) => {
+                            {hackathons.map((hackathon) => {
                               const isGranted = grantedIds.includes(hackathon.id);
                               return (
                                 <button
@@ -708,6 +719,7 @@ function HostApprovalPanel({
 
 export function AdminDashboard({
   selectedHackathon,
+  hackathons = PORTAL_HACKATHONS,
   judgingCriteria,
   isLoadingCriteria,
   isSavingCriteria,
@@ -747,6 +759,14 @@ export function AdminDashboard({
   platformOpsLive,
   onCreateAiHackathon,
   onCreateManualHackathon,
+  judgeInviteLabel = "",
+  onJudgeInviteLabelChange,
+  judgeInviteHackathonIds = [],
+  onToggleJudgeInviteHackathon,
+  judgeInviteUrl = null,
+  judgeInviteMessage = null,
+  isCreatingJudgeInvite = false,
+  onCreateJudgeInvite,
 }: AdminDashboardProps) {
   const [newSubmission, setNewSubmission] = useState<NewSubmissionInput>({
     participantId: "",
@@ -1073,6 +1093,20 @@ export function AdminDashboard({
         onCreateSubmission={onCreateSubmission}
         onDeleteSubmission={onDeleteSubmission}
       />
+
+      {onCreateJudgeInvite && onToggleJudgeInviteHackathon && onJudgeInviteLabelChange ? (
+        <JudgeInvitePanel
+          hackathons={hackathons && hackathons.length > 0 ? hackathons : PORTAL_HACKATHONS}
+          selectedHackathonIds={judgeInviteHackathonIds}
+          onToggleHackathon={onToggleJudgeInviteHackathon}
+          label={judgeInviteLabel}
+          onLabelChange={onJudgeInviteLabelChange}
+          inviteUrl={judgeInviteUrl}
+          isBusy={isCreatingJudgeInvite}
+          message={judgeInviteMessage}
+          onGenerate={onCreateJudgeInvite}
+        />
+      ) : null}
 
       {isLoadingUsers ? (
         <section className={`${sectionClass}`}>

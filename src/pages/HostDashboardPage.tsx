@@ -10,31 +10,46 @@ import {
   where,
 } from "firebase/firestore";
 import { DashboardLayout, sectionClass } from "@/components/dashboard/DashboardLayout";
+import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
+import {
+  HostEventBriefEditor,
+  type HostEventBriefForm,
+} from "@/components/dashboard/HostEventBriefEditor";
+import { emptyHostEventBriefForm } from "@/lib/hostEventBriefForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
+import {
+  getHostedHackathonUrl,
+  publishHostEventPublicly,
+  unpublishHostEventPublicly,
+} from "@/lib/aiHackathons";
 import { getFirestoreDb } from "@/lib/firebaseClient";
+import { getHackathonById, type HackathonId } from "@/lib/hackathons";
+import { buildInviteUrl } from "@/lib/inviteTokens";
+import { createJudgeInvite } from "@/lib/portalInvites";
 import {
   createTicketCode,
   createTicketQrPayload,
   extractTicketCode,
   formatDateTime,
   getTicketQrImageUrl,
+  mapHostEventFromFirestore,
+  normalizeFocusAreas,
+  parseDatetimeLocal,
+  toDatetimeLocalValue,
   type HostEvent,
   type HostEventJudge,
   type HostEventTicket,
 } from "@/lib/hostEvents";
+import {
+  getEventFontPreset,
+  getEventLayoutStyle,
+  normalizeAccentHex,
+} from "@/lib/eventBranding";
 
-const emptyEventForm = {
-  name: "",
-  description: "",
-  startAt: "",
-  endAt: "",
-  location: "",
-  capacity: "100",
-};
+const emptyEventForm = emptyHostEventBriefForm;
 
 const emptyTicketForm = {
   attendeeName: "",
@@ -48,23 +63,6 @@ const emptyJudgeForm = {
   organization: "",
   expertise: "",
 };
-
-const mapEvent = (id: string, data: Record<string, unknown>): HostEvent => ({
-  id,
-  owner_id: typeof data.owner_id === "string" ? data.owner_id : "",
-  name: typeof data.name === "string" ? data.name : "",
-  description: typeof data.description === "string" ? data.description : "",
-  start_at: typeof data.start_at === "string" ? data.start_at : "",
-  end_at: typeof data.end_at === "string" ? data.end_at : "",
-  location: typeof data.location === "string" ? data.location : "",
-  capacity: typeof data.capacity === "number" ? data.capacity : Number(data.capacity) || 0,
-  status:
-    data.status === "published" || data.status === "closed" || data.status === "draft"
-      ? data.status
-      : "draft",
-  created_at: typeof data.created_at === "string" ? data.created_at : "",
-  updated_at: typeof data.updated_at === "string" ? data.updated_at : "",
-});
 
 const mapTicket = (id: string, data: Record<string, unknown>): HostEventTicket => ({
   id,
@@ -103,12 +101,16 @@ export default function HostDashboardPage() {
   const [tickets, setTickets] = useState<HostEventTicket[]>([]);
   const [judges, setJudges] = useState<HostEventJudge[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>("");
-  const [eventForm, setEventForm] = useState(emptyEventForm);
+  const [eventForm, setEventForm] = useState<HostEventBriefForm>(() => emptyEventForm());
   const [ticketForm, setTicketForm] = useState(emptyTicketForm);
   const [judgeForm, setJudgeForm] = useState(emptyJudgeForm);
   const [checkInCode, setCheckInCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [portalJudgeInviteUrl, setPortalJudgeInviteUrl] = useState<string | null>(null);
+  const [portalJudgeInviteMessage, setPortalJudgeInviteMessage] = useState<string | null>(null);
+  const [isCreatingPortalJudgeInvite, setIsCreatingPortalJudgeInvite] = useState(false);
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
@@ -129,12 +131,37 @@ export default function HostDashboardPage() {
     if (!selectedEvent) return;
     setEventForm({
       name: selectedEvent.name,
+      tagline: selectedEvent.tagline,
       description: selectedEvent.description,
-      startAt: selectedEvent.start_at ? selectedEvent.start_at.slice(0, 16) : "",
-      endAt: selectedEvent.end_at ? selectedEvent.end_at.slice(0, 16) : "",
+      theme: selectedEvent.theme,
+      format: selectedEvent.format || "Online",
+      eligibility: selectedEvent.eligibility || "Open to participants worldwide",
+      teamSize: selectedEvent.teamSize || "Solo or teams of 1–4",
+      prize: selectedEvent.prize,
+      rulebookUrl: selectedEvent.rulebookUrl,
+      registrationUrl: selectedEvent.registrationUrl,
+      highlightNote: selectedEvent.highlightNote,
+      focusAreas: selectedEvent.focusAreas.join(", "),
+      schedule: selectedEvent.schedule.length > 0 ? selectedEvent.schedule : [],
+      coverImageUrl: selectedEvent.coverImageUrl,
+      bannerImageUrl: selectedEvent.bannerImageUrl,
+      logoUrl: selectedEvent.logoUrl,
+      galleryUrls: selectedEvent.galleryUrls,
+      guests: selectedEvent.guests,
+      organizerName: selectedEvent.organizerName,
+      accentColor: selectedEvent.accentColor || "#00A3FF",
+      fontPreset: getEventFontPreset(selectedEvent.fontPreset),
+      layoutStyle: getEventLayoutStyle(selectedEvent.layoutStyle),
+      startAt: selectedEvent.start_at ? toDatetimeLocalValue(selectedEvent.start_at) : "",
+      endAt: selectedEvent.end_at ? toDatetimeLocalValue(selectedEvent.end_at) : "",
       location: selectedEvent.location,
       capacity: String(selectedEvent.capacity || ""),
     });
+    setPublishedUrl(
+      selectedEvent.public_hackathon_id
+        ? getHostedHackathonUrl(selectedEvent.public_hackathon_id)
+        : null,
+    );
   }, [selectedEvent]);
 
   useEffect(() => {
@@ -163,7 +190,7 @@ export default function HostDashboardPage() {
         );
 
         const nextEvents = eventsSnap.docs.map((item) =>
-          mapEvent(item.id, item.data() as Record<string, unknown>),
+          mapHostEventFromFirestore(item.id, item.data() as Record<string, unknown>),
         );
         setEvents(nextEvents);
         setTickets(
@@ -212,34 +239,80 @@ export default function HostDashboardPage() {
     );
   }
 
-  const createEvent = async () => {
+  const buildEventFieldsFromForm = () => {
     if (!eventForm.name.trim() || !eventForm.startAt || !eventForm.location.trim()) {
-      setMessage("Event name, start time, and location are required.");
-      return;
+      throw new Error("Event name, start time, and location are required.");
     }
+    const start = parseDatetimeLocal(eventForm.startAt);
+    if (!start) throw new Error("Start time is invalid.");
+    const end = eventForm.endAt ? parseDatetimeLocal(eventForm.endAt) : null;
+    if (eventForm.endAt && !end) throw new Error("End time is invalid.");
+    if (end && end.getTime() < start.getTime()) {
+      throw new Error("End time must be after the start time.");
+    }
+    return {
+      name: eventForm.name.trim(),
+      tagline: eventForm.tagline.trim(),
+      description: eventForm.description.trim(),
+      theme: eventForm.theme.trim(),
+      format: eventForm.format.trim(),
+      eligibility: eventForm.eligibility.trim(),
+      teamSize: eventForm.teamSize.trim(),
+      prize: eventForm.prize.trim(),
+      rulebookUrl: eventForm.rulebookUrl.trim(),
+      registrationUrl: eventForm.registrationUrl.trim(),
+      highlightNote: eventForm.highlightNote.trim(),
+      focusAreas: normalizeFocusAreas(eventForm.focusAreas),
+      schedule: eventForm.schedule
+        .map((item) => ({
+          time: item.time.trim(),
+          title: item.title.trim(),
+          description: item.description.trim(),
+        }))
+        .filter((item) => item.time || item.title || item.description),
+      coverImageUrl: eventForm.coverImageUrl.trim(),
+      bannerImageUrl: eventForm.bannerImageUrl.trim(),
+      logoUrl: eventForm.logoUrl.trim(),
+      galleryUrls: eventForm.galleryUrls.map((url) => url.trim()).filter(Boolean),
+      guests: eventForm.guests
+        .map((guest) => ({
+          name: guest.name.trim(),
+          role: guest.role.trim(),
+          bio: guest.bio.trim(),
+          imageUrl: guest.imageUrl.trim(),
+        }))
+        .filter((guest) => guest.name || guest.imageUrl),
+      organizerName: eventForm.organizerName.trim(),
+      accentColor: normalizeAccentHex(eventForm.accentColor) || "#00A3FF",
+      fontPreset: getEventFontPreset(eventForm.fontPreset),
+      layoutStyle: getEventLayoutStyle(eventForm.layoutStyle),
+      start_at: start.toISOString(),
+      end_at: end ? end.toISOString() : "",
+      location: eventForm.location.trim(),
+      capacity: Number(eventForm.capacity) || 0,
+    };
+  };
 
+  const createEvent = async () => {
     setIsBusy(true);
     setMessage(null);
+    setPublishedUrl(null);
     try {
+      const fields = buildEventFieldsFromForm();
       const now = new Date().toISOString();
       const payload = {
         owner_id: sessionUser.id,
-        name: eventForm.name.trim(),
-        description: eventForm.description.trim(),
-        start_at: eventForm.startAt ? new Date(eventForm.startAt).toISOString() : "",
-        end_at: eventForm.endAt ? new Date(eventForm.endAt).toISOString() : "",
-        location: eventForm.location.trim(),
-        capacity: Number(eventForm.capacity) || 0,
+        ...fields,
         status: "draft" as const,
+        public_hackathon_id: null,
         created_at: now,
         updated_at: now,
       };
       const ref = await addDoc(collection(db, "host_events"), payload);
-      const created = mapEvent(ref.id, payload);
+      const created = mapHostEventFromFirestore(ref.id, payload);
       setEvents((prev) => [created, ...prev]);
       setSelectedEventId(ref.id);
-      setEventForm(emptyEventForm);
-      setMessage("Event draft created.");
+      setMessage("Event draft created. Publish it when you are ready for it to appear on /hackathons.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to create event.");
     } finally {
@@ -249,26 +322,33 @@ export default function HostDashboardPage() {
 
   const saveSelectedEvent = async () => {
     if (!selectedEvent) return;
-    if (!eventForm.name.trim() || !eventForm.startAt || !eventForm.location.trim()) {
-      setMessage("Event name, start time, and location are required.");
-      return;
-    }
 
     setIsBusy(true);
+    setMessage(null);
     try {
+      const fields = buildEventFieldsFromForm();
       const updatedAt = new Date().toISOString();
-      const patch = {
-        name: eventForm.name.trim(),
-        description: eventForm.description.trim(),
-        start_at: new Date(eventForm.startAt).toISOString(),
-        end_at: eventForm.endAt ? new Date(eventForm.endAt).toISOString() : "",
-        location: eventForm.location.trim(),
-        capacity: Number(eventForm.capacity) || 0,
-        updated_at: updatedAt,
-      };
+      const patch = { ...fields, updated_at: updatedAt };
       await updateDoc(doc(db, "host_events", selectedEvent.id), patch);
-      setEvents((prev) => prev.map((event) => event.id === selectedEvent.id ? { ...event, ...patch } : event));
-      setMessage("Event details saved.");
+      let nextEvent: HostEvent = { ...selectedEvent, ...patch };
+
+      // Keep the public listing in sync when the event is already live.
+      if (selectedEvent.status === "published") {
+        const publicEvent = await publishHostEventPublicly(db, nextEvent, sessionUser.id);
+        nextEvent = {
+          ...nextEvent,
+          public_hackathon_id: publicEvent.id,
+          status: "published",
+        };
+        setPublishedUrl(getHostedHackathonUrl(publicEvent.id));
+        setMessage("Event details saved and public page updated.");
+      } else {
+        setMessage("Event details saved.");
+      }
+
+      setEvents((prev) =>
+        prev.map((event) => (event.id === selectedEvent.id ? nextEvent : event)),
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save event details.");
     } finally {
@@ -279,22 +359,61 @@ export default function HostDashboardPage() {
   const publishEvent = async () => {
     if (!selectedEvent) return;
     setIsBusy(true);
+    setMessage(null);
     try {
+      const fields = buildEventFieldsFromForm();
       const updatedAt = new Date().toISOString();
       await updateDoc(doc(db, "host_events", selectedEvent.id), {
-        status: "published",
+        ...fields,
         updated_at: updatedAt,
       });
+
+      const eventForPublish: HostEvent = {
+        ...selectedEvent,
+        ...fields,
+        updated_at: updatedAt,
+      };
+      const publicEvent = await publishHostEventPublicly(db, eventForPublish, sessionUser.id);
+      const publicPath = getHostedHackathonUrl(publicEvent.id);
+
       setEvents((prev) =>
         prev.map((event) =>
           event.id === selectedEvent.id
-            ? { ...event, status: "published", updated_at: updatedAt }
+            ? {
+                ...eventForPublish,
+                status: "published",
+                public_hackathon_id: publicEvent.id,
+                updated_at: new Date().toISOString(),
+              }
             : event,
         ),
       );
-      setMessage("Event published.");
+      setPublishedUrl(publicPath);
+      setMessage("Event is live on the public directory.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to publish event.");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const unpublishEvent = async () => {
+    if (!selectedEvent) return;
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      await unpublishHostEventPublicly(db, selectedEvent);
+      const updatedAt = new Date().toISOString();
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === selectedEvent.id
+            ? { ...event, status: "draft", updated_at: updatedAt }
+            : event,
+        ),
+      );
+      setMessage("Event unpublished. It is hidden from /hackathons until you publish again.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to unpublish event.");
     } finally {
       setIsBusy(false);
     }
@@ -386,6 +505,35 @@ export default function HostDashboardPage() {
     }
   };
 
+  const createPortalJudgeInviteLink = async () => {
+    if (!sessionUser) return;
+    const hackathonId = selectedEvent?.public_hackathon_id;
+    if (!hackathonId) {
+      setPortalJudgeInviteMessage(
+        "Publish this event first so the invite can assign a public hackathon workspace."
+      );
+      return;
+    }
+    setIsCreatingPortalJudgeInvite(true);
+    setPortalJudgeInviteMessage(null);
+    try {
+      const invite = await createJudgeInvite(db, {
+        createdBy: sessionUser.id,
+        createdByEmail: sessionUser.email,
+        hackathonIds: [hackathonId],
+        label: selectedEvent?.name || "Host judge invite",
+      });
+      setPortalJudgeInviteUrl(buildInviteUrl("judge", invite.token));
+      setPortalJudgeInviteMessage("Portal invite ready — judges get direct access after Google signup.");
+    } catch (error) {
+      setPortalJudgeInviteMessage(
+        error instanceof Error ? error.message : "Unable to create portal invite."
+      );
+    } finally {
+      setIsCreatingPortalJudgeInvite(false);
+    }
+  };
+
   const inviteJudge = async () => {
     if (!selectedEvent) {
       setMessage("Select or create an event first.");
@@ -443,7 +591,7 @@ export default function HostDashboardPage() {
                 Event operations
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Create events, issue QR tickets, run check-in, and manage judges.
+                Create events, publish them publicly, issue QR tickets, run check-in, and manage judges.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -462,91 +610,93 @@ export default function HostDashboardPage() {
             </div>
           </div>
           {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
+          {publishedUrl && selectedEvent?.status === "published" ? (
+            <p className="mt-2 text-sm">
+              <Link className="underline underline-offset-4" to={publishedUrl}>
+                Open public event page
+              </Link>
+              <span className="text-muted-foreground"> · also listed on </span>
+              <Link className="underline underline-offset-4" to="/hackathons">
+                /hackathons
+              </Link>
+            </p>
+          ) : null}
         </section>
 
         <section id="event-details" className={`${sectionClass} space-y-5 p-6`}>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="font-display text-xl font-semibold">Event details</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Create, update, and publish your hosted event.</p>
+              <h2 className="font-display text-xl font-semibold">Event brief</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Pick a ready-made template, customize the look, then publish a unique public page.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {selectedEvent ? (
-                <Button type="button" variant="outline" onClick={() => void publishEvent()} disabled={isBusy || selectedEvent.status === "published"}>
-                  Publish selected
+              {selectedEvent &&
+              (selectedEvent.status !== "published" || !selectedEvent.public_hackathon_id) ? (
+                <Button type="button" onClick={() => void publishEvent()} disabled={isBusy}>
+                  {selectedEvent.status === "published" && !selectedEvent.public_hackathon_id
+                    ? "Post to public directory"
+                    : "Publish to public"}
                 </Button>
               ) : null}
-              <Button type="button" variant="outline" onClick={() => { setSelectedEventId(""); setEventForm(emptyEventForm); }} disabled={isBusy}>
+              {selectedEvent &&
+              selectedEvent.status === "published" &&
+              selectedEvent.public_hackathon_id ? (
+                <Button type="button" variant="outline" onClick={() => void unpublishEvent()} disabled={isBusy}>
+                  Unpublish
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setSelectedEventId("");
+                  setEventForm(emptyEventForm());
+                  setPublishedUrl(null);
+                  setMessage(null);
+                }}
+                disabled={isBusy}
+              >
                 New draft
               </Button>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input
-              placeholder="Event name"
-              value={eventForm.name}
-              onChange={(event) => setEventForm((prev) => ({ ...prev, name: event.target.value }))}
-            />
-            <Input
-              placeholder="Location"
-              value={eventForm.location}
-              onChange={(event) => setEventForm((prev) => ({ ...prev, location: event.target.value }))}
-            />
-            <Input
-              type="datetime-local"
-              value={eventForm.startAt}
-              onChange={(event) => setEventForm((prev) => ({ ...prev, startAt: event.target.value }))}
-            />
-            <Input
-              type="datetime-local"
-              value={eventForm.endAt}
-              onChange={(event) => setEventForm((prev) => ({ ...prev, endAt: event.target.value }))}
-            />
-            <Input
-              type="number"
-              min={1}
-              placeholder="Capacity"
-              value={eventForm.capacity}
-              onChange={(event) => setEventForm((prev) => ({ ...prev, capacity: event.target.value }))}
-            />
-            <select
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-              value={selectedEventId}
-              onChange={(event) => {
-                setSelectedEventId(event.target.value);
-                if (!event.target.value) setEventForm(emptyEventForm);
-              }}
-            >
-              <option value="">Select event</option>
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.name} ({event.status})
-                </option>
-              ))}
-            </select>
-          </div>
-          <Textarea
-            placeholder="Short description"
-            value={eventForm.description}
-            onChange={(event) => setEventForm((prev) => ({ ...prev, description: event.target.value }))}
+          <HostEventBriefEditor
+            value={eventForm}
+            onChange={setEventForm}
+            selectedEventId={selectedEventId}
+            eventOptions={events.map((event) => ({
+              id: event.id,
+              name: event.name,
+              status: event.status,
+            }))}
+            onSelectEvent={(eventId) => {
+              setSelectedEventId(eventId);
+              if (!eventId) {
+                setEventForm(emptyEventForm());
+                setPublishedUrl(null);
+              }
+            }}
+            uploaderId={sessionUser.id}
+            disabled={isBusy}
           />
-          <Button type="button" onClick={() => void (selectedEvent ? saveSelectedEvent() : createEvent())} disabled={isBusy}>
-            {selectedEvent ? "Save event details" : "Create event draft"}
-          </Button>
 
-          {selectedEvent ? (
-            <div className="rounded-lg border border-border/70 bg-muted/20 p-4 text-sm">
-              <p className="font-medium">{selectedEvent.name}</p>
-              <p className="mt-1 text-muted-foreground">{selectedEvent.description || "No description"}</p>
-              <p className="mt-2 text-muted-foreground">
-                {formatDateTime(selectedEvent.start_at)} → {formatDateTime(selectedEvent.end_at)}
-              </p>
-              <p className="mt-1 text-muted-foreground">
-                {selectedEvent.location || "Location TBD"} · Capacity {selectedEvent.capacity}
-              </p>
-            </div>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              onClick={() => void (selectedEvent ? saveSelectedEvent() : createEvent())}
+              disabled={isBusy}
+            >
+              {selectedEvent ? "Save event brief" : "Create event draft"}
+            </Button>
+            {selectedEvent ? (
+              <Badge variant={selectedEvent.status === "published" ? "default" : "secondary"}>
+                {selectedEvent.status}
+              </Badge>
+            ) : null}
+          </div>
         </section>
 
         <section id="tickets" className={`${sectionClass} space-y-5 p-6`}>
@@ -634,8 +784,27 @@ export default function HostDashboardPage() {
         <section id="judges" className={`${sectionClass} space-y-5 p-6`}>
           <div>
             <h2 className="font-display text-xl font-semibold">Judges</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Invite judges for the selected event.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Keep a contact list and share a portal invite link for direct judge access.
+            </p>
           </div>
+          {selectedEvent?.public_hackathon_id ? (
+            <JudgeInvitePanel
+              hackathons={[getHackathonById(selectedEvent.public_hackathon_id as HackathonId)]}
+              selectedHackathonIds={[selectedEvent.public_hackathon_id as HackathonId]}
+              onToggleHackathon={() => undefined}
+              label={selectedEvent.name}
+              onLabelChange={() => undefined}
+              inviteUrl={portalJudgeInviteUrl}
+              isBusy={isCreatingPortalJudgeInvite}
+              message={portalJudgeInviteMessage}
+              onGenerate={createPortalJudgeInviteLink}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Publish the event to unlock a judge portal invite link with direct access.
+            </p>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
               placeholder="Judge name"

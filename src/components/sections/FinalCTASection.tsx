@@ -87,12 +87,20 @@ const FinalCTASection = () => {
         </motion.div>
 
         <motion.p
-          className="mt-16 font-body text-xs tracking-[0.22em] text-white/35"
+          className="mt-16 font-body text-xs tracking-[0.18em] text-white/35"
           initial={{ opacity: 0 }}
           animate={isVisible ? { opacity: 1 } : {}}
           transition={{ duration: 0.5, delay: 0.45 }}
         >
-          ORGANIZED BY COGNISOR AI · TOKYO
+          ORGANIZED BY COGNISOR AI · TOKYO · GET HIRED WITH{" "}
+          <a
+            href="https://peerportal.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white/50 transition-colors hover:text-primary"
+          >
+            PEERPORTAL.APP
+          </a>
         </motion.p>
       </div>
     </section>

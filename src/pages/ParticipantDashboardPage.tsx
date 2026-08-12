@@ -22,8 +22,21 @@ import {
   SITE_HACKATHON_ID,
   type HackathonId,
 } from "@/lib/hackathons";
+import { buildInviteUrl } from "@/lib/inviteTokens";
+import {
+  createTeamInvite,
+  listTeamMembershipsForSubmission,
+  revokeTeamInvite,
+} from "@/lib/portalInvites";
 import { queueParticipantEmail } from "@/lib/participantEmail";
-import type { Submission, UserProfile } from "@/types/portal";
+import {
+  closeOwnOpenPosts,
+  createTeammatePost,
+  deleteTeammatePost,
+  listTeammatePosts,
+  updateTeammatePost,
+} from "@/lib/teammatePosts";
+import type { Submission, TeamMemberRecord, TeammatePost, UserProfile } from "@/types/portal";
 
 const initialParticipantForm = {
   title: "",
@@ -154,6 +167,14 @@ export default function ParticipantDashboardPage() {
   const [enrolledHackathonIds, setEnrolledHackathonIds] = useState<HackathonId[]>([]);
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
   const [isJoiningHackathon, setIsJoiningHackathon] = useState(false);
+  const [teammatePosts, setTeammatePosts] = useState<TeammatePost[]>([]);
+  const [isLoadingTeammatePosts, setIsLoadingTeammatePosts] = useState(false);
+  const [isSavingTeammatePost, setIsSavingTeammatePost] = useState(false);
+  const [teammatePostMessage, setTeammatePostMessage] = useState<string | null>(null);
+  const [teamInviteUrl, setTeamInviteUrl] = useState<string | null>(null);
+  const [teamInviteToken, setTeamInviteToken] = useState<string | null>(null);
+  const [linkedTeamMembers, setLinkedTeamMembers] = useState<TeamMemberRecord[]>([]);
+  const [isTeamInviteBusy, setIsTeamInviteBusy] = useState(false);
 
   const mapSubmissionToForm = (data: Submission) => ({
     title: data.title ?? "",
@@ -276,6 +297,54 @@ export default function ParticipantDashboardPage() {
 
     void loadParticipantWorkspace();
   }, [sessionUser, db]);
+
+  useEffect(() => {
+    if (!sessionUser || sessionUser.role !== "participant") return;
+    let cancelled = false;
+    const loadPosts = async () => {
+      setIsLoadingTeammatePosts(true);
+      try {
+        const posts = await listTeammatePosts(db, selectedHackathonId);
+        if (!cancelled) setTeammatePosts(posts);
+      } catch {
+        if (!cancelled) setTeammatePosts([]);
+      } finally {
+        if (!cancelled) setIsLoadingTeammatePosts(false);
+      }
+    };
+    void loadPosts();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUser, db, selectedHackathonId]);
+
+  useEffect(() => {
+    if (!activeSubmissionId) {
+      setLinkedTeamMembers([]);
+      setTeamInviteUrl(null);
+      setTeamInviteToken(null);
+      return;
+    }
+    let cancelled = false;
+    const loadMembers = async () => {
+      try {
+        const fromSubmission = participantSubmission?.team_members ?? [];
+        const fromCollection = await listTeamMembershipsForSubmission(db, activeSubmissionId);
+        if (cancelled) return;
+        const byId = new Map<string, TeamMemberRecord>();
+        for (const member of [...fromSubmission, ...fromCollection]) {
+          if (member.user_id) byId.set(member.user_id, member);
+        }
+        setLinkedTeamMembers(Array.from(byId.values()));
+      } catch {
+        if (!cancelled) setLinkedTeamMembers(participantSubmission?.team_members ?? []);
+      }
+    };
+    void loadMembers();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSubmissionId, db, participantSubmission]);
 
   useEffect(() => {
     const scoped = participantSubmissions;
@@ -467,6 +536,119 @@ export default function ParticipantDashboardPage() {
     }
   };
 
+  const handleCreateTeammatePost = async (input: {
+    looking_for: string;
+    message: string;
+    skills: string;
+    author_name: string;
+    author_email: string;
+  }) => {
+    if (!sessionUser || selectedHackathon.status === "past") return;
+    if (!input.looking_for.trim() || !input.author_email.trim()) {
+      setTeammatePostMessage("Looking-for and email are required.");
+      return;
+    }
+    setIsSavingTeammatePost(true);
+    setTeammatePostMessage(null);
+    try {
+      await closeOwnOpenPosts(db, sessionUser.id, selectedHackathonId);
+      const post = await createTeammatePost(db, sessionUser.id, {
+        hackathon_id: selectedHackathonId,
+        author_name: input.author_name || participantForm.fullName || sessionUser.email,
+        author_email: input.author_email || sessionUser.email,
+        looking_for: input.looking_for,
+        message: input.message,
+        skills: input.skills,
+      });
+      setTeammatePosts((prev) => [post, ...prev.filter((entry) => entry.user_id !== sessionUser.id)]);
+      setTeammatePostMessage("Your teammate request is live for all participants.");
+    } catch (error: unknown) {
+      setTeammatePostMessage(
+        error instanceof Error ? error.message : "Unable to publish teammate request."
+      );
+    } finally {
+      setIsSavingTeammatePost(false);
+    }
+  };
+
+  const handleCloseTeammatePost = async (postId: string) => {
+    setIsSavingTeammatePost(true);
+    try {
+      await updateTeammatePost(db, postId, { status: "closed" });
+      setTeammatePosts((prev) => prev.filter((post) => post.id !== postId));
+      setTeammatePostMessage("Request closed.");
+    } catch (error: unknown) {
+      setTeammatePostMessage(
+        error instanceof Error ? error.message : "Unable to close request."
+      );
+    } finally {
+      setIsSavingTeammatePost(false);
+    }
+  };
+
+  const handleDeleteTeammatePost = async (postId: string) => {
+    setIsSavingTeammatePost(true);
+    try {
+      await deleteTeammatePost(db, postId);
+      setTeammatePosts((prev) => prev.filter((post) => post.id !== postId));
+      setTeammatePostMessage("Request deleted.");
+    } catch (error: unknown) {
+      setTeammatePostMessage(
+        error instanceof Error ? error.message : "Unable to delete request."
+      );
+    } finally {
+      setIsSavingTeammatePost(false);
+    }
+  };
+
+  const handleGenerateTeamInvite = async () => {
+    if (!sessionUser || !activeSubmissionId) {
+      setSubmissionMessage("Save your project first, then create an invite link.");
+      return;
+    }
+    setIsTeamInviteBusy(true);
+    setSubmissionMessage(null);
+    try {
+      if (teamInviteToken) {
+        await revokeTeamInvite(db, teamInviteToken).catch(() => undefined);
+      }
+      const invite = await createTeamInvite(db, {
+        submissionId: activeSubmissionId,
+        ownerId: sessionUser.id,
+        hackathonId: selectedHackathonId,
+        teamName: participantForm.teamName || participantForm.title || "My team",
+        ownerName: participantForm.fullName || sessionUser.email,
+        ownerEmail: sessionUser.email,
+      });
+      setTeamInviteToken(invite.token);
+      setTeamInviteUrl(buildInviteUrl("team", invite.token));
+      setSubmissionMessage("Team invite link ready — share it with teammates.");
+    } catch (error: unknown) {
+      setSubmissionMessage(
+        error instanceof Error ? error.message : "Unable to create team invite."
+      );
+    } finally {
+      setIsTeamInviteBusy(false);
+    }
+  };
+
+  const handleRevokeTeamInvite = async () => {
+    if (!teamInviteToken) return;
+    setIsTeamInviteBusy(true);
+    try {
+      await revokeTeamInvite(db, teamInviteToken);
+      setTeamInviteToken(null);
+      setTeamInviteUrl(null);
+      setSubmissionMessage("Team invite link revoked.");
+    } catch (error: unknown) {
+      setSubmissionMessage(
+        error instanceof Error ? error.message : "Unable to revoke invite."
+      );
+    } finally {
+      setIsTeamInviteBusy(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
@@ -523,6 +705,20 @@ export default function ParticipantDashboardPage() {
         isSubmittingProject={isSubmittingProject}
         onUploadProjectImage={handleUploadProjectImage}
         onSave={handleParticipantSubmit}
+        teammatePosts={teammatePosts}
+        isLoadingTeammatePosts={isLoadingTeammatePosts}
+        isSavingTeammatePost={isSavingTeammatePost}
+        teammatePostMessage={teammatePostMessage}
+        currentUserId={sessionUser.id}
+        currentUserEmail={sessionUser.email}
+        onCreateTeammatePost={handleCreateTeammatePost}
+        onCloseTeammatePost={handleCloseTeammatePost}
+        onDeleteTeammatePost={handleDeleteTeammatePost}
+        teamInviteUrl={teamInviteUrl}
+        linkedTeamMembers={linkedTeamMembers}
+        isTeamInviteBusy={isTeamInviteBusy}
+        onGenerateTeamInvite={handleGenerateTeamInvite}
+        onRevokeTeamInvite={handleRevokeTeamInvite}
       />
     </DashboardLayout>
   );

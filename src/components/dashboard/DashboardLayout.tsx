@@ -21,6 +21,7 @@ import {
   ChevronsUpDown,
   Radar,
   CalendarCheck2,
+  BookOpen,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
@@ -307,6 +308,14 @@ function DashboardLayoutContent({
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className={menuButtonClass}>
+                        <DashboardNavLink href="#judge-invites" onNavigate={closeMobileNav}>
+                          <Scale className={navIconClass} />
+                          <span>Judge invites</span>
+                        </DashboardNavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={menuButtonClass}>
                         <DashboardNavLink href="/dashboard/admin#platform" onNavigate={closeMobileNav}>
                           <Sparkles className={navIconClass} />
                           <span>Platform</span>
@@ -327,6 +336,14 @@ function DashboardLayoutContent({
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className={menuButtonClass}>
+                        <DashboardNavLink href="#find-teammates" onNavigate={closeMobileNav}>
+                          <Users className={navIconClass} />
+                          <span>Find Teammates</span>
+                        </DashboardNavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={menuButtonClass}>
                         <DashboardNavLink href="/dashboard/participant/profile" onNavigate={closeMobileNav}>
                           <UserRound className={navIconClass} />
                           <span>My Profile</span>
@@ -338,6 +355,14 @@ function DashboardLayoutContent({
                         <DashboardNavLink href="#my-project" onNavigate={closeMobileNav}>
                           <FileText className={navIconClass} />
                           <span>My Project</span>
+                        </DashboardNavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={menuButtonClass}>
+                        <DashboardNavLink href="#resources-guide" onNavigate={closeMobileNav}>
+                          <BookOpen className={navIconClass} />
+                          <span>Resources & guide</span>
                         </DashboardNavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -604,6 +629,14 @@ function DashboardLayoutContent({
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className={menuButtonClass}>
+                    <DashboardNavLink href="/resources" onNavigate={closeMobileNav}>
+                      <BookOpen className={navIconClass} />
+                      <span>Guide</span>
+                    </DashboardNavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild className={menuButtonClass}>
                     <DashboardNavLink

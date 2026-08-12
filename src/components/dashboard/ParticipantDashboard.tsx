@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  ArrowRight,
+  BookOpen,
   CalendarDays,
   ExternalLink,
   FileText,
@@ -17,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { PARTICIPANT_GUIDE_STEPS } from "@/lib/participantGuide";
 import {
   Select,
   SelectContent,
@@ -25,18 +28,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
+import { FindTeammatesSection } from "@/components/dashboard/FindTeammatesSection";
 import { FollowCommunityPanel } from "@/components/dashboard/FollowCommunityPanel";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
 import { GalleryUploadField, ImageUploadField } from "@/components/dashboard/ImageUploadField";
 import { getPeopleProfileCompleteness } from "@/components/dashboard/PeopleProfileSection";
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
+import { TeamInvitePanel } from "@/components/dashboard/TeamInvitePanel";
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import type {
   HackathonId,
   ParticipantHackathonSummary,
   PortalHackathon,
 } from "@/lib/hackathons";
-import type { Submission } from "@/types/portal";
+import type { Submission, TeamMemberRecord, TeammatePost } from "@/types/portal";
 
 const statusLabel: Record<PortalHackathon["status"], string> = {
   active: "Active",
@@ -153,6 +158,28 @@ export type ParticipantDashboardProps = {
   isSubmittingProject: boolean;
   onUploadProjectImage?: (file: File, kind: "cover" | "gallery") => Promise<string>;
   onSave: () => Promise<void>;
+  /** Find teammates board (public to all participants for the selected event). */
+  teammatePosts?: TeammatePost[];
+  isLoadingTeammatePosts?: boolean;
+  isSavingTeammatePost?: boolean;
+  teammatePostMessage?: string | null;
+  currentUserId?: string;
+  currentUserEmail?: string;
+  onCreateTeammatePost?: (input: {
+    looking_for: string;
+    message: string;
+    skills: string;
+    author_name: string;
+    author_email: string;
+  }) => Promise<void>;
+  onCloseTeammatePost?: (postId: string) => Promise<void>;
+  onDeleteTeammatePost?: (postId: string) => Promise<void>;
+  /** Team invite link for the active submission. */
+  teamInviteUrl?: string | null;
+  linkedTeamMembers?: TeamMemberRecord[];
+  isTeamInviteBusy?: boolean;
+  onGenerateTeamInvite?: () => Promise<void>;
+  onRevokeTeamInvite?: () => Promise<void>;
 };
 
 export function ParticipantDashboard({
@@ -174,6 +201,20 @@ export function ParticipantDashboard({
   isSubmittingProject,
   onUploadProjectImage,
   onSave,
+  teammatePosts = [],
+  isLoadingTeammatePosts = false,
+  isSavingTeammatePost = false,
+  teammatePostMessage = null,
+  currentUserId = "",
+  currentUserEmail = "",
+  onCreateTeammatePost,
+  onCloseTeammatePost,
+  onDeleteTeammatePost,
+  teamInviteUrl = null,
+  linkedTeamMembers = [],
+  isTeamInviteBusy = false,
+  onGenerateTeamInvite,
+  onRevokeTeamInvite,
 }: ParticipantDashboardProps) {
   const [submissionSearchQuery, setSubmissionSearchQuery] = useState("");
   const normalizedPdfUrl = ensureAbsoluteUrl(participantForm.submissionPdfUrl);
@@ -407,6 +448,72 @@ export function ParticipantDashboard({
 
       <section
         className={`${sectionClass}`}
+        id="resources-guide"
+        aria-labelledby="resources-guide-heading"
+      >
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="dash-icon-chip" aria-hidden>
+              <BookOpen className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Resources & guide</p>
+              <h2 id="resources-guide-heading" className="dash-title">
+                Get more from the portal
+              </h2>
+              <p className="dash-subtitle">
+                Quick path from join → profile → submit → boards. Open the full guide anytime.
+              </p>
+            </div>
+          </div>
+          <Button asChild variant="outline" className="shrink-0">
+            <Link to="/resources">
+              Full guide
+              <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden />
+            </Link>
+          </Button>
+        </div>
+
+        <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {PARTICIPANT_GUIDE_STEPS.map((step, index) => (
+            <li
+              key={step.id}
+              className="rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-primary/30 hover:bg-primary/5"
+            >
+              <Link to={`/resources#${step.id}`} className="block h-full">
+                <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                  Step {String(index + 1).padStart(2, "0")}
+                </span>
+                <p className="mt-2 font-display text-base font-semibold tracking-tight text-foreground">
+                  {step.title}
+                </p>
+                <p className="mt-1.5 line-clamp-2 font-body text-xs text-muted-foreground">
+                  {step.description}
+                </p>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {onCreateTeammatePost && onCloseTeammatePost && onDeleteTeammatePost ? (
+        <FindTeammatesSection
+          posts={teammatePosts}
+          isLoading={isLoadingTeammatePosts}
+          isReadOnly={isReadOnly}
+          currentUserId={currentUserId}
+          defaultName={participantForm.fullName}
+          defaultEmail={currentUserEmail}
+          isSaving={isSavingTeammatePost}
+          message={teammatePostMessage}
+          onCreatePost={onCreateTeammatePost}
+          onClosePost={onCloseTeammatePost}
+          onDeletePost={onDeleteTeammatePost}
+        />
+      ) : null}
+
+      <section
+        className={`${sectionClass}`}
         id="my-profile"
         aria-labelledby="profile-details-heading"
       >
@@ -581,6 +688,21 @@ export function ParticipantDashboard({
               rows={4}
             />
           </div>
+          {onGenerateTeamInvite ? (
+            <TeamInvitePanel
+              inviteUrl={teamInviteUrl}
+              linkedMembers={linkedTeamMembers}
+              isBusy={isTeamInviteBusy}
+              disabled={!activeSubmissionId || isReadOnly}
+              disabledReason={
+                isReadOnly
+                  ? "Past events are view-only."
+                  : "Save your project once to unlock a shareable team invite link."
+              }
+              onGenerate={onGenerateTeamInvite}
+              onRevoke={onRevokeTeamInvite}
+            />
+          ) : null}
         </div>
       </section>
 

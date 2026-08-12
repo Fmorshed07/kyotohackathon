@@ -14,8 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Space Grotesk", "system-ui", "sans-serif"],
-        body: ["Manrope", "system-ui", "sans-serif"],
+        display: ["var(--event-display)", "Space Grotesk", "system-ui", "sans-serif"],
+        body: ["var(--event-body)", "Manrope", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       colors: {

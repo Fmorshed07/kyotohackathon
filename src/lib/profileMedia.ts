@@ -5,7 +5,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export type ProfileMediaKind = "avatar" | "cover" | "gallery";
-export type EventMediaKind = "cover" | "banner" | "gallery" | "guest";
+export type EventMediaKind = "cover" | "banner" | "gallery" | "guest" | "logo";
 
 const extensionForMime = (mime: string) => {
   if (mime === "image/png") return "png";

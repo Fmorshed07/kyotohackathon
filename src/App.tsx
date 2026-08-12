@@ -27,6 +27,8 @@ import HackathonsPage from "./pages/HackathonsPage";
 import GeneratedHackathonPage from "./pages/GeneratedHackathonPage";
 import HackathonBoardsPage from "./pages/HackathonBoardsPage";
 import ProjectGalleryPage from "./pages/ProjectGalleryPage";
+import ResourcesPage from "./pages/ResourcesPage";
+import InviteAcceptPage from "./pages/InviteAcceptPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -151,6 +153,8 @@ const App = () => (
           <Route path="/boards" element={<ProtectedRoute><HackathonBoardsPage /></ProtectedRoute>} />
           <Route path="/boards/:hackathonId" element={<ProtectedRoute><HackathonBoardsPage /></ProtectedRoute>} />
           <Route path="/projects" element={<ProjectGalleryPage />} />
+          <Route path="/resources" element={<ResourcesPage />} />
+          <Route path="/invite/:kind/:token" element={<InviteAcceptPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

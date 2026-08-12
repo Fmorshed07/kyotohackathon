@@ -10,6 +10,12 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
 import { getDashboardPathForUser, isStaffRole, participantNeedsOnboarding } from "@/lib/portalRoutes";
 import { consumePendingAdminGrant, hasPendingAdminGrant } from "@/lib/adminGrants";
+import {
+  clearPendingInvite,
+  readPendingInvite,
+  stashPendingInvite,
+} from "@/lib/inviteTokens";
+import { redeemJudgeInvite } from "@/lib/portalInvites";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import type { JudgeApprovalStatus, PortalRole, SessionUser } from "@/types/portal";
 
@@ -96,6 +102,7 @@ export default function SignIn() {
 
   const searchMode = new URLSearchParams(location.search).get("mode");
   const searchRole = new URLSearchParams(location.search).get("role");
+  const searchInvite = new URLSearchParams(location.search).get("invite");
   const stateMode = (location.state as { mode?: "signin" | "signup"; role?: AuthRole })?.mode;
   const stateRole = (location.state as { mode?: "signin" | "signup"; role?: AuthRole })?.role;
   const isSignupPath = location.pathname === "/signup";
@@ -116,6 +123,12 @@ export default function SignIn() {
   const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchInvite?.trim()) {
+      stashPendingInvite(initialRole === "judge" ? "judge" : "team", searchInvite.trim());
+    }
+  }, [searchInvite, initialRole]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -184,6 +197,45 @@ export default function SignIn() {
             `This account is registered as a ${existingRole}. Opening that workspace instead.`
           );
         }
+
+        const pendingJudgeInviteOnSignIn =
+          readPendingInvite("judge") ||
+          (searchInvite?.trim() && (authRole === "judge" || existingRole === "judge")
+            ? searchInvite.trim()
+            : null);
+        if (
+          pendingJudgeInviteOnSignIn &&
+          (existingRole === "judge" || existingRole === "mentor")
+        ) {
+          try {
+            const existingIds = Array.isArray(existingData.hackathon_ids)
+              ? existingData.hackathon_ids.filter(
+                  (value): value is string => typeof value === "string"
+                )
+              : [];
+            await redeemJudgeInvite(db, pendingJudgeInviteOnSignIn, {
+              userId: user.uid,
+              email: user.email ?? "",
+              existingHackathonIds: existingIds,
+            });
+            clearPendingInvite("judge");
+            navigate("/dashboard/judge", { replace: true });
+            return;
+          } catch {
+            // Fall through to normal dashboard routing.
+          }
+        }
+
+        const pendingTeamInviteOnSignIn =
+          readPendingInvite("team") ||
+          (searchInvite?.trim() && existingRole === "participant" ? searchInvite.trim() : null);
+        if (pendingTeamInviteOnSignIn && existingRole === "participant") {
+          navigate(`/invite/team/${encodeURIComponent(pendingTeamInviteOnSignIn)}`, {
+            replace: true,
+          });
+          return;
+        }
+
         navigate(
           pathForSession({
             role: existingRole,
@@ -214,13 +266,27 @@ export default function SignIn() {
       }
 
       // Event enrollment for participants happens in onboarding / dashboard — not here.
+      const pendingJudgeInvite =
+        readPendingInvite("judge") ||
+        (searchInvite?.trim() && authRole === "judge" ? searchInvite.trim() : null);
+      const pendingTeamInvite =
+        readPendingInvite("team") ||
+        (searchInvite?.trim() && authRole === "participant" ? searchInvite.trim() : null);
+
       const targetRole = hasAdminGrant ? "admin" : (existingRole ?? authRole);
       const isNewParticipantSignup =
         mode === "signup" && targetRole === "participant" && !existingRole;
       const isNewJudgeSignup = mode === "signup" && targetRole === "judge" && !existingRole;
       const isNewHostSignup = mode === "signup" && targetRole === "host" && !existingRole;
+      const creatingApprovedJudgeViaInvite =
+        Boolean(pendingJudgeInvite) &&
+        (isNewJudgeSignup ||
+          (targetRole === "judge" &&
+            (!existingRole || existingJudgeApprovalStatus === "pending")));
       const targetJudgeApprovalStatus = isStaffRole(targetRole)
-        ? existingJudgeApprovalStatus ?? (existingRole ? "approved" : "pending")
+        ? creatingApprovedJudgeViaInvite
+          ? "approved"
+          : existingJudgeApprovalStatus ?? (existingRole ? "approved" : "pending")
         : undefined;
 
       await setDoc(
@@ -228,8 +294,11 @@ export default function SignIn() {
         {
           email: user.email,
           role: targetRole,
-          ...(isNewJudgeSignup || (isStaffRole(targetRole) && !existingRole)
+          ...(isNewJudgeSignup || (isStaffRole(targetRole) && !existingRole) || creatingApprovedJudgeViaInvite
             ? { judgeApprovalStatus: targetJudgeApprovalStatus ?? "pending" }
+            : {}),
+          ...(creatingApprovedJudgeViaInvite && pendingJudgeInvite
+            ? { invite_token: pendingJudgeInvite }
             : {}),
           ...(isNewHostSignup
             ? {
@@ -246,8 +315,39 @@ export default function SignIn() {
         await consumePendingAdminGrant(db, user.email);
       }
 
+      if (pendingJudgeInvite && (targetRole === "judge" || creatingApprovedJudgeViaInvite)) {
+        try {
+          const existingIds = Array.isArray(existingData.hackathon_ids)
+            ? existingData.hackathon_ids.filter((value): value is string => typeof value === "string")
+            : [];
+          await redeemJudgeInvite(db, pendingJudgeInvite, {
+            userId: user.uid,
+            email: user.email ?? "",
+            existingHackathonIds: existingIds,
+          });
+          clearPendingInvite("judge");
+          navigate("/dashboard/judge", { replace: true });
+          return;
+        } catch (inviteError) {
+          setAuthError(
+            inviteError instanceof Error
+              ? inviteError.message
+              : "Signed in, but the judge invite could not be applied."
+          );
+        }
+      }
+
       if (isNewParticipantSignup) {
+        if (pendingTeamInvite) {
+          navigate(`/invite/team/${encodeURIComponent(pendingTeamInvite)}`, { replace: true });
+          return;
+        }
         navigate("/onboarding", { replace: true });
+        return;
+      }
+
+      if (pendingTeamInvite && targetRole === "participant") {
+        navigate(`/invite/team/${encodeURIComponent(pendingTeamInvite)}`, { replace: true });
         return;
       }
 
