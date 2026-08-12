@@ -2,6 +2,9 @@ import { collection, doc, deleteDoc, getDoc, getDocs, query, setDoc, updateDoc, 
 import { getFirebaseAuth } from "@/lib/firebaseClient";
 import {
   PORTAL_HACKATHONS,
+  isJoinableHackathon,
+  mergeHackathonCatalogs,
+  sortJoinableHackathons,
   type HackathonId,
   type HackathonStatus,
   type PortalHackathon,
@@ -480,12 +483,90 @@ export type HostedHackathonUpdate = Partial<
   >
 >;
 
+/** Marker used for portal catalog rows that are not yet backed by a Firestore listing. */
+export const PORTAL_CATALOG_CREATED_BY = "portal-catalog";
+
+export function isPortalEditionId(id: string) {
+  return PORTAL_HACKATHONS.some((portal) => portal.id === id);
+}
+
+/** True only for in-memory catalog stubs (no Firestore listing yet). */
+export function isPortalCatalogEvent(event: Pick<HostedHackathon, "createdBy" | "id">) {
+  return event.createdBy === PORTAL_CATALOG_CREATED_BY;
+}
+
+export function portalHackathonAsHosted(hackathon: PortalHackathon): HostedHackathon {
+  return {
+    id: hackathon.id,
+    name: hackathon.name,
+    shortName: hackathon.shortName,
+    eventDate: hackathon.eventDate,
+    location: hackathon.location,
+    theme: hackathon.theme,
+    status: hackathon.status,
+    summary: hackathon.theme,
+    format: "Portal catalog",
+    eligibility: "See event board",
+    teamSize: "See event board",
+    prize: hackathon.status === "past" ? "Completed" : "Portal live",
+    requirements: [],
+    schedule: [],
+    rulebookUrl: "",
+    coverImageUrl: "",
+    bannerImageUrl: "",
+    galleryUrls: [],
+    guests: [],
+    lumaUrl: "",
+    // Portal boards stay listed on /hackathons (including past editions).
+    published: true,
+    createdAt: "",
+    createdBy: PORTAL_CATALOG_CREATED_BY,
+    aiGenerated: false,
+    createdManually: false,
+  };
+}
+
+/**
+ * Materialize a fixed portal edition (Kyoto / Tokyo / Dhaka) into Firestore so
+ * admin edit / publish / lifecycle controls can persist. No-op if the doc exists
+ * or the id is not a portal edition.
+ */
+export async function ensurePortalCatalogHackathon(
+  db: Firestore,
+  id: string,
+  createdBy?: string,
+): Promise<boolean> {
+  if (!isPortalEditionId(id)) return false;
+  const ref = doc(db, "hackathons", id);
+  const existing = await getDoc(ref);
+  if (existing.exists()) return false;
+
+  const portal = PORTAL_HACKATHONS.find((entry) => entry.id === id);
+  if (!portal) return false;
+
+  const authUid = getFirebaseAuth().currentUser?.uid?.trim() || "";
+  const owner = createdBy?.trim() || authUid || "admin";
+  const base = portalHackathonAsHosted(portal);
+  const { id: _omit, ...fields } = base;
+
+  await setDoc(ref, {
+    ...fields,
+    createdAt: new Date().toISOString(),
+    createdBy: owner,
+    createdManually: true,
+    portalEdition: true,
+  });
+  return true;
+}
+
 /** Admin (or owning host via rules): patch public listing fields. */
 export async function updateHostedHackathon(
   db: Firestore,
   id: string,
   patch: HostedHackathonUpdate,
 ): Promise<void> {
+  await ensurePortalCatalogHackathon(db, id);
+
   const payload: Record<string, unknown> = {};
   if (patch.name !== undefined) payload.name = patch.name.trim();
   if (patch.shortName !== undefined) payload.shortName = patch.shortName.trim();
@@ -558,6 +639,54 @@ export async function fetchPublishedHackathons(db: Firestore): Promise<HostedHac
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
+export function hostedToPortalHackathon(event: HostedHackathon): PortalHackathon {
+  return {
+    id: event.id,
+    name: event.name,
+    shortName: event.shortName,
+    eventDate: event.eventDate,
+    location: event.location,
+    theme: event.theme,
+    status: event.status,
+  };
+}
+
+/** Full name catalog for dashboard switchers (static boards + published Firebase events). */
+export async function fetchPortalHackathonCatalog(db: Firestore): Promise<PortalHackathon[]> {
+  const published = await fetchPublishedHackathons(db);
+  return mergeHackathonCatalogs(
+    PORTAL_HACKATHONS,
+    published.map(hostedToPortalHackathon),
+  );
+}
+
+/**
+ * Events participants can join at signup / onboarding / dashboard.
+ * Temporarily limited to AI Ideathon listings only (hide Kyoto/Dhaka catalog boards).
+ */
+export async function fetchJoinablePortalHackathons(db: Firestore): Promise<PortalHackathon[]> {
+  const published = await fetchPublishedHackathons(db);
+  const createdAtById: Record<string, string> = {};
+  for (const event of published) {
+    createdAtById[event.id] = event.createdAt;
+  }
+
+  const ideathons = published
+    .filter(isJoinableHackathon)
+    .filter(isAiIdeathonEvent)
+    .map(hostedToPortalHackathon);
+
+  return sortJoinableHackathons(ideathons, createdAtById);
+}
+
+/** Signup / join pickers: match published AI Ideathon events by id or name. */
+export function isAiIdeathonEvent(
+  event: Pick<PortalHackathon, "id" | "name" | "shortName">,
+): boolean {
+  const haystack = `${event.id} ${event.name} ${event.shortName}`.toLowerCase();
+  return haystack.includes("ideathon");
+}
+
 export async function fetchAiHackathon(db: Firestore, id: string): Promise<HostedHackathon | null> {
   const snapshot = await getDoc(doc(db, "hackathons", id));
   return snapshot.exists() ? asHostedHackathon(snapshot.id, snapshot.data()) : null;
@@ -576,6 +705,7 @@ export async function setHackathonPublished(
   id: string,
   published: boolean,
 ): Promise<void> {
+  await ensurePortalCatalogHackathon(db, id);
   await setDoc(doc(db, "hackathons", id), { published }, { merge: true });
   await syncLinkedHostEventVisibility(db, id, published);
 }
@@ -585,6 +715,7 @@ export async function setHackathonStatus(
   id: string,
   status: HackathonStatus,
 ): Promise<void> {
+  await ensurePortalCatalogHackathon(db, id);
   const payload: { status: HackathonStatus; published?: boolean } = { status };
   // Going live also makes the event public so /hackathons and /events stay consistent.
   // Past / upcoming keep the current published flag so you can keep past events visible
@@ -628,44 +759,6 @@ export function getHackathonVisibilityLabel(event: Pick<HostedHackathon, "publis
   if (event.status === "active") return "Live";
   if (event.status === "past") return "Past";
   return "Published";
-}
-
-/** Marker used for portal catalog rows that are not yet backed by a Firestore listing. */
-export const PORTAL_CATALOG_CREATED_BY = "portal-catalog";
-
-export function isPortalCatalogEvent(event: Pick<HostedHackathon, "createdBy" | "id">) {
-  return event.createdBy === PORTAL_CATALOG_CREATED_BY;
-}
-
-export function portalHackathonAsHosted(hackathon: PortalHackathon): HostedHackathon {
-  return {
-    id: hackathon.id,
-    name: hackathon.name,
-    shortName: hackathon.shortName,
-    eventDate: hackathon.eventDate,
-    location: hackathon.location,
-    theme: hackathon.theme,
-    status: hackathon.status,
-    summary: hackathon.theme,
-    format: "Portal catalog",
-    eligibility: "See event board",
-    teamSize: "See event board",
-    prize: hackathon.status === "past" ? "Completed" : "Portal live",
-    requirements: [],
-    schedule: [],
-    rulebookUrl: "",
-    coverImageUrl: "",
-    bannerImageUrl: "",
-    galleryUrls: [],
-    guests: [],
-    lumaUrl: "",
-    // Portal boards stay listed on /hackathons (including past editions).
-    published: true,
-    createdAt: "",
-    createdBy: PORTAL_CATALOG_CREATED_BY,
-    aiGenerated: false,
-    createdManually: false,
-  };
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   getHackathonVisibilityLabel,
   getHostedHackathonUrl,
   isPortalCatalogEvent,
+  isPortalEditionId,
   type HostedHackathon,
   type HostedHackathonUpdate,
 } from "@/lib/aiHackathons";
@@ -355,7 +356,8 @@ export function EventManagementWorkspace({
                 const publicUrl = getHostedHackathonUrl(event.id);
                 const visibility = getHackathonVisibilityLabel(event);
                 const isEditing = editingId === event.id && editDraft;
-                const isCatalog = isPortalCatalogEvent(event);
+                const isCatalogStub = isPortalCatalogEvent(event);
+                const isPortalEdition = isPortalEditionId(event.id);
 
                 return (
                   <li key={event.id} className="bg-white/[0.02] px-4 py-4 sm:px-5">
@@ -374,7 +376,7 @@ export function EventManagementWorkspace({
                           >
                             {visibility}
                           </Badge>
-                          {isCatalog ? (
+                          {isPortalEdition ? (
                             <Badge
                               variant="outline"
                               className="border-amber-400/30 bg-amber-400/10 font-display text-[10px] uppercase tracking-wide text-amber-200"
@@ -414,20 +416,12 @@ export function EventManagementWorkspace({
                           {event.theme || event.summary || "No theme yet."}
                         </p>
                         <div className="flex flex-wrap items-center gap-3 pt-1">
-                          {isCatalog ? (
+                          {event.published ? (
                             <Link
-                              to="/hackathons"
+                              to={isCatalogStub ? "/hackathons" : publicUrl}
                               className="inline-flex items-center gap-1 font-display text-xs font-semibold text-primary hover:underline"
                             >
-                              View on /hackathons
-                              <ExternalLink className="h-3 w-3" />
-                            </Link>
-                          ) : event.published ? (
-                            <Link
-                              to={publicUrl}
-                              className="inline-flex items-center gap-1 font-display text-xs font-semibold text-primary hover:underline"
-                            >
-                              View public page
+                              {isCatalogStub ? "View on /hackathons" : "View public page"}
                               <ExternalLink className="h-3 w-3" />
                             </Link>
                           ) : (
@@ -444,7 +438,7 @@ export function EventManagementWorkspace({
                             </Link>
                           ) : null}
                           <span className="font-mono text-[11px] text-muted-foreground/80">{event.id}</span>
-                          {!isCatalog && event.createdBy ? (
+                          {!isCatalogStub && event.createdBy ? (
                             <span className="font-mono text-[11px] text-muted-foreground/60">
                               by {event.createdBy.slice(0, 8)}…
                             </span>
@@ -453,16 +447,14 @@ export function EventManagementWorkspace({
                       </div>
 
                       <div className="flex shrink-0 flex-col gap-2 sm:min-w-[240px]">
-                        {isCatalog ? (
-                          <p className="font-body text-xs text-muted-foreground">
-                            Portal catalog edition — always listed here, including past events.
-                            Publish a host/admin listing with this id to unlock full edit controls.
-                          </p>
-                        ) : (
-                          <>
                         <p className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                           Access
                         </p>
+                        {isCatalogStub ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            Portal edition — first save publishes a manageable listing for this id.
+                          </p>
+                        ) : null}
                         <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
@@ -503,12 +495,19 @@ export function EventManagementWorkspace({
                             type="button"
                             size="sm"
                             variant="outline"
-                            disabled={busy || isBusy}
+                            disabled={busy || isBusy || isCatalogStub}
                             className="gap-1.5 text-destructive hover:text-destructive"
+                            title={
+                              isCatalogStub
+                                ? "Catalog editions stay listed until a saved override exists"
+                                : undefined
+                            }
                             onClick={() => {
                               if (
                                 window.confirm(
-                                  `Delete “${event.name}” from the public directory? Host ops data is kept as a draft.`,
+                                  isPortalEdition
+                                    ? `Remove the saved override for “${event.name}”? The portal catalog row will return with default details.`
+                                    : `Delete “${event.name}” from the public directory? Host ops data is kept as a draft.`,
                                 )
                               ) {
                                 void onDeleteEvent(event.id);
@@ -560,8 +559,6 @@ export function EventManagementWorkspace({
                             Mark past
                           </Button>
                         </div>
-                          </>
-                        )}
                       </div>
                     </div>
 

@@ -22,7 +22,9 @@ import {
   PORTAL_HACKATHONS,
   SITE_HACKATHON_ID,
   type HackathonId,
+  type PortalHackathon,
 } from "@/lib/hackathons";
+import { fetchPortalHackathonCatalog } from "@/lib/aiHackathons";
 import { getDashboardPathForUser } from "@/lib/portalRoutes";
 import { deleteStorageImageByUrl, uploadProfileAvatar, uploadProfileImage } from "@/lib/profileMedia";
 import type { UserProfile } from "@/types/portal";
@@ -122,8 +124,11 @@ const mapUserProfileToForm = (profile: UserProfile | undefined | null): PeoplePr
 export default function ParticipantProfilePage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
+  const [eventCatalog, setEventCatalog] = useState<PortalHackathon[]>(PORTAL_HACKATHONS);
   const { selectedHackathonId, setSelectedHackathonId } = useHackathonSelection(
-    HACKATHON_STORAGE_KEYS.participant
+    HACKATHON_STORAGE_KEYS.participant,
+    undefined,
+    eventCatalog
   );
 
   const [profileForm, setProfileForm] = useState<PeopleProfileFormState>(initialProfileForm);
@@ -164,18 +169,31 @@ export default function ParticipantProfilePage() {
     if (sessionUser?.hackathonId && isHackathonId(sessionUser.hackathonId)) {
       ids.add(sessionUser.hackathonId);
     }
-    return PORTAL_HACKATHONS.filter((hackathon) => ids.has(hackathon.id)).map(
-      (hackathon) => hackathon.id
-    );
+    return Array.from(ids);
   }, [enrolledHackathonIds, sessionUser]);
 
   const accessibleHackathons = useMemo(
-    () => getHackathonsByIds(accessibleHackathonIds),
-    [accessibleHackathonIds]
+    () => getHackathonsByIds(accessibleHackathonIds, eventCatalog),
+    [accessibleHackathonIds, eventCatalog]
   );
 
   useEffect(() => {
+    let cancelled = false;
+    void fetchPortalHackathonCatalog(db)
+      .then((catalog) => {
+        if (!cancelled) setEventCatalog(catalog);
+      })
+      .catch(() => {
+        // Keep static catalog fallback.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [db]);
+
+  useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
+    if (accessibleHackathonIds.length === 0) return;
     if (accessibleHackathonIds.includes(selectedHackathonId)) return;
     setSelectedHackathonId(accessibleHackathonIds[0] ?? SITE_HACKATHON_ID);
   }, [accessibleHackathonIds, selectedHackathonId, sessionUser, setSelectedHackathonId]);

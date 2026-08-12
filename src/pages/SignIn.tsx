@@ -15,6 +15,13 @@ import {
   readPendingInvite,
   stashPendingInvite,
 } from "@/lib/inviteTokens";
+import {
+  clearPendingHackathon,
+  isHackathonId,
+  readPendingHackathon,
+  stashPendingHackathon,
+  type HackathonId,
+} from "@/lib/hackathons";
 import { redeemJudgeInvite } from "@/lib/portalInvites";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import type { JudgeApprovalStatus, PortalRole, SessionUser } from "@/types/portal";
@@ -22,6 +29,22 @@ import type { JudgeApprovalStatus, PortalRole, SessionUser } from "@/types/porta
 const sectionClass = "rounded-xl border border-border bg-card";
 
 type AuthRole = "participant" | "judge" | "host";
+
+const onboardingPath = (hackathonId?: string | null) =>
+  hackathonId && isHackathonId(hackathonId)
+    ? `/onboarding?hackathon=${encodeURIComponent(hackathonId)}`
+    : "/onboarding";
+
+const enrollPendingHackathonIds = (
+  existingIds: unknown,
+  pendingId: HackathonId | null
+): HackathonId[] => {
+  const ids = Array.isArray(existingIds)
+    ? existingIds.filter((value): value is string => typeof value === "string" && isHackathonId(value))
+    : [];
+  if (!pendingId) return ids;
+  return Array.from(new Set<HackathonId>([pendingId, ...ids]));
+};
 
 const normalizePortalRole = (value: unknown): PortalRole | undefined => {
   if (typeof value !== "string") return undefined;
@@ -74,9 +97,9 @@ const roleCopy: Record<
 > = {
   participant: {
     signupHint:
-      "Anyone can join. Sign up with Google, then choose your event during onboarding or from the dashboard.",
+      "Anyone can join AI Ideathon. Sign up with Google, confirm the event in onboarding, then open your participant dashboard.",
     signinHint: "Log in with Google to open your participant workspace.",
-    headerSignup: "Join a hackathon",
+    headerSignup: "Join AI Ideathon",
     headerSignin: "Welcome back",
   },
   judge: {
@@ -103,6 +126,9 @@ export default function SignIn() {
   const searchMode = new URLSearchParams(location.search).get("mode");
   const searchRole = new URLSearchParams(location.search).get("role");
   const searchInvite = new URLSearchParams(location.search).get("invite");
+  const searchHackathon =
+    new URLSearchParams(location.search).get("hackathon") ??
+    new URLSearchParams(location.search).get("event");
   const stateMode = (location.state as { mode?: "signin" | "signup"; role?: AuthRole })?.mode;
   const stateRole = (location.state as { mode?: "signin" | "signup"; role?: AuthRole })?.role;
   const isSignupPath = location.pathname === "/signup";
@@ -131,9 +157,17 @@ export default function SignIn() {
   }, [searchInvite, initialRole]);
 
   useEffect(() => {
+    if (searchHackathon && isHackathonId(searchHackathon)) {
+      stashPendingHackathon(searchHackathon);
+      setAuthRole("participant");
+    }
+  }, [searchHackathon]);
+
+  useEffect(() => {
     const params = new URLSearchParams(location.search);
     const m = params.get("mode");
     const r = params.get("role");
+    const hackathon = params.get("hackathon") ?? params.get("event");
     if (m === "signin" || m === "signup") {
       setMode(m);
     } else if (location.pathname === "/signup") {
@@ -143,6 +177,10 @@ export default function SignIn() {
     }
     if (r === "participant" || r === "judge" || r === "host") {
       setAuthRole(r);
+    }
+    if (hackathon && isHackathonId(hackathon)) {
+      stashPendingHackathon(hackathon);
+      if (!r) setAuthRole("participant");
     }
   }, [location.search, location.pathname]);
 
@@ -155,9 +193,73 @@ export default function SignIn() {
       sessionUser?.role === "host" ||
       sessionUser?.role === "admin"
     ) {
+      const pendingHackathon =
+        readPendingHackathon() ||
+        (searchHackathon && isHackathonId(searchHackathon) ? searchHackathon : null);
+
+      // Keep users on signup long enough to enroll a deep-linked event when already signed in.
+      if (sessionUser.role === "participant" && pendingHackathon && (isSignupPath || searchHackathon)) {
+        return;
+      }
+
       navigate(pathForSession(sessionUser), { replace: true });
     }
-  }, [authLoading, sessionUser, navigate]);
+  }, [authLoading, sessionUser, navigate, searchHackathon, isSignupPath]);
+
+  const enrollExistingParticipantForPendingEvent = async () => {
+    if (!sessionUser || sessionUser.role !== "participant") return;
+    const pendingHackathon =
+      readPendingHackathon() ||
+      (searchHackathon && isHackathonId(searchHackathon) ? searchHackathon : null);
+    if (!pendingHackathon) {
+      navigate(pathForSession(sessionUser), { replace: true });
+      return;
+    }
+
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      const nextIds = Array.from(
+        new Set<HackathonId>([pendingHackathon, ...(sessionUser.hackathonIds ?? [])])
+      );
+      await setDoc(
+        doc(db, "users", sessionUser.id),
+        {
+          hackathon_id: pendingHackathon,
+          hackathon_ids: nextIds,
+        },
+        { merge: true }
+      );
+      clearPendingHackathon();
+      navigate(
+        participantNeedsOnboarding(sessionUser)
+          ? onboardingPath(pendingHackathon)
+          : "/dashboard/participant",
+        { replace: true }
+      );
+    } catch (error: unknown) {
+      const message =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Could not join that event.";
+      setAuthError(message);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authLoading || isAuthLoading) return;
+    if (!sessionUser || sessionUser.role !== "participant") return;
+    const pendingHackathon =
+      readPendingHackathon() ||
+      (searchHackathon && isHackathonId(searchHackathon) ? searchHackathon : null);
+    if (!pendingHackathon) return;
+    if (!(isSignupPath || searchHackathon)) return;
+    void enrollExistingParticipantForPendingEvent();
+    // Intentionally run when a deep-linked event is present for an already-signed-in participant.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, sessionUser, searchHackathon, isSignupPath]);
 
   const handleGoogleAuth = async () => {
     setIsAuthLoading(true);
@@ -233,6 +335,49 @@ export default function SignIn() {
           navigate(`/invite/team/${encodeURIComponent(pendingTeamInviteOnSignIn)}`, {
             replace: true,
           });
+          return;
+        }
+
+        const pendingHackathonOnSignIn =
+          readPendingHackathon() ||
+          (searchHackathon && isHackathonId(searchHackathon) ? searchHackathon : null);
+
+        if (existingRole === "participant" && pendingHackathonOnSignIn) {
+          const nextIds = enrollPendingHackathonIds(
+            existingData.hackathon_ids,
+            pendingHackathonOnSignIn
+          );
+          await setDoc(
+            userRef,
+            {
+              hackathon_id: pendingHackathonOnSignIn,
+              hackathon_ids: nextIds,
+            },
+            { merge: true }
+          );
+          clearPendingHackathon();
+
+          const needsOnboarding = participantNeedsOnboarding({
+            role: "participant",
+            onboardingCompletedAt:
+              typeof existingData.onboardingCompletedAt === "string"
+                ? existingData.onboardingCompletedAt
+                : null,
+            profile: {
+              fullName: typeof existingData.fullName === "string" ? existingData.fullName : null,
+              profileUpdatedAt:
+                typeof existingData.profileUpdatedAt === "string"
+                  ? existingData.profileUpdatedAt
+                  : null,
+            },
+          });
+
+          navigate(
+            needsOnboarding
+              ? onboardingPath(pendingHackathonOnSignIn)
+              : "/dashboard/participant",
+            { replace: true }
+          );
           return;
         }
 
@@ -342,12 +487,57 @@ export default function SignIn() {
           navigate(`/invite/team/${encodeURIComponent(pendingTeamInvite)}`, { replace: true });
           return;
         }
-        navigate("/onboarding", { replace: true });
+        const pendingHackathon =
+          readPendingHackathon() ||
+          (searchHackathon && isHackathonId(searchHackathon) ? searchHackathon : null);
+        navigate(onboardingPath(pendingHackathon), { replace: true });
         return;
       }
 
       if (pendingTeamInvite && targetRole === "participant") {
         navigate(`/invite/team/${encodeURIComponent(pendingTeamInvite)}`, { replace: true });
+        return;
+      }
+
+      if (targetRole === "participant") {
+        const pendingHackathon =
+          readPendingHackathon() ||
+          (searchHackathon && isHackathonId(searchHackathon) ? searchHackathon : null);
+        if (pendingHackathon) {
+          const nextIds = enrollPendingHackathonIds(existingData.hackathon_ids, pendingHackathon);
+          await setDoc(
+            userRef,
+            {
+              hackathon_id: pendingHackathon,
+              hackathon_ids: nextIds,
+            },
+            { merge: true }
+          );
+          clearPendingHackathon();
+        }
+
+        const sessionForPath = {
+          role: targetRole,
+          judgeApprovalStatus: targetJudgeApprovalStatus ?? existingJudgeApprovalStatus,
+          onboardingCompletedAt:
+            typeof existingData.onboardingCompletedAt === "string"
+              ? existingData.onboardingCompletedAt
+              : null,
+          profile: {
+            fullName: typeof existingData.fullName === "string" ? existingData.fullName : null,
+            profileUpdatedAt:
+              typeof existingData.profileUpdatedAt === "string"
+                ? existingData.profileUpdatedAt
+                : null,
+          },
+        };
+
+        if (participantNeedsOnboarding(sessionForPath)) {
+          navigate(onboardingPath(pendingHackathon), { replace: true });
+          return;
+        }
+
+        navigate(pathForSession(sessionForPath), { replace: true });
         return;
       }
 
@@ -380,18 +570,42 @@ export default function SignIn() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Redirecting…</p>
+      </div>
+    );
+  }
+
+  const pendingHackathonForSession =
+    readPendingHackathon() ||
+    (searchHackathon && isHackathonId(searchHackathon) ? searchHackathon : null);
+  const holdingForEventJoin =
+    Boolean(sessionUser?.role === "participant" && pendingHackathonForSession && (isSignupPath || searchHackathon));
+
   if (
-    authLoading ||
-    (sessionUser &&
-      (sessionUser.role === "participant" ||
-        sessionUser.role === "mentor" ||
-        sessionUser.role === "judge" ||
-        sessionUser.role === "host" ||
-        sessionUser.role === "admin"))
+    sessionUser &&
+    !holdingForEventJoin &&
+    (sessionUser.role === "participant" ||
+      sessionUser.role === "mentor" ||
+      sessionUser.role === "judge" ||
+      sessionUser.role === "host" ||
+      sessionUser.role === "admin")
   ) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Redirecting…</p>
+      </div>
+    );
+  }
+
+  if (holdingForEventJoin) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">
+          {isAuthLoading ? "Joining your event…" : "Opening your dashboard…"}
+        </p>
       </div>
     );
   }
@@ -474,7 +688,7 @@ export default function SignIn() {
                 <p className="text-[0.7rem] text-muted-foreground">
                   {mode === "signup"
                     ? authRole === "participant"
-                      ? "You'll pick your event in onboarding and can add more from the dashboard."
+                      ? "You'll pick from the latest open events in onboarding, land in your dashboard, and can switch or join more events there."
                       : authRole === "judge"
                         ? "Judge accounts need admin approval before scoring."
                         : "Host accounts need admin approval before running events."

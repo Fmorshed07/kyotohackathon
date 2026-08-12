@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import {
   ArrowLeft,
   ArrowRight,
   CalendarDays,
   Check,
-  Compass,
   Github,
   Globe,
   Linkedin,
@@ -34,18 +33,26 @@ import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { formDraftStorageKey } from "@/lib/formDrafts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import {
+  fetchAiHackathon,
+  fetchJoinablePortalHackathons,
+  hostedToPortalHackathon,
+  isAiIdeathonEvent,
+} from "@/lib/aiHackathons";
+import {
   SITE_HACKATHON_ID,
-  getHackathonById,
-  getJoinableHackathons,
+  clearPendingHackathon,
   isHackathonId,
   isJoinableHackathon,
+  mergeHackathonCatalogs,
+  readPendingHackathon,
+  resolvePortalHackathon,
+  stashPendingHackathon,
   type HackathonId,
+  type PortalHackathon,
 } from "@/lib/hackathons";
 import { getDashboardPathForUser, participantNeedsOnboarding } from "@/lib/portalRoutes";
 import { queueParticipantEmail } from "@/lib/participantEmail";
 import { cn } from "@/lib/utils";
-
-const JOINABLE = getJoinableHackathons();
 
 type OnboardingStep = 1 | 2 | 3;
 
@@ -173,7 +180,7 @@ const parseSkillList = (value: string) =>
 const stepMeta: Record<OnboardingStep, { title: string; subtitle: string }> = {
   1: {
     title: "Confirm your event",
-    subtitle: "Pick the open hackathon you are joining. Past editions stay hidden.",
+    subtitle: "Join AI Ideathon — the open event available for signup right now.",
   },
   2: {
     title: "Who are you on the team?",
@@ -187,12 +194,20 @@ const stepMeta: Record<OnboardingStep, { title: string; subtitle: string }> = {
 
 export default function ParticipantOnboardingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const db = getFirestoreDb();
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
 
+  const preferredHackathonId = useMemo(() => {
+    const fromQuery = searchParams.get("hackathon") ?? searchParams.get("event");
+    if (fromQuery && isHackathonId(fromQuery)) return fromQuery;
+    return readPendingHackathon();
+  }, [searchParams]);
+
   const [step, setStep] = useState<OnboardingStep>(1);
+  const [joinableHackathons, setJoinableHackathons] = useState<PortalHackathon[]>([]);
   const [hackathonId, setHackathonId] = useState<HackathonId>(
-    JOINABLE[0]?.id ?? SITE_HACKATHON_ID
+    preferredHackathonId ?? SITE_HACKATHON_ID
   );
   const [form, setForm] = useState<OnboardingForm>(emptyForm);
   const [formBaseline, setFormBaseline] = useState<OnboardingForm>(emptyForm);
@@ -201,7 +216,10 @@ export default function ParticipantOnboardingPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedHackathon = useMemo(() => getHackathonById(hackathonId), [hackathonId]);
+  const selectedHackathon = useMemo(
+    () => resolvePortalHackathon(hackathonId, joinableHackathons),
+    [hackathonId, joinableHackathons]
+  );
   const selectedSkills = useMemo(() => parseSkillList(form.skills), [form.skills]);
   const knownRoleIds = useMemo(() => new Set(ROLE_OPTIONS.map((role) => role.id)), []);
 
@@ -226,6 +244,12 @@ export default function ParticipantOnboardingPage() {
   useUnsavedChangesGuard(isOnboardingDirty && !isSaving);
 
   useEffect(() => {
+    if (preferredHackathonId) {
+      stashPendingHackathon(preferredHackathonId);
+    }
+  }, [preferredHackathonId]);
+
+  useEffect(() => {
     if (authLoading) return;
     if (!sessionUser || sessionUser.role !== "participant") return;
 
@@ -233,7 +257,32 @@ export default function ParticipantOnboardingPage() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const snap = await getDoc(doc(db, "users", sessionUser.id));
+        const [joinable, snap] = await Promise.all([
+          fetchJoinablePortalHackathons(db).catch(() => [] as PortalHackathon[]),
+          getDoc(doc(db, "users", sessionUser.id)),
+        ]);
+
+        let nextJoinable = joinable;
+        const preferred =
+          preferredHackathonId && isHackathonId(preferredHackathonId)
+            ? preferredHackathonId
+            : null;
+
+        if (preferred && !nextJoinable.some((entry) => entry.id === preferred)) {
+          const hosted = await fetchAiHackathon(db, preferred).catch(() => null);
+          if (
+            hosted &&
+            hosted.published &&
+            isJoinableHackathon(hosted) &&
+            isAiIdeathonEvent(hosted)
+          ) {
+            nextJoinable = mergeHackathonCatalogs(
+              [hostedToPortalHackathon(hosted)],
+              nextJoinable
+            );
+          }
+        }
+
         const data = snap.data() ?? {};
         const enrolled =
           typeof data.hackathon_id === "string" && isHackathonId(data.hackathon_id)
@@ -244,14 +293,17 @@ export default function ParticipantOnboardingPage() {
               ? data.hackathon_ids[0]
               : sessionUser.hackathonId;
 
-        const nextId =
-          enrolled && isJoinableHackathon(getHackathonById(enrolled))
-            ? enrolled
-            : (JOINABLE[0]?.id ?? SITE_HACKATHON_ID);
+        const preferredOrEnrolled =
+          (preferred && nextJoinable.some((entry) => entry.id === preferred)
+            ? preferred
+            : null) ??
+          (enrolled && nextJoinable.some((entry) => entry.id === enrolled) ? enrolled : null);
 
+        const nextId = preferredOrEnrolled ?? nextJoinable[0]?.id ?? SITE_HACKATHON_ID;
         const loadedRole = typeof data.publicRole === "string" ? data.publicRole : "";
 
         if (!cancelled) {
+          setJoinableHackathons(nextJoinable);
           setHackathonId(nextId);
           const nextForm: OnboardingForm = {
             fullName: typeof data.fullName === "string" ? data.fullName : "",
@@ -289,7 +341,7 @@ export default function ParticipantOnboardingPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, db, knownRoleIds, sessionUser]);
+  }, [authLoading, db, knownRoleIds, preferredHackathonId, sessionUser]);
 
   useEffect(() => {
     if (!pendingOnboardingRestore) return;
@@ -482,6 +534,7 @@ export default function ParticipantOnboardingPage() {
         discordHandle: form.discordHandle.trim().replace(/^@/, ""),
       });
       clearOnboardingDraft();
+      clearPendingHackathon();
       navigate("/dashboard/participant", { replace: true });
     } catch (err: unknown) {
       const msg =
@@ -559,7 +612,7 @@ export default function ParticipantOnboardingPage() {
             {step === 1 ? (
               <div className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {JOINABLE.map((hackathon) => {
+                  {joinableHackathons.map((hackathon) => {
                     const selected = hackathon.id === hackathonId;
                     return (
                       <button
@@ -567,7 +620,7 @@ export default function ParticipantOnboardingPage() {
                         type="button"
                         onClick={() => setHackathonId(hackathon.id)}
                         className={cn(
-                          "rounded-xl border p-4 text-left transition",
+                          "rounded-xl border p-4 text-left transition sm:col-span-2",
                           selected
                             ? "border-primary bg-primary/10"
                             : "border-border/70 bg-background/50 hover:border-primary/40"
@@ -595,30 +648,17 @@ export default function ParticipantOnboardingPage() {
                       </button>
                     );
                   })}
-                  <Link
-                    to="/hackathons"
-                    className="rounded-xl border border-dashed border-border/80 bg-background/30 p-4 text-left transition hover:border-primary/50 hover:bg-primary/5"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
-                        <Compass className="h-3.5 w-3.5" />
-                      </span>
-                      <span className="font-display text-base font-semibold">Explore events</span>
-                      <Badge variant="outline">browse</Badge>
-                    </div>
-                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                      Not sure yet? Browse every Cognisor Impact hub, then come back and join the one
-                      that fits.
-                    </p>
-                    <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
-                      Open hackathons
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </p>
-                  </Link>
                 </div>
-                <p className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                  You are joining <strong className="text-foreground">{selectedHackathon.name}</strong>.
-                </p>
+                {joinableHackathons.length === 0 ? (
+                  <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                    AI Ideathon is not open for signup yet. Check the public event page, or try again
+                    shortly.
+                  </p>
+                ) : (
+                  <p className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    You are joining <strong className="text-foreground">{selectedHackathon.name}</strong>.
+                  </p>
+                )}
               </div>
             ) : null}
 

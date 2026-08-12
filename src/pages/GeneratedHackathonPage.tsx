@@ -29,6 +29,9 @@ import { cn } from "@/lib/utils";
 
 type PublicCriterion = { id: string; title: string; weight: number; questions: string[] };
 
+const participantSignupHref = (eventId: string) =>
+  `/signup?role=participant&hackathon=${encodeURIComponent(eventId)}`;
+
 const normalizeCriteria = (value: unknown): PublicCriterion[] => {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry, index) => {
@@ -141,14 +144,13 @@ function EventHero({
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 </Button>
-              ) : (
-                <Button asChild size="lg" className="gap-2">
-                  <Link to="/signup">
-                    Join on Cognisor
-                    <Users className="h-4 w-4" />
-                  </Link>
-                </Button>
-              )}
+              ) : null}
+              <Button asChild size="lg" variant={event.lumaUrl ? "outline" : "default"} className="gap-2">
+                <Link to={participantSignupHref(event.id)}>
+                  Join on Cognisor
+                  <Users className="h-4 w-4" />
+                </Link>
+              </Button>
               {event.rulebookUrl ? (
                 <Button asChild size="lg" variant="outline" className="gap-2 border-white/25 bg-black/30 text-white backdrop-blur hover:bg-black/50">
                   <a href={event.rulebookUrl} target="_blank" rel="noreferrer">
@@ -239,13 +241,12 @@ function EventHero({
                 Register now <ExternalLink className="h-4 w-4" />
               </a>
             </Button>
-          ) : (
-            <Button asChild className="gap-2">
-              <Link to="/signup">
-                Join Cognisor <Users className="h-4 w-4" />
-              </Link>
-            </Button>
-          )}
+          ) : null}
+          <Button asChild variant={event.lumaUrl ? "outline" : "default"} className="gap-2">
+            <Link to={participantSignupHref(event.id)}>
+              Join Cognisor <Users className="h-4 w-4" />
+            </Link>
+          </Button>
           {event.rulebookUrl ? (
             <Button asChild variant="outline" className="gap-2">
               <a href={event.rulebookUrl} target="_blank" rel="noreferrer">
@@ -623,7 +624,7 @@ export default function GeneratedHackathonPage() {
                       </Button>
                     ) : null}
                     <Button asChild variant={event.lumaUrl ? "outline" : "default"} className="gap-2">
-                      <Link to="/signup">
+                      <Link to={participantSignupHref(event.id)}>
                         Create participant account <ArrowLeft className="h-4 w-4 rotate-180" />
                       </Link>
                     </Button>

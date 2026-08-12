@@ -15,16 +15,22 @@ import {
   buildParticipantHackathonSummaries,
   filterSubmissionsByHackathon,
   getHackathonsByIds,
-  getJoinableHackathons,
   getSubmissionHackathonId,
   getUserAllowedHackathonIds,
   HACKATHON_PUBLIC_URLS,
   HACKATHON_STORAGE_KEYS,
   isHackathonId,
   PORTAL_HACKATHONS,
+  resolvePortalHackathon,
   SITE_HACKATHON_ID,
   type HackathonId,
+  type PortalHackathon,
 } from "@/lib/hackathons";
+import {
+  fetchJoinablePortalHackathons,
+  fetchPortalHackathonCatalog,
+  getHostedHackathonUrl,
+} from "@/lib/aiHackathons";
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import {
   createTeamInvite,
@@ -185,8 +191,16 @@ const sortSubmissionsNewestFirst = (submissions: Submission[]) =>
 export default function ParticipantDashboardPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
-  const { selectedHackathonId, selectedHackathon, setSelectedHackathonId } = useHackathonSelection(
-    HACKATHON_STORAGE_KEYS.participant
+  const [eventCatalog, setEventCatalog] = useState<PortalHackathon[]>(PORTAL_HACKATHONS);
+  const [liveJoinableHackathons, setLiveJoinableHackathons] = useState<PortalHackathon[]>([]);
+  const { selectedHackathonId, setSelectedHackathonId } = useHackathonSelection(
+    HACKATHON_STORAGE_KEYS.participant,
+    undefined,
+    eventCatalog
+  );
+  const selectedHackathon = useMemo(
+    () => resolvePortalHackathon(selectedHackathonId, eventCatalog),
+    [eventCatalog, selectedHackathonId]
   );
 
   const [allParticipantSubmissions, setAllParticipantSubmissions] = useState<Submission[]>([]);
@@ -246,15 +260,13 @@ export default function ParticipantDashboardPage() {
       ids.add(getSubmissionHackathonId(submission));
     }
 
-    // Past events stay visible only when the participant is already enrolled / submitted.
-    return PORTAL_HACKATHONS.filter((hackathon) => ids.has(hackathon.id)).map(
-      (hackathon) => hackathon.id
-    );
+    // Keep enrolled / submitted events visible even when they are Firebase-only or past.
+    return Array.from(ids);
   }, [allParticipantSubmissions, enrolledHackathonIds, sessionUser]);
 
   const accessibleHackathons = useMemo(
-    () => getHackathonsByIds(accessibleHackathonIds),
-    [accessibleHackathonIds]
+    () => getHackathonsByIds(accessibleHackathonIds, eventCatalog),
+    [accessibleHackathonIds, eventCatalog]
   );
 
   const participantSubmissions = useMemo(
@@ -266,14 +278,40 @@ export default function ParticipantDashboardPage() {
   );
 
   const hackathonSummaries = useMemo(
-    () => buildParticipantHackathonSummaries(allParticipantSubmissions, enrolledHackathonIds),
-    [allParticipantSubmissions, enrolledHackathonIds]
+    () =>
+      buildParticipantHackathonSummaries(
+        allParticipantSubmissions,
+        enrolledHackathonIds,
+        eventCatalog
+      ),
+    [allParticipantSubmissions, enrolledHackathonIds, eventCatalog]
   );
 
   const joinableHackathons = useMemo(() => {
     const enrolled = new Set(accessibleHackathonIds);
-    return getJoinableHackathons().filter((hackathon) => !enrolled.has(hackathon.id));
-  }, [accessibleHackathonIds]);
+    return liveJoinableHackathons.filter((hackathon) => !enrolled.has(hackathon.id));
+  }, [accessibleHackathonIds, liveJoinableHackathons]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadEvents = async () => {
+      try {
+        const [catalog, joinable] = await Promise.all([
+          fetchPortalHackathonCatalog(db),
+          fetchJoinablePortalHackathons(db),
+        ]);
+        if (cancelled) return;
+        setEventCatalog(catalog);
+        setLiveJoinableHackathons(joinable);
+      } catch {
+        // Keep static catalog fallbacks.
+      }
+    };
+    void loadEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [db]);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
@@ -602,7 +640,7 @@ export default function ParticipantDashboardPage() {
 
   const handleJoinHackathon = async (hackathonId: HackathonId) => {
     if (!sessionUser) return;
-    const joinable = getJoinableHackathons().some((entry) => entry.id === hackathonId);
+    const joinable = liveJoinableHackathons.some((entry) => entry.id === hackathonId);
     if (!joinable) {
       setSubmissionMessage("That event is not open for new participants.");
       return;
@@ -622,7 +660,9 @@ export default function ParticipantDashboardPage() {
       );
       setEnrolledHackathonIds(nextHackathonIds);
       setSelectedHackathonId(hackathonId);
-      setSubmissionMessage(`Joined ${PORTAL_HACKATHONS.find((h) => h.id === hackathonId)?.name ?? "event"}.`);
+      setSubmissionMessage(
+        `Joined ${resolvePortalHackathon(hackathonId, eventCatalog).name}.`
+      );
     } catch (error: unknown) {
       const message =
         typeof error === "object" && error && "message" in error
@@ -847,7 +887,9 @@ export default function ParticipantDashboardPage() {
         selectedHackathon={selectedHackathon}
         hackathonSummaries={hackathonSummaries}
         joinableHackathons={joinableHackathons}
-        publicSiteUrl={HACKATHON_PUBLIC_URLS[selectedHackathonId]}
+        publicSiteUrl={
+          HACKATHON_PUBLIC_URLS[selectedHackathonId] ?? getHostedHackathonUrl(selectedHackathonId)
+        }
         isLoadingWorkspace={isLoadingWorkspace}
         isReadOnly={isReadOnly}
         isJoiningHackathon={isJoiningHackathon}

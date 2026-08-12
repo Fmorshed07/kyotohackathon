@@ -22,11 +22,27 @@ import {
   Radar,
   CalendarCheck2,
   BookOpen,
+  Wand2,
+  PenLine,
+  UserCog,
+  Gavel,
+  Medal,
+  ChartColumn,
+  Server,
+  Mail,
+  ChevronDown,
+  type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { useState, type ReactNode } from "react";
 import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +76,7 @@ import {
   type PortalHackathon,
 } from "@/lib/hackathons";
 import type { SessionUser } from "@/types/portal";
+import { cn } from "@/lib/utils";
 
 type DashboardLayoutProps = {
   sessionUser: SessionUser;
@@ -69,6 +86,14 @@ type DashboardLayoutProps = {
   hackathons?: PortalHackathon[];
   selectedHackathonId?: HackathonId;
   onHackathonChange?: (hackathonId: HackathonId) => void;
+};
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  external?: boolean;
+  toHost?: boolean;
 };
 
 const roleThemes: Record<
@@ -98,11 +123,41 @@ const roleThemes: Record<
 };
 
 const menuButtonClass =
-  "group/nav dash-nav-item h-11 sm:h-12 hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/15 data-[active=true]:font-medium data-[active=true]:text-primary";
+  "group/nav dash-nav-item h-10 sm:h-11 hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/15 data-[active=true]:font-medium data-[active=true]:text-primary";
 
 const navIconClass = "dash-nav-icon group-hover/nav:text-primary";
 
 const groupLabelClass = "dash-nav-label !text-primary/70";
+
+const ADMIN_OPERATE: NavItem[] = [
+  { href: "#overview", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard/admin/screening", label: "Screening agent", icon: Radar },
+  { href: "/dashboard/admin/operations", label: "Operations", icon: Activity },
+  { href: "/dashboard/admin/events", label: "Event management", icon: CalendarCheck2 },
+  { href: "/dashboard/admin#platform", label: "Platform", icon: Server },
+];
+
+const ADMIN_CREATE: NavItem[] = [
+  { href: "#ai-event-builder", label: "AI event builder", icon: Wand2 },
+  { href: "#manual-event-builder", label: "Manual event", icon: PenLine },
+  { href: "/dashboard/host", label: "Host ops", icon: Ticket, toHost: true },
+];
+
+const ADMIN_PEOPLE: NavItem[] = [
+  { href: "#manage-participants", label: "Participants", icon: Users },
+  { href: "#manage-judges", label: "Judges", icon: Scale },
+  { href: "#manage-hosts", label: "Host approvals", icon: UserCog },
+  { href: "#judge-invites", label: "Judge invites", icon: Mail },
+];
+
+const ADMIN_SCORING: NavItem[] = [
+  { href: "#judge-marks", label: "Judge marks", icon: Gavel },
+  { href: "#submission-marks", label: "Submissions", icon: ClipboardList },
+  { href: "#analytics", label: "Analytics", icon: BarChart3 },
+  { href: "#host-analytics", label: "Host analytics", icon: ChartColumn },
+  { href: "#top-3-marks", label: "Top 3 marks", icon: Medal },
+  { href: "#top-3-ranking", label: "Top 3 ranking", icon: Trophy },
+];
 
 function MobileSidebarClose() {
   const { isMobile, setOpenMobile } = useSidebar();
@@ -188,6 +243,106 @@ function DashboardNavLink({
   );
 }
 
+function NavMenuItems({
+  items,
+  onNavigate,
+}: {
+  items: NavItem[];
+  onNavigate: () => void;
+}) {
+  return (
+    <>
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <SidebarMenuItem key={`${item.href}-${item.label}`}>
+            <SidebarMenuButton asChild className={menuButtonClass}>
+              {item.toHost ? (
+                <Link
+                  to={item.href}
+                  onClick={onNavigate}
+                  className="flex w-full items-center gap-2"
+                >
+                  <Icon className={navIconClass} />
+                  <span>{item.label}</span>
+                </Link>
+              ) : (
+                <DashboardNavLink
+                  href={item.href}
+                  onNavigate={onNavigate}
+                  external={item.external}
+                >
+                  <Icon className={navIconClass} />
+                  <span>{item.label}</span>
+                </DashboardNavLink>
+              )}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </>
+  );
+}
+
+function NavSection({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <SidebarGroup className={cn("dash-nav-section", className)}>
+      <SidebarGroupLabel className={groupLabelClass}>{label}</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu className="gap-0.5">{children}</SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+function CollapsibleNavSection({
+  label,
+  items,
+  onNavigate,
+  defaultOpen = true,
+}: {
+  label: string;
+  items: NavItem[];
+  onNavigate: () => void;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="dash-nav-section group/collapsible">
+      <SidebarGroup>
+        <SidebarGroupLabel asChild className={cn(groupLabelClass, "h-8 cursor-pointer")}>
+          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 outline-none ring-sidebar-ring transition-colors hover:text-primary focus-visible:ring-2">
+            <span>{label}</span>
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 text-primary/50 transition-transform duration-200",
+                open && "rotate-180",
+              )}
+              aria-hidden
+            />
+          </CollapsibleTrigger>
+        </SidebarGroupLabel>
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              <NavMenuItems items={items} onNavigate={onNavigate} />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </CollapsibleContent>
+      </SidebarGroup>
+    </Collapsible>
+  );
+}
+
 function DashboardLayoutContent({
   sessionUser,
   role,
@@ -250,7 +405,7 @@ function DashboardLayoutContent({
     <>
       <Sidebar side="left" className="dash-sidebar border-r border-sidebar-border">
         <SidebarHeader className="border-b border-white/[0.06]">
-          <div className="flex h-16 items-center gap-2.5 px-3">
+          <div className="flex h-14 items-center gap-2 px-3 sm:h-16 sm:gap-2.5">
             <SidebarTrigger className="hidden text-sidebar-foreground/80 hover:text-primary md:inline-flex" />
             <BrandLogo
               size="sm"
@@ -265,402 +420,263 @@ function DashboardLayoutContent({
             <MobileSidebarClose />
           </div>
         </SidebarHeader>
-        <SidebarContent className="overscroll-contain">
-          <SidebarGroup>
-            <SidebarGroupLabel className={groupLabelClass}>
-              Dashboard
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
+        <SidebarContent className="dash-sidebar-scroll overscroll-contain px-1.5 pb-3">
+          {role === "admin" ? (
+            <>
+              <NavSection label="Operate">
+                <NavMenuItems items={ADMIN_OPERATE} onNavigate={closeMobileNav} />
+              </NavSection>
+              <CollapsibleNavSection
+                label="Create"
+                items={ADMIN_CREATE}
+                onNavigate={closeMobileNav}
+                defaultOpen={false}
+              />
+              <CollapsibleNavSection
+                label="People"
+                items={ADMIN_PEOPLE}
+                onNavigate={closeMobileNav}
+                defaultOpen
+              />
+              <CollapsibleNavSection
+                label="Scoring"
+                items={ADMIN_SCORING}
+                onNavigate={closeMobileNav}
+                defaultOpen={false}
+              />
+            </>
+          ) : (
+            <NavSection label="Dashboard">
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className={menuButtonClass}>
+                  <DashboardNavLink href="#overview" onNavigate={closeMobileNav}>
+                    <LayoutDashboard className={navIconClass} />
+                    <span>Overview</span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {role === "participant" && (
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#my-hackathons" onNavigate={closeMobileNav}>
+                        <CalendarRange className={navIconClass} />
+                        <span>My Hackathons</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#find-teammates" onNavigate={closeMobileNav}>
+                        <Users className={navIconClass} />
+                        <span>Find Teammates</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink
+                        href="/dashboard/participant/profile"
+                        onNavigate={closeMobileNav}
+                      >
+                        <UserRound className={navIconClass} />
+                        <span>My Profile</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#my-project" onNavigate={closeMobileNav}>
+                        <FileText className={navIconClass} />
+                        <span>My Project</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#resources-guide" onNavigate={closeMobileNav}>
+                        <BookOpen className={navIconClass} />
+                        <span>Resources & guide</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="/projects" onNavigate={closeMobileNav}>
+                        <LayoutGrid className={navIconClass} />
+                        <span>Projects & demos</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              )}
+              {isStaffDashboard && (
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#teams" onNavigate={closeMobileNav}>
+                        <Users className={navIconClass} />
+                        <span>Teams</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#top-3-ranking" onNavigate={closeMobileNav}>
+                        <Trophy className={navIconClass} />
+                        <span>Top 3 Ranking</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#submissions" onNavigate={closeMobileNav}>
+                        <ClipboardList className={navIconClass} />
+                        <span>Submissions</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              )}
+              {role === "host" && (
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#event-details" onNavigate={closeMobileNav}>
+                        <CalendarRange className={navIconClass} />
+                        <span>Event details</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#tickets" onNavigate={closeMobileNav}>
+                        <Ticket className={navIconClass} />
+                        <span>Tickets & QR</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#check-in" onNavigate={closeMobileNav}>
+                        <ClipboardList className={navIconClass} />
+                        <span>Check-in</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="#judges" onNavigate={closeMobileNav}>
+                        <Scale className={navIconClass} />
+                        <span>Judges</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              )}
+            </NavSection>
+          )}
+
+          {role !== "host" && (
+            <NavSection label="Boards">
+              {role === "admin" && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild className={menuButtonClass}>
-                    <DashboardNavLink href="#overview" onNavigate={closeMobileNav}>
-                      <LayoutDashboard className={navIconClass} />
-                      <span>Overview</span>
+                    <DashboardNavLink href="/boards" onNavigate={closeMobileNav}>
+                      <LayoutGrid className={navIconClass} />
+                      <span>All boards</span>
                     </DashboardNavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                {role === "admin" && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="/dashboard/admin/screening" onNavigate={closeMobileNav}>
-                          <Radar className={navIconClass} />
-                          <span>Screening Agent</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="/dashboard/admin/operations" onNavigate={closeMobileNav}>
-                          <Activity className={navIconClass} />
-                          <span>Operations</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="/dashboard/admin/events" onNavigate={closeMobileNav}>
-                          <CalendarCheck2 className={navIconClass} />
-                          <span>Event management</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#judge-invites" onNavigate={closeMobileNav}>
-                          <Scale className={navIconClass} />
-                          <span>Judge invites</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="/dashboard/admin#platform" onNavigate={closeMobileNav}>
-                          <Sparkles className={navIconClass} />
-                          <span>Platform</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
-                )}
-                {role === "participant" && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#my-hackathons" onNavigate={closeMobileNav}>
-                          <CalendarRange className={navIconClass} />
-                          <span>My Hackathons</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#find-teammates" onNavigate={closeMobileNav}>
-                          <Users className={navIconClass} />
-                          <span>Find Teammates</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="/dashboard/participant/profile" onNavigate={closeMobileNav}>
-                          <UserRound className={navIconClass} />
-                          <span>My Profile</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#my-project" onNavigate={closeMobileNav}>
-                          <FileText className={navIconClass} />
-                          <span>My Project</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#resources-guide" onNavigate={closeMobileNav}>
-                          <BookOpen className={navIconClass} />
-                          <span>Resources & guide</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="/projects" onNavigate={closeMobileNav}>
-                          <LayoutGrid className={navIconClass} />
-                          <span>Projects & demos</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
-                )}
-                {isStaffDashboard && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#teams" onNavigate={closeMobileNav}>
-                          <Users className={navIconClass} />
-                          <span>Teams</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#top-3-ranking" onNavigate={closeMobileNav}>
-                          <Trophy className={navIconClass} />
-                          <span>Top 3 Ranking</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#submissions" onNavigate={closeMobileNav}>
-                          <ClipboardList className={navIconClass} />
-                          <span>Submissions</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
-                )}
-                {role === "host" && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#event-details" onNavigate={closeMobileNav}>
-                          <CalendarRange className={navIconClass} />
-                          <span>Event details</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#tickets" onNavigate={closeMobileNav}>
-                          <Ticket className={navIconClass} />
-                          <span>Tickets & QR</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#check-in" onNavigate={closeMobileNav}>
-                          <ClipboardList className={navIconClass} />
-                          <span>Check-in</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#judges" onNavigate={closeMobileNav}>
-                          <Scale className={navIconClass} />
-                          <span>Judges</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
-                )}
-                {role === "admin" && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#ai-event-builder" onNavigate={closeMobileNav}>
-                          <Sparkles className={navIconClass} />
-                          <span>AI event builder</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#manual-event-builder" onNavigate={closeMobileNav}>
-                          <FileText className={navIconClass} />
-                          <span>Manual event</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <Link to="/dashboard/host" onClick={closeMobileNav} className="flex w-full items-center gap-2">
-                          <Ticket className={navIconClass} />
-                          <span>Host ops (tickets)</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#manage-participants" onNavigate={closeMobileNav}>
-                          <Users className={navIconClass} />
-                          <span>Manage Participants</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#manage-judges" onNavigate={closeMobileNav}>
-                          <Scale className={navIconClass} />
-                          <span>Manage Judges</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#manage-hosts" onNavigate={closeMobileNav}>
-                          <Users className={navIconClass} />
-                          <span>Host approvals</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#judge-marks" onNavigate={closeMobileNav}>
-                          <Scale className={navIconClass} />
-                          <span>Judge Marks</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#submission-marks" onNavigate={closeMobileNav}>
-                          <ClipboardList className={navIconClass} />
-                          <span>Submissions</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#analytics" onNavigate={closeMobileNav}>
-                          <BarChart3 className={navIconClass} />
-                          <span>Analytics</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#host-analytics" onNavigate={closeMobileNav}>
-                          <Activity className={navIconClass} />
-                          <span>Host Analytics</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#top-3-marks" onNavigate={closeMobileNav}>
-                          <Trophy className={navIconClass} />
-                          <span>Top 3 Marks</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={menuButtonClass}>
-                        <DashboardNavLink href="#top-3-ranking" onNavigate={closeMobileNav}>
-                          <Trophy className={navIconClass} />
-                          <span>Top 3 Ranking</span>
-                        </DashboardNavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
-                )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          {role !== "host" && <SidebarGroup>
-            <SidebarGroupLabel className={groupLabelClass}>
-              Boards
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {role === "admin" && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="/boards" onNavigate={closeMobileNav}>
-                        <LayoutGrid className={navIconClass} />
-                        <span>All Boards</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-                {boardHackathons.map((hackathon) => (
-                  <SidebarMenuItem key={hackathon.id}>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink
-                        href={`/boards/${hackathon.id}`}
-                        onNavigate={closeMobileNav}
-                      >
-                        <CalendarRange className={navIconClass} />
-                        <span className="flex min-w-0 flex-col items-start gap-0.5">
-                          <span className="truncate">{hackathon.shortName} Board</span>
-                          <span className="dash-nav-meta">{hackathon.eventDate}</span>
-                        </span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-                {(role === "participant" || isStaffDashboard) && boardHackathons.length === 0 ? (
-                  <SidebarMenuItem>
-                    <p className="px-2 py-2 text-xs text-muted-foreground">
-                      {role === "participant"
-                        ? "Your event board appears here after you register for a hackathon."
-                        : "Assigned event boards appear here after an admin grants you access."}
-                    </p>
-                  </SidebarMenuItem>
-                ) : null}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>}
+              )}
+              {boardHackathons.map((hackathon) => (
+                <SidebarMenuItem key={hackathon.id}>
+                  <SidebarMenuButton asChild className={menuButtonClass}>
+                    <DashboardNavLink
+                      href={`/boards/${hackathon.id}`}
+                      onNavigate={closeMobileNav}
+                    >
+                      <CalendarRange className={navIconClass} />
+                      <span className="flex min-w-0 flex-col items-start gap-0.5">
+                        <span className="truncate">{hackathon.shortName} Board</span>
+                        <span className="dash-nav-meta">{hackathon.eventDate}</span>
+                      </span>
+                    </DashboardNavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              {(role === "participant" || isStaffDashboard) &&
+              boardHackathons.length === 0 ? (
+                <SidebarMenuItem>
+                  <p className="px-2 py-2 text-xs text-muted-foreground">
+                    {role === "participant"
+                      ? "Your event board appears here after you register for a hackathon."
+                      : "Assigned event boards appear here after an admin grants you access."}
+                  </p>
+                </SidebarMenuItem>
+              ) : null}
+            </NavSection>
+          )}
 
           {(role === "admin" || isStaffDashboard || role === "participant") &&
             hackathons &&
             selectedHackathonId &&
             onHackathonChange && (
-              <SidebarGroup>
-                <SidebarGroupLabel className={groupLabelClass}>
-                  Hackathons
-                </SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {hackathons.map((hackathon) => {
-                      const isActive = hackathon.id === selectedHackathonId;
-                      return (
-                        <SidebarMenuItem key={hackathon.id}>
-                          <SidebarMenuButton
-                            isActive={isActive}
-                            className={`!h-auto min-h-12 py-3 ${menuButtonClass}`}
-                            onClick={() => handleHackathonChange(hackathon.id)}
-                          >
-                            <CalendarRange className={navIconClass} />
-                            <span className="flex min-w-0 flex-col items-start gap-0.5">
-                              <span className="truncate font-medium tracking-tight">
-                                {hackathon.shortName}
-                              </span>
-                              <span className="dash-nav-meta">{hackathon.eventDate}</span>
-                            </span>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
+              <NavSection label="Hackathons">
+                {hackathons.map((hackathon) => {
+                  const isActive = hackathon.id === selectedHackathonId;
+                  return (
+                    <SidebarMenuItem key={hackathon.id}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        className={`!h-auto min-h-11 py-2.5 ${menuButtonClass}`}
+                        onClick={() => handleHackathonChange(hackathon.id)}
+                      >
+                        <CalendarRange className={navIconClass} />
+                        <span className="flex min-w-0 flex-col items-start gap-0.5">
+                          <span className="truncate font-medium tracking-tight">
+                            {hackathon.shortName}
+                          </span>
+                          <span className="dash-nav-meta">{hackathon.eventDate}</span>
+                        </span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </NavSection>
             )}
 
-          <SidebarGroup>
-            <SidebarGroupLabel className={groupLabelClass}>
-              Resources
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={menuButtonClass}>
-                    <DashboardNavLink href="/resources" onNavigate={closeMobileNav}>
-                      <BookOpen className={navIconClass} />
-                      <span>Guide</span>
-                    </DashboardNavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={menuButtonClass}>
-                    <DashboardNavLink
-                      href={DISCORD_URL}
-                      onNavigate={closeMobileNav}
-                      external
-                    >
-                      <MessageCircle className={navIconClass} />
-                      <span>Discord</span>
-                      <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    </DashboardNavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={menuButtonClass}>
-                    <DashboardNavLink href="/hackathons" onNavigate={closeMobileNav}>
-                      <Sparkles className={navIconClass} />
-                      <span>Event site</span>
-                    </DashboardNavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <NavSection label="Resources">
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild className={menuButtonClass}>
+                <DashboardNavLink href="/resources" onNavigate={closeMobileNav}>
+                  <BookOpen className={navIconClass} />
+                  <span>Guide</span>
+                </DashboardNavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild className={menuButtonClass}>
+                <DashboardNavLink
+                  href={DISCORD_URL}
+                  onNavigate={closeMobileNav}
+                  external
+                >
+                  <MessageCircle className={navIconClass} />
+                  <span>Discord</span>
+                  <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                </DashboardNavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild className={menuButtonClass}>
+                <DashboardNavLink href="/hackathons" onNavigate={closeMobileNav}>
+                  <Sparkles className={navIconClass} />
+                  <span>Event site</span>
+                </DashboardNavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </NavSection>
         </SidebarContent>
         <SidebarFooter className="border-t border-white/[0.06]">
           <div className="p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
@@ -672,21 +688,27 @@ function DashboardLayoutContent({
                   aria-label="Open profile menu"
                 >
                   <span
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary font-display text-base font-bold tracking-tight text-primary-foreground shadow-[0_0_20px_hsl(199_100%_50%/0.45)]"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary font-display text-sm font-bold tracking-tight text-primary-foreground shadow-[0_0_20px_hsl(199_100%_50%/0.45)] sm:h-10 sm:w-10 sm:text-base"
                     aria-hidden
                   >
                     {userInitial}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-display text-[15px] font-medium tracking-tight text-sidebar-foreground">
+                    <span className="block truncate font-display text-[14px] font-medium tracking-tight text-sidebar-foreground sm:text-[15px]">
                       {sessionUser.email}
                     </span>
-                    <span className="mt-1 inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" aria-hidden />
+                    <span className="mt-0.5 inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-primary sm:mt-1 sm:text-[11px]">
+                      <span
+                        className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"
+                        aria-hidden
+                      />
                       {sessionUser.role ?? "unassigned"}
                     </span>
                   </span>
-                  <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <ChevronsUpDown
+                    className="h-4 w-4 shrink-0 text-muted-foreground"
+                    aria-hidden
+                  />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent

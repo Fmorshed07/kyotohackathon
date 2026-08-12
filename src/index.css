@@ -251,13 +251,27 @@
     border-right-color: hsl(199 100% 50% / 0.12);
   }
 
+  .dash-sidebar-scroll {
+    scrollbar-gutter: stable;
+  }
+
+  .dash-nav-section {
+    @apply relative mt-1;
+  }
+
+  .dash-nav-section + .dash-nav-section,
+  .dash-nav-section + [data-sidebar="group"],
+  [data-sidebar="group"] + .dash-nav-section {
+    @apply mt-2 border-t border-white/[0.05] pt-2;
+  }
+
   .dash-nav-label {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    @apply px-2.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/70 sm:text-xs;
+    @apply mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-primary/70 sm:text-[11px];
   }
 
   .dash-nav-item {
-    @apply relative min-h-11 cursor-pointer gap-3 rounded-md px-3 font-display text-[15px] font-medium tracking-[-0.01em] text-sidebar-foreground/80 transition-all duration-200 sm:min-h-12 sm:text-base;
+    @apply relative min-h-10 cursor-pointer gap-2.5 rounded-md px-2.5 font-display text-[14px] font-medium tracking-[-0.01em] text-sidebar-foreground/80 transition-all duration-200 sm:min-h-11 sm:gap-3 sm:px-3 sm:text-[15px];
   }
 
   .dash-nav-item:hover {

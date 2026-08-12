@@ -65,13 +65,78 @@ export const PORTAL_HACKATHONS: PortalHackathon[] = [
 export const isHackathonId = (value: string): value is HackathonId =>
   /^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(value.trim());
 
-export const getHackathonById = (id: HackathonId): PortalHackathon => {
-  const hackathon = PORTAL_HACKATHONS.find((entry) => entry.id === id);
-  if (!hackathon) {
-    return PORTAL_HACKATHONS[0];
+/** Fallback label when an id is not in the static catalog or a live event list. */
+export const portalHackathonStub = (
+  id: HackathonId,
+  overrides?: Partial<PortalHackathon>
+): PortalHackathon => ({
+  id,
+  name: overrides?.name ?? id,
+  shortName: overrides?.shortName ?? id,
+  eventDate: overrides?.eventDate ?? "See event page",
+  location: overrides?.location ?? "See event page",
+  theme: overrides?.theme ?? "",
+  status: overrides?.status ?? "upcoming",
+});
+
+export const findPortalHackathon = (
+  id: HackathonId,
+  catalog: PortalHackathon[] = PORTAL_HACKATHONS
+): PortalHackathon | undefined => catalog.find((entry) => entry.id === id);
+
+/**
+ * Resolve an event by id from an optional live catalog, then the static portal list.
+ * Unknown Firebase ids return a stub — never silently remap to Kyoto.
+ */
+export const resolvePortalHackathon = (
+  id: HackathonId,
+  catalog: PortalHackathon[] = PORTAL_HACKATHONS
+): PortalHackathon =>
+  findPortalHackathon(id, catalog) ??
+  findPortalHackathon(id, PORTAL_HACKATHONS) ??
+  portalHackathonStub(id);
+
+export const getHackathonById = (id: HackathonId): PortalHackathon =>
+  resolvePortalHackathon(id);
+
+/** Persist preferred event across signup → onboarding (and returning-user join). */
+export const PENDING_HACKATHON_KEY = "cognisor_pending_hackathon";
+
+export function stashPendingHackathon(id: string) {
+  if (!isHackathonId(id)) return;
+  try {
+    sessionStorage.setItem(PENDING_HACKATHON_KEY, id);
+  } catch {
+    // ignore quota / private mode
   }
-  return hackathon;
-};
+}
+
+export function readPendingHackathon(): HackathonId | null {
+  try {
+    const value = sessionStorage.getItem(PENDING_HACKATHON_KEY);
+    return value && isHackathonId(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingHackathon() {
+  try {
+    sessionStorage.removeItem(PENDING_HACKATHON_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function mergeHackathonCatalogs(...lists: PortalHackathon[][]): PortalHackathon[] {
+  const byId = new Map<string, PortalHackathon>();
+  for (const list of lists) {
+    for (const item of list) {
+      byId.set(item.id, item);
+    }
+  }
+  return Array.from(byId.values());
+}
 
 export const getSubmissionHackathonId = (
   submission: Pick<Submission, "hackathon_id">
@@ -138,7 +203,8 @@ export type ParticipantHackathonSummary = {
 
 export const buildParticipantHackathonSummaries = (
   submissions: Submission[],
-  enrolledHackathonIds?: HackathonId[] | HackathonId | null
+  enrolledHackathonIds?: HackathonId[] | HackathonId | null,
+  catalog: PortalHackathon[] = PORTAL_HACKATHONS
 ): ParticipantHackathonSummary[] => {
   const byHackathon = new Map<HackathonId, Submission[]>();
 
@@ -160,25 +226,24 @@ export const buildParticipantHackathonSummaries = (
 
   // Only show events the participant is enrolled in or has submitted to.
   // Do not auto-inject the site default — new users should only see their chosen event(s).
-  return PORTAL_HACKATHONS.filter((hackathon) => enrolledIds.has(hackathon.id)).map(
-    (hackathon) => {
-      const hackathonSubmissions = (byHackathon.get(hackathon.id) ?? []).slice().sort((left, right) => {
-        const leftDate = Date.parse(left.created_at ?? "");
-        const rightDate = Date.parse(right.created_at ?? "");
-        if (Number.isNaN(leftDate) && Number.isNaN(rightDate)) return 0;
-        if (Number.isNaN(leftDate)) return 1;
-        if (Number.isNaN(rightDate)) return -1;
-        return rightDate - leftDate;
-      });
+  return Array.from(enrolledIds).map((id) => {
+    const hackathon = resolvePortalHackathon(id, catalog);
+    const hackathonSubmissions = (byHackathon.get(id) ?? []).slice().sort((left, right) => {
+      const leftDate = Date.parse(left.created_at ?? "");
+      const rightDate = Date.parse(right.created_at ?? "");
+      if (Number.isNaN(leftDate) && Number.isNaN(rightDate)) return 0;
+      if (Number.isNaN(leftDate)) return 1;
+      if (Number.isNaN(rightDate)) return -1;
+      return rightDate - leftDate;
+    });
 
-      return {
-        hackathon,
-        submissionCount: hackathonSubmissions.length,
-        latestTitle: hackathonSubmissions[0]?.title?.trim() || null,
-        enrolled: true,
-      };
-    }
-  );
+    return {
+      hackathon,
+      submissionCount: hackathonSubmissions.length,
+      latestTitle: hackathonSubmissions[0]?.title?.trim() || null,
+      enrolled: true,
+    };
+  });
 };
 
 /** Public-safe fields for the participant event board (no judge scores/notes). */
@@ -254,10 +319,21 @@ export const userHasHackathonAccess = (
   hackathonId: HackathonId
 ): boolean => getUserAllowedHackathonIds(user).includes(hackathonId);
 
-export const getHackathonsByIds = (ids: HackathonId[]): PortalHackathon[] =>
-  PORTAL_HACKATHONS.filter((hackathon) => ids.includes(hackathon.id));
+export const getHackathonsByIds = (
+  ids: HackathonId[],
+  catalog: PortalHackathon[] = PORTAL_HACKATHONS
+): PortalHackathon[] => {
+  const seen = new Set<string>();
+  const result: PortalHackathon[] = [];
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    result.push(resolvePortalHackathon(id, catalog));
+  }
+  return result;
+};
 
-const STATUS_ORDER: Record<HackathonStatus, number> = {
+export const STATUS_ORDER: Record<HackathonStatus, number> = {
   active: 0,
   upcoming: 1,
   past: 2,
@@ -267,11 +343,25 @@ const STATUS_ORDER: Record<HackathonStatus, number> = {
 export const isJoinableHackathon = (hackathon: PortalHackathon): boolean =>
   hackathon.status === "active" || hackathon.status === "upcoming";
 
-/** Active first, then upcoming — used for participant signup / join pickers. */
+export const sortJoinableHackathons = (
+  list: PortalHackathon[],
+  createdAtById?: Record<string, string>
+): PortalHackathon[] =>
+  [...list].sort((left, right) => {
+    const byStatus = STATUS_ORDER[left.status] - STATUS_ORDER[right.status];
+    if (byStatus !== 0) return byStatus;
+    const leftCreated = createdAtById?.[left.id] ?? "";
+    const rightCreated = createdAtById?.[right.id] ?? "";
+    // Newest published events first within the same status.
+    if (leftCreated || rightCreated) {
+      return rightCreated.localeCompare(leftCreated);
+    }
+    return left.name.localeCompare(right.name);
+  });
+
+/** Active first, then upcoming — static catalog only (prefer async Firebase merge). */
 export const getJoinableHackathons = (): PortalHackathon[] =>
-  PORTAL_HACKATHONS.filter(isJoinableHackathon).sort(
-    (left, right) => STATUS_ORDER[left.status] - STATUS_ORDER[right.status]
-  );
+  sortJoinableHackathons(PORTAL_HACKATHONS.filter(isJoinableHackathon));
 
 /**
  * Signup / grant pickers.
@@ -284,9 +374,7 @@ export const getHackathonsForOnboarding = (options?: {
   const list = options?.includePast
     ? [...PORTAL_HACKATHONS]
     : getJoinableHackathons();
-  return list.sort(
-    (left, right) => STATUS_ORDER[left.status] - STATUS_ORDER[right.status]
-  );
+  return sortJoinableHackathons(list);
 };
 
 export const getUserHackathonId = (

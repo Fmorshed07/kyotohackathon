@@ -90,7 +90,7 @@ export default function EventManagementPage() {
   };
 
   const handlePublish = (eventId: string) => {
-    const event = events.find((item) => item.id === eventId);
+    const event = listingEvents.find((item) => item.id === eventId);
     return runMutation(
       eventId,
       () => setHackathonPublished(db, eventId, true),
@@ -99,7 +99,7 @@ export default function EventManagementPage() {
   };
 
   const handleUnpublish = (eventId: string) => {
-    const event = events.find((item) => item.id === eventId);
+    const event = listingEvents.find((item) => item.id === eventId);
     return runMutation(
       eventId,
       () => setHackathonPublished(db, eventId, false),
@@ -108,7 +108,7 @@ export default function EventManagementPage() {
   };
 
   const handleSetStatus = (eventId: string, status: HackathonStatus) => {
-    const event = events.find((item) => item.id === eventId);
+    const event = listingEvents.find((item) => item.id === eventId);
     const label =
       status === "active" ? "is now live" : status === "past" ? "was marked as past" : "is set to upcoming";
     return runMutation(
@@ -119,7 +119,7 @@ export default function EventManagementPage() {
   };
 
   const handleSaveEvent = (eventId: string, patch: HostedHackathonUpdate) => {
-    const event = events.find((item) => item.id === eventId);
+    const event = listingEvents.find((item) => item.id === eventId);
     return runMutation(
       eventId,
       () => updateHostedHackathon(db, eventId, patch),
@@ -128,7 +128,7 @@ export default function EventManagementPage() {
   };
 
   const handleDeleteEvent = (eventId: string) => {
-    const event = events.find((item) => item.id === eventId);
+    const event = listingEvents.find((item) => item.id === eventId);
     return runMutation(
       eventId,
       () => deleteHostedHackathon(db, eventId),
