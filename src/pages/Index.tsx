@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingExperience from "@/components/LoadingExperience";
 import AnimatedBackground from "@/components/AnimatedBackground";
@@ -14,38 +14,53 @@ import LookingForJobsSection from "@/components/sections/LookingForJobsSection";
 import FinalCTASection from "@/components/sections/FinalCTASection";
 
 const Index = () => {
-  const [isLoading, setIsLoading] = useState(true);
+  const [showLoader, setShowLoader] = useState(true);
+  const [contentReady, setContentReady] = useState(false);
+
+  const finishLoader = useCallback(() => {
+    setShowLoader(false);
+  }, []);
+
+  const revealContent = useCallback(() => {
+    setContentReady(true);
+  }, []);
+
+  // Safety: if exit callback is skipped, still reveal the page
+  useEffect(() => {
+    if (showLoader || contentReady) return;
+    const fallback = window.setTimeout(revealContent, 700);
+    return () => clearTimeout(fallback);
+  }, [showLoader, contentReady, revealContent]);
 
   return (
     <>
-      <AnimatePresence mode="wait">
-        {isLoading && (
-          <LoadingExperience onComplete={() => setIsLoading(false)} />
-        )}
+      <AnimatePresence mode="wait" onExitComplete={revealContent}>
+        {showLoader ? <LoadingExperience key="boot" onComplete={finishLoader} /> : null}
       </AnimatePresence>
 
-      <motion.div
-        initial={false}
-        animate={{ opacity: isLoading ? 0 : 1 }}
-        transition={{ duration: 0.5 }}
-        aria-hidden={isLoading}
-      >
-        <AnimatedBackground />
+      {contentReady ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <AnimatedBackground />
 
-        <SiteHeader />
+          <SiteHeader />
 
-        <main className="relative">
-          <HeroSection />
-          <FeaturePreviewSection />
-          <HostSection />
-          <AboutSection />
-          <PlatformSection />
-          <CognisorSection />
-          <CommunitySection />
-          <LookingForJobsSection />
-          <FinalCTASection />
-        </main>
-      </motion.div>
+          <main className="relative">
+            <HeroSection />
+            <FeaturePreviewSection />
+            <HostSection />
+            <AboutSection />
+            <PlatformSection />
+            <CognisorSection />
+            <CommunitySection />
+            <LookingForJobsSection />
+            <FinalCTASection />
+          </main>
+        </motion.div>
+      ) : null}
     </>
   );
 };

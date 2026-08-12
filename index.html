@@ -69,7 +69,19 @@
     />
   </head>
 
-  <body>
+  <body class="bg-black text-white antialiased">
+    <style>
+      /* Cover pre-React paint + Google Translate chrome so no flash of foreign/gadget text */
+      html, body, #root { min-height: 100%; background: #000; color: #fff; }
+      .goog-te-banner-frame,
+      .goog-te-banner-frame.skiptranslate,
+      .skiptranslate,
+      #goog-gt-tt,
+      .goog-te-balloon-frame,
+      .VIpgJd-ZVi9od-ORHb-OEVmcd,
+      .VIpgJd-ZVi9od-l4eHX-hSRGPd { display: none !important; }
+      body { top: 0 !important; }
+    </style>
     <div id="root"></div>
     <script>
       window.googleTranslateElementInit = function() { window.__googleTranslateReady = true; };
