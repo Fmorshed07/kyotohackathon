@@ -363,6 +363,7 @@ function HostAnalyticsPanel({
 
 function UserManagementTable({
   users,
+  hackathons,
   title,
   description,
   emptyMessage,
@@ -375,6 +376,7 @@ function UserManagementTable({
   onUpdateHackathonAccess,
 }: {
   users: AdminUser[];
+  hackathons: PortalHackathon[];
   title: string;
   description: string;
   emptyMessage: string;
@@ -1116,6 +1118,7 @@ export function AdminDashboard({
         <>
           <UserManagementTable
             users={users}
+            hackathons={hackathons}
             title={`All users · ${selectedHackathon.shortName}`}
             description={`Accounts linked to ${selectedHackathon.name} via signup, submissions, or judging activity.`}
             emptyMessage={`No users linked to ${selectedHackathon.name} yet.`}
@@ -1129,6 +1132,7 @@ export function AdminDashboard({
           />
           <UserManagementTable
             users={participants}
+            hackathons={hackathons}
             title={`Participants · ${selectedHackathon.shortName}`}
             description={`Participant accounts for ${selectedHackathon.name}.`}
             emptyMessage={`No participants for ${selectedHackathon.name} yet.`}
@@ -1142,6 +1146,7 @@ export function AdminDashboard({
           />
           <UserManagementTable
             users={staff}
+            hackathons={hackathons}
             title={`Mentors & judges · ${selectedHackathon.shortName}`}
             description={`Mentor and judge accounts for ${selectedHackathon.name}. Toggle event chips to grant or revoke access.`}
             emptyMessage={`No mentors or judges for ${selectedHackathon.name} yet.`}
