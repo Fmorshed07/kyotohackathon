@@ -134,7 +134,7 @@ export default function Dashboard() {
   }
 
   if (sessionUser.role === "judge" || sessionUser.role === "mentor") {
-    if (sessionUser.judgeApprovalStatus === "pending") {
+    if (!canAccessStaffDashboard(sessionUser.role, sessionUser.judgeApprovalStatus)) {
       return (
         <div className="flex min-h-svh items-center justify-center bg-background px-6">
           <div className="max-w-xl rounded-xl border border-border/50 bg-card/80 p-8 text-center">

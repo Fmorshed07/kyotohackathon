@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   filterCurrentHackathons,
@@ -28,6 +28,41 @@ function readStoredHackathonId(storageKey: string): HackathonId | null {
   }
 }
 
+function replaceHackathonSearchParam(
+  searchParams: URLSearchParams,
+  hackathonId: HackathonId,
+): URLSearchParams {
+  const next = new URLSearchParams(searchParams);
+  next.set("hackathon", hackathonId);
+  next.delete("event");
+  return next;
+}
+
+function resolveInitialId(
+  storageKey: string,
+  hackathons: PortalHackathon[],
+  preferCurrent: boolean,
+  requestedFromUrl: HackathonId | null,
+): HackathonId {
+  if (requestedFromUrl) return requestedFromUrl;
+  const stored = readStoredHackathonId(storageKey);
+  if (stored) {
+    if (!preferCurrent) return stored;
+    const match = hackathons.find((entry) => entry.id === stored);
+    // Keep stored id while the live catalog hydrates.
+    if (!match || isCurrentHackathon(match)) return stored;
+  }
+  const pool = preferCurrent ? filterCurrentHackathons(hackathons) : hackathons;
+  return pickDefaultHackathonId(pool);
+}
+
+/**
+ * Event workspace selection.
+ *
+ * Click updates React state immediately and writes `?hackathon=`.
+ * URL adoption (back/forward, deep links) runs only after the address bar
+ * catches up — never reverts a click while setSearchParams is in flight.
+ */
 export function useHackathonSelection(
   storageKey: string,
   allowedHackathonIds?: HackathonId[],
@@ -37,61 +72,85 @@ export function useHackathonSelection(
   const { syncUrl = false, preferCurrent = false } = options;
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const requestedFromUrl = (() => {
+  const urlHackathonId = useMemo(() => {
     if (!syncUrl) return null;
     const value = searchParams.get("hackathon") ?? searchParams.get("event");
     return value && isHackathonId(value) ? value : null;
-  })();
+  }, [searchParams, syncUrl]);
 
   const switcherHackathons = useMemo(
     () => (preferCurrent ? filterCurrentHackathons(hackathons) : hackathons),
     [hackathons, preferCurrent],
   );
 
-  const [selectedHackathonId, setSelectedHackathonIdState] = useState<HackathonId>(() => {
-    if (requestedFromUrl) return requestedFromUrl;
-    const stored = readStoredHackathonId(storageKey);
-    if (stored) {
-      if (!preferCurrent) return stored;
-      const match = hackathons.find((entry) => entry.id === stored);
-      if (match && isCurrentHackathon(match)) return stored;
+  const [selectedHackathonId, setSelectedHackathonIdState] = useState<HackathonId>(() =>
+    resolveInitialId(storageKey, hackathons, preferCurrent, urlHackathonId),
+  );
+
+  /** After a user click, ignore stale URL values until the query matches this id. */
+  const pendingUrlWriteRef = useRef<HackathonId | null>(null);
+
+  const commitSelection = (hackathonId: HackathonId, writeUrl: boolean) => {
+    setSelectedHackathonIdState(hackathonId);
+    if (!syncUrl || !writeUrl) return;
+    if (urlHackathonId === hackathonId) {
+      pendingUrlWriteRef.current = null;
+      return;
     }
-    return pickDefaultHackathonId(preferCurrent ? switcherHackathons : hackathons);
-  });
+    pendingUrlWriteRef.current = hackathonId;
+    setSearchParams(replaceHackathonSearchParam(searchParams, hackathonId), { replace: true });
+  };
 
   const setSelectedHackathonId = (hackathonId: HackathonId) => {
     if (!isHackathonId(hackathonId)) return;
-    setSelectedHackathonIdState(hackathonId);
+    commitSelection(hackathonId, true);
   };
 
-  // URL wins when present (separate platform route per event).
+  // Adopt URL for deep links / back-forward — but never while a click write is in flight.
   useEffect(() => {
-    if (!syncUrl || !requestedFromUrl) return;
-    if (requestedFromUrl !== selectedHackathonId) {
-      setSelectedHackathonIdState(requestedFromUrl);
-    }
-  }, [requestedFromUrl, selectedHackathonId, syncUrl]);
+    if (!syncUrl) return;
 
-  // Only clamp when an explicit allow-list is provided (judge / mentor scopes).
+    if (pendingUrlWriteRef.current) {
+      if (urlHackathonId === pendingUrlWriteRef.current) {
+        pendingUrlWriteRef.current = null;
+      }
+      return;
+    }
+
+    if (!urlHackathonId) return;
+    setSelectedHackathonIdState((current) =>
+      current === urlHackathonId ? current : urlHackathonId,
+    );
+  }, [syncUrl, urlHackathonId]);
+
+  // Judge / mentor allow-list.
   useEffect(() => {
     if (!allowedHackathonIds || allowedHackathonIds.length === 0) return;
-    if (!allowedHackathonIds.includes(selectedHackathonId)) {
-      setSelectedHackathonIdState(allowedHackathonIds[0]);
-    }
-  }, [allowedHackathonIds, selectedHackathonId]);
+    if (allowedHackathonIds.includes(selectedHackathonId)) return;
+    commitSelection(allowedHackathonIds[0], true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowedHackathonIds, selectedHackathonId, syncUrl, urlHackathonId, searchParams]);
 
-  // After the live catalog loads, leave past editions for the latest active/upcoming event
-  // unless the URL explicitly pins a past workspace.
+  // Prefer live events only when the URL does not pin a workspace.
   useEffect(() => {
-    if (!preferCurrent || requestedFromUrl) return;
+    if (!preferCurrent || urlHackathonId || pendingUrlWriteRef.current) return;
     const selected = hackathons.find((entry) => entry.id === selectedHackathonId);
     if (selected && isCurrentHackathon(selected)) return;
+    if (!selected && selectedHackathonId) return;
     if (switcherHackathons.length === 0) return;
     const nextId = pickDefaultHackathonId(switcherHackathons);
-    if (nextId !== selectedHackathonId) {
-      setSelectedHackathonIdState(nextId);
-    }
-  }, [hackathons, preferCurrent, requestedFromUrl, selectedHackathonId, switcherHackathons]);
+    if (nextId === selectedHackathonId) return;
+    commitSelection(nextId, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    hackathons,
+    preferCurrent,
+    urlHackathonId,
+    selectedHackathonId,
+    switcherHackathons,
+    syncUrl,
+    searchParams,
+  ]);
 
   useEffect(() => {
     try {
@@ -101,15 +160,29 @@ export function useHackathonSelection(
     }
   }, [selectedHackathonId, storageKey]);
 
+  // Seed URL when absent. Never overwrite a different explicit pin.
   useEffect(() => {
-    if (!syncUrl) return;
-    const current = searchParams.get("hackathon") ?? searchParams.get("event");
-    if (current === selectedHackathonId) return;
-    const next = new URLSearchParams(searchParams);
-    next.set("hackathon", selectedHackathonId);
-    next.delete("event");
-    setSearchParams(next, { replace: true });
-  }, [searchParams, selectedHackathonId, setSearchParams, syncUrl]);
+    if (!syncUrl || urlHackathonId || pendingUrlWriteRef.current) return;
+    if (preferCurrent) {
+      const selected = hackathons.find((entry) => entry.id === selectedHackathonId);
+      const canUpgrade =
+        (!selected || !isCurrentHackathon(selected)) && switcherHackathons.length > 0;
+      if (canUpgrade) return;
+    }
+    pendingUrlWriteRef.current = selectedHackathonId;
+    setSearchParams(replaceHackathonSearchParam(searchParams, selectedHackathonId), {
+      replace: true,
+    });
+  }, [
+    hackathons,
+    preferCurrent,
+    urlHackathonId,
+    selectedHackathonId,
+    setSearchParams,
+    switcherHackathons,
+    syncUrl,
+    searchParams,
+  ]);
 
   return {
     selectedHackathonId,

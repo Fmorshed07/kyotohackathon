@@ -13,10 +13,19 @@ import {
   pickPreferredHackathonId,
   PORTAL_HACKATHONS,
   SITE_HACKATHON_ID,
+  withHackathonQuery,
 } from "@/lib/hackathons";
 
 /** Dynamic hosted event id — not part of the static Impact catalog. */
 const hostedIdeathonId = "ai-ideathon-2026-q9pxii";
+
+describe("withHackathonQuery", () => {
+  it("keeps hash after the query string", () => {
+    expect(withHackathonQuery("/dashboard/admin/people#manage-judges", hostedIdeathonId)).toBe(
+      `/dashboard/admin/people?hackathon=${hostedIdeathonId}#manage-judges`,
+    );
+  });
+});
 
 describe("event paths and enrollment", () => {
   it("builds board and workspace paths for any hosted event id", () => {

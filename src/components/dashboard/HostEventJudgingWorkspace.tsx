@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, deleteField, doc, getDocs, setDoc } from "firebase/firestore";
 import {
   AdminJudgingSection,
 } from "@/components/dashboard/AdminJudgingSection";
@@ -138,68 +138,90 @@ export function HostEventJudgingWorkspace({
       setIsLoadingUsers(true);
       setIsLoadingSubmissions(true);
       setIsLoadingTop3Rankings(true);
-      try {
-        const [usersSnap, hackathonSubmissions, rankings] = await Promise.all([
-          getDocs(collection(db, "users")),
-          fetchSubmissionsForHackathon(db, hackathonId),
-          fetchJudgeRankingsForHackathon(db, hackathonId),
-        ]);
 
-        if (cancelled) return;
+      const loadErrors: string[] = [];
 
-        const emailLookup: Record<string, string> = {};
-        const allUsers: AdminUser[] = usersSnap.docs
-          .map((docSnap): AdminUser | null => {
-            const data = docSnap.data();
-            if (typeof data.email === "string" && data.email.trim()) {
-              const normalizedEmail = data.email.trim().toLowerCase();
-              emailLookup[docSnap.id] = data.email;
-              emailLookup[normalizedEmail] = data.email;
-            }
-            const role = normalizePortalRole(data.role);
-            if (!role || !data.email || typeof data.email !== "string") return null;
-            const judgeApprovalStatus = isStaffRole(role)
-              ? normalizeJudgeApprovalStatus(data.judgeApprovalStatus) ?? "approved"
-              : undefined;
-            const hostApprovalStatus =
-              role === "host"
-                ? normalizeHostApprovalStatus(data.hostApprovalStatus) ?? "pending"
+      const usersResult = await getDocs(collection(db, "users"))
+        .then((usersSnap) => {
+          const emailLookup: Record<string, string> = {};
+          const allUsers: AdminUser[] = usersSnap.docs
+            .map((docSnap): AdminUser | null => {
+              const data = docSnap.data();
+              if (typeof data.email === "string" && data.email.trim()) {
+                const normalizedEmail = data.email.trim().toLowerCase();
+                emailLookup[docSnap.id] = data.email;
+                emailLookup[normalizedEmail] = data.email;
+              }
+              const role = normalizePortalRole(data.role);
+              if (!role || !data.email || typeof data.email !== "string") return null;
+              const judgeApprovalStatus = isStaffRole(role)
+                ? normalizeJudgeApprovalStatus(data.judgeApprovalStatus) ?? "pending"
                 : undefined;
-            const hackathonIds = getUserAllowedHackathonIds({
-              hackathon_id: data.hackathon_id,
-              hackathon_ids: data.hackathon_ids,
-            });
-            return {
-              id: docSnap.id,
-              email: data.email,
-              role,
-              judgeApprovalStatus,
-              hostApprovalStatus,
-              hackathonId: hackathonIds[0] ?? getUserHackathonId({ hackathon_id: data.hackathon_id }),
-              hackathonIds,
-              profile: mapUserProfile(data),
-            };
-          })
-          .filter((user): user is AdminUser => user !== null);
+              const hostApprovalStatus =
+                role === "host"
+                  ? normalizeHostApprovalStatus(data.hostApprovalStatus) ?? "pending"
+                  : undefined;
+              const hackathonIds = getUserAllowedHackathonIds({
+                hackathon_id: data.hackathon_id,
+                hackathon_ids: data.hackathon_ids,
+              });
+              return {
+                id: docSnap.id,
+                email: data.email,
+                role,
+                judgeApprovalStatus,
+                hostApprovalStatus,
+                hackathonId: hackathonIds[0] ?? getUserHackathonId({ hackathon_id: data.hackathon_id }),
+                hackathonIds,
+                profile: mapUserProfile(data),
+              };
+            })
+            .filter((user): user is AdminUser => user !== null);
+          return { allUsers, emailLookup };
+        })
+        .catch((error: unknown) => {
+          loadErrors.push(
+            typeof error === "object" && error && "message" in error
+              ? String((error as { message?: string }).message)
+              : "Failed to load users.",
+          );
+          return { allUsers: [] as AdminUser[], emailLookup: {} as Record<string, string> };
+        });
 
-        setUsers(allUsers);
-        setUserEmailLookup(emailLookup);
-        setSubmissions(hackathonSubmissions);
-        setJudgeRankings(rankings);
-      } catch (error: unknown) {
-        if (cancelled) return;
-        const text =
-          typeof error === "object" && error && "message" in error
-            ? String((error as { message?: string }).message)
-            : "Failed to load judging data.";
-        onMessage?.(text);
-      } finally {
-        if (!cancelled) {
-          setIsLoadingUsers(false);
-          setIsLoadingSubmissions(false);
-          setIsLoadingTop3Rankings(false);
-        }
+      const hackathonSubmissions = await fetchSubmissionsForHackathon(db, hackathonId).catch(
+        (error: unknown) => {
+          loadErrors.push(
+            typeof error === "object" && error && "message" in error
+              ? String((error as { message?: string }).message)
+              : "Failed to load submissions.",
+          );
+          return [] as Awaited<ReturnType<typeof fetchSubmissionsForHackathon>>;
+        },
+      );
+
+      const rankings = await fetchJudgeRankingsForHackathon(db, hackathonId).catch(
+        (error: unknown) => {
+          loadErrors.push(
+            typeof error === "object" && error && "message" in error
+              ? String((error as { message?: string }).message)
+              : "Failed to load judge rankings.",
+          );
+          return [] as Awaited<ReturnType<typeof fetchJudgeRankingsForHackathon>>;
+        },
+      );
+
+      if (cancelled) return;
+
+      setUsers(usersResult.allUsers);
+      setUserEmailLookup(usersResult.emailLookup);
+      setSubmissions(hackathonSubmissions);
+      setJudgeRankings(rankings);
+      if (loadErrors.length > 0) {
+        onMessage?.(loadErrors[0]);
       }
+      setIsLoadingUsers(false);
+      setIsLoadingSubmissions(false);
+      setIsLoadingTop3Rankings(false);
     };
 
     void load();
@@ -344,7 +366,7 @@ export function HostEventJudgingWorkspace({
   );
 
   const handleApproveJudge = async (user: AdminUser) => {
-    if (!isStaffRole(user.role) || user.judgeApprovalStatus !== "pending") return;
+    if (!isStaffRole(user.role) || user.judgeApprovalStatus === "approved") return;
     setSavingUserId(user.id);
     try {
       const existingIds = user.hackathonIds ?? (user.hackathonId ? [user.hackathonId] : []);
@@ -379,6 +401,43 @@ export function HostEventJudgingWorkspace({
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
           : "Failed to approve judge access.";
+      onMessage?.(text);
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleRejectJudge = async (user: AdminUser) => {
+    if (!isStaffRole(user.role) || user.judgeApprovalStatus === "approved") return;
+    setSavingUserId(user.id);
+    try {
+      await setDoc(
+        doc(db, "users", user.id),
+        {
+          role: "participant",
+          judgeApprovalStatus: deleteField(),
+        },
+        { merge: true },
+      );
+      setUsers((current) =>
+        current.map((currentUser) =>
+          currentUser.id === user.id
+            ? {
+                ...currentUser,
+                role: "participant",
+                judgeApprovalStatus: undefined,
+              }
+            : currentUser,
+        ),
+      );
+      onMessage?.(
+        `Rejected ${user.role} request for ${user.email}. Account converted to participant.`,
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to reject judge access.";
       onMessage?.(text);
     } finally {
       setSavingUserId(null);
@@ -513,6 +572,7 @@ export function HostEventJudgingWorkspace({
         selectedHackathon={hackathon}
         savingUserId={savingUserId}
         onApproveJudge={handleApproveJudge}
+        onRejectJudge={handleRejectJudge}
       />
       <AdminJudgingSection
         selectedHackathon={hackathon}

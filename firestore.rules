@@ -43,10 +43,7 @@ service cloud.firestore {
     }
 
     function isApprovedStaff() {
-      return isStaff() && (
-        !userDocExists()
-        || get(userDocPath()).data.judgeApprovalStatus != "pending"
-      );
+      return isStaff() && get(userDocPath()).data.judgeApprovalStatus == "approved";
     }
 
     function isHost() {
@@ -100,6 +97,7 @@ service cloud.firestore {
           || resource.data.role == null
           || resource.data.role == ""
           || resource.data.role == "judge"
+          || resource.data.role == "mentor"
         );
     }
 
@@ -153,6 +151,28 @@ service cloud.firestore {
         ]);
     }
 
+    // Auth users with no portal role yet may request judge/mentor/host access (pending approval).
+    // Covers setDoc(merge) when a stub user doc already exists (update, not create).
+    function canRequestStaffOrHostRole(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && (
+          !("role" in resource.data)
+          || resource.data.role == null
+          || resource.data.role == ""
+        )
+        && (
+          (
+            (request.resource.data.role == "judge" || request.resource.data.role == "mentor")
+            && request.resource.data.judgeApprovalStatus == "pending"
+          )
+          || (
+            request.resource.data.role == "host"
+            && request.resource.data.hostApprovalStatus == "pending"
+          )
+        );
+    }
+
     function ownsHostEvent(eventId) {
       return exists(/databases/$(database)/documents/host_events/$(eventId))
         && get(/databases/$(database)/documents/host_events/$(eventId)).data.owner_id == request.auth.uid;
@@ -162,7 +182,15 @@ service cloud.firestore {
       return hackathonId is string
         && hackathonId.size() > 0
         && exists(/databases/$(database)/documents/hackathons/$(hackathonId))
-        && get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.createdBy == request.auth.uid;
+        && (
+          get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.createdBy == request.auth.uid
+          || (
+            get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.hostEventId is string
+            && ownsHostEvent(
+              get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.hostEventId
+            )
+          )
+        );
     }
 
     // Approved hosts may approve pending judges/mentors for events they own.
@@ -191,6 +219,16 @@ service cloud.firestore {
         );
     }
 
+    // Approved hosts may reject pending judges/mentors (convert to participant).
+    function canHostRejectJudge() {
+      return isApprovedHost()
+        && (resource.data.role == "judge" || resource.data.role == "mentor")
+        && resource.data.judgeApprovalStatus == "pending"
+        && request.resource.data.role == "participant"
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["role", "judgeApprovalStatus"]);
+    }
+
     match /users/{userId} {
       allow create: if (isPortalAdminAccount() && request.auth.uid == userId)
         || (hasPendingAdminGrant() && request.auth.uid == userId)
@@ -201,8 +239,10 @@ service cloud.firestore {
         || (hasPendingAdminGrant() && request.auth.uid == userId)
         || canUpdateOwnProfile(userId)
         || canClaimParticipantRole(userId)
+        || canRequestStaffOrHostRole(userId)
         || canRedeemJudgeInvite(userId)
-        || canHostApproveJudge();
+        || canHostApproveJudge()
+        || canHostRejectJudge();
       allow delete: if isAdmin();
     }
 

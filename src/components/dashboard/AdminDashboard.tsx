@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -6,12 +6,14 @@ import {
   Activity,
   CalendarCheck2,
   ExternalLink,
+  Gavel,
   Github,
   Mail,
+  PenLine,
   Radar,
   ShieldCheck,
-  Sparkles,
   Users,
+  Wand2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -33,11 +35,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
-import { getHackathonById, PORTAL_HACKATHONS, type PortalHackathon, type HackathonId } from "@/lib/hackathons";
+import {
+  getHackathonById,
+  PORTAL_HACKATHONS,
+  withHackathonQuery,
+  type PortalHackathon,
+  type HackathonId,
+} from "@/lib/hackathons";
 import type { AdminGrantRecord } from "@/lib/adminGrants";
 import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { AdminJudgingSection } from "@/components/dashboard/AdminJudgingSection";
-import { PlatformOpsConsole, type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole";
+import { type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole";
 import { AiHackathonLauncher } from "@/components/dashboard/AiHackathonLauncher";
 import { ManualHackathonLauncher } from "@/components/dashboard/ManualHackathonLauncher";
 import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
@@ -89,7 +97,11 @@ export type NewSubmissionInput = {
 
 type AdminAnalytics = AdminJudgingStatistics;
 
+export type AdminWorkspace = "overview" | "create" | "people" | "judging";
+
 type AdminDashboardProps = {
+  /** Which admin sub-page to render — each stays under /dashboard/admin/*. */
+  workspace?: AdminWorkspace;
   selectedHackathon: PortalHackathon;
   /** Dynamic event list for staff access grants (portal + hosted). */
   hackathons?: PortalHackathon[];
@@ -111,6 +123,7 @@ type AdminDashboardProps = {
   onRoleChange: (userId: string, role: PortalRole) => void;
   onSaveRole: (user: AdminUser) => Promise<void>;
   onApproveJudge: (user: AdminUser) => Promise<void>;
+  onRejectJudge: (user: AdminUser) => Promise<void>;
   onApproveHost: (user: AdminUser) => Promise<void>;
   onUpdateHackathonAccess: (user: AdminUser, hackathonIds: HackathonId[]) => Promise<void>;
   adminGrantEmail: string;
@@ -369,6 +382,7 @@ function UserManagementTable({
   onRoleChange,
   onSaveRole,
   onApproveJudge,
+  onRejectJudge,
   onUpdateHackathonAccess,
 }: {
   users: AdminUser[];
@@ -382,6 +396,7 @@ function UserManagementTable({
   onRoleChange: (userId: string, role: PortalRole) => void;
   onSaveRole: (user: AdminUser) => Promise<void>;
   onApproveJudge: (user: AdminUser) => Promise<void>;
+  onRejectJudge: (user: AdminUser) => Promise<void>;
   onUpdateHackathonAccess: (user: AdminUser, hackathonIds: HackathonId[]) => Promise<void>;
 }) {
   return (
@@ -433,7 +448,7 @@ function UserManagementTable({
                   const selectedRole = pendingRoles[user.id] ?? user.role;
                   const hasPendingChange = selectedRole !== user.role;
                   const isPendingStaff =
-                    isStaffRole(user.role) && user.judgeApprovalStatus === "pending";
+                    isStaffRole(user.role) && user.judgeApprovalStatus !== "approved";
                   const profile = user.profile;
                   const githubUrl = getGithubUrl(profile);
                   const socialLinks = [
@@ -586,9 +601,17 @@ function UserManagementTable({
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={roleBadgeVariant[selectedRole]} className="uppercase tracking-[0.14em]">
-                          {user.role}
-                        </Badge>
+                        <div className="flex flex-col items-start gap-1.5">
+                          <Badge variant={roleBadgeVariant[selectedRole]} className="uppercase tracking-[0.14em]">
+                            {user.role}
+                          </Badge>
+                          {isPendingStaff ? (
+                            <p className="max-w-[12rem] text-xs leading-snug text-amber-200/90">
+                              Pending approval — this {user.role} cannot open the judging dashboard until an admin
+                              approves them.
+                            </p>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Select
@@ -609,9 +632,16 @@ function UserManagementTable({
                       </TableCell>
                       <TableCell>
                         {isStaffRole(user.role) ? (
-                          <Badge variant={isPendingStaff ? "secondary" : "default"}>
-                            {isPendingStaff ? "Pending approval" : "Approved"}
-                          </Badge>
+                          <div className="flex flex-col items-start gap-1.5">
+                            <Badge variant={isPendingStaff ? "secondary" : "default"}>
+                              {isPendingStaff ? "Pending approval" : "Approved"}
+                            </Badge>
+                            {isPendingStaff ? (
+                              <p className="max-w-[10rem] text-xs leading-snug text-muted-foreground">
+                                Awaiting admin approval before event judging access is active.
+                              </p>
+                            ) : null}
+                          </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">N/A</span>
                         )}
@@ -627,15 +657,26 @@ function UserManagementTable({
                             {savingUserId === user.id ? "Saving..." : "Save"}
                           </Button>
                           {isPendingStaff ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-3 text-[0.7rem] uppercase tracking-[0.22em]"
-                              disabled={savingUserId === user.id}
-                              onClick={() => onApproveJudge(user)}
-                            >
-                              {savingUserId === user.id ? "Saving..." : "Approve"}
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-3 text-[0.7rem] uppercase tracking-[0.22em]"
+                                disabled={savingUserId === user.id}
+                                onClick={() => onApproveJudge(user)}
+                              >
+                                {savingUserId === user.id ? "Saving..." : "Approve"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-8 px-3 text-[0.7rem] uppercase tracking-[0.22em]"
+                                disabled={savingUserId === user.id}
+                                onClick={() => onRejectJudge(user)}
+                              >
+                                {savingUserId === user.id ? "Saving..." : "Reject"}
+                              </Button>
+                            </>
                           ) : null}
                         </div>
                       </TableCell>
@@ -720,14 +761,16 @@ export function JudgeApprovalPanel({
   selectedHackathon,
   savingUserId,
   onApproveJudge,
+  onRejectJudge,
 }: {
   judges: AdminUser[];
   selectedHackathon: PortalHackathon;
   savingUserId: string | null;
   onApproveJudge: (user: AdminUser) => Promise<void>;
+  onRejectJudge: (user: AdminUser) => Promise<void>;
 }) {
-  const pendingJudges = judges.filter((judge) => judge.judgeApprovalStatus === "pending");
-  const approvedJudges = judges.filter((judge) => judge.judgeApprovalStatus !== "pending");
+  const pendingJudges = judges.filter((judge) => judge.judgeApprovalStatus !== "approved");
+  const approvedJudges = judges.filter((judge) => judge.judgeApprovalStatus === "approved");
 
   return (
     <section className={`${sectionClass} overflow-hidden p-0`} id="manage-judge-approvals">
@@ -738,10 +781,11 @@ export function JudgeApprovalPanel({
           </span>
           <div>
             <p className="dash-eyebrow">Judge access control</p>
-            <h2 className="dash-title">Judge & mentor approval queue</h2>
+            <h2 className="dash-title">Pending approval</h2>
             <p className="dash-subtitle">
-              Approve self-signup judges and mentors. Approving grants access to{" "}
-              {selectedHackathon.shortName} (and any events they already hold).
+              Approve or reject self-signup judges and mentors. Approving grants access to{" "}
+              {selectedHackathon.shortName} (and any events they already hold). Rejecting converts
+              the account to a participant.
             </p>
           </div>
         </div>
@@ -782,16 +826,29 @@ export function JudgeApprovalPanel({
                   Pending
                 </Badge>
               </div>
-              <Button
-                size="sm"
-                className="mt-4"
-                disabled={savingUserId === judge.id}
-                onClick={() => void onApproveJudge(judge)}
-              >
-                {savingUserId === judge.id
-                  ? "Approving..."
-                  : `Approve for ${selectedHackathon.shortName}`}
-              </Button>
+              <p className="mt-3 text-xs leading-snug text-amber-200/90">
+                This {judge.role} is pending approval and cannot open the judging dashboard until
+                approved.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  disabled={savingUserId === judge.id}
+                  onClick={() => void onApproveJudge(judge)}
+                >
+                  {savingUserId === judge.id
+                    ? "Saving..."
+                    : `Approve for ${selectedHackathon.shortName}`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={savingUserId === judge.id}
+                  onClick={() => void onRejectJudge(judge)}
+                >
+                  {savingUserId === judge.id ? "Saving..." : "Reject"}
+                </Button>
+              </div>
             </article>
           ))
         )}
@@ -801,6 +858,7 @@ export function JudgeApprovalPanel({
 }
 
 export function AdminDashboard({
+  workspace = "overview",
   selectedHackathon,
   hackathons = PORTAL_HACKATHONS,
   judgingCriteria,
@@ -820,6 +878,7 @@ export function AdminDashboard({
   onRoleChange,
   onSaveRole,
   onApproveJudge,
+  onRejectJudge,
   onApproveHost,
   onUpdateHackathonAccess,
   adminGrantEmail,
@@ -862,7 +921,11 @@ export function AdminDashboard({
   });
   const participants = users.filter((user) => user.role === "participant");
   const staff = users.filter((user) => isStaffRole(user.role));
+  // Full pending queue (not hackathon-scoped) so self-signup judges appear before event access is granted.
+  const pendingStaff = judgeAccounts.filter((user) => user.judgeApprovalStatus !== "approved");
+  const approvedStaff = staff.filter((user) => user.judgeApprovalStatus === "approved");
   const hostAnalytics = buildHostAnalytics(users);
+  const eventQuery = selectedHackathon.id;
 
   useEffect(() => {
     setNewSubmission({
@@ -875,11 +938,363 @@ export function AdminDashboard({
     });
   }, [selectedHackathon.id]);
 
+  if (workspace === "create") {
+    return (
+      <div className="space-y-8">
+        <section className={sectionClass} aria-label="Create event">
+          <div className="dash-stack-header flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="dash-icon-chip" aria-hidden>
+                <Wand2 className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="dash-eyebrow">Create</p>
+                <h2 className="dash-title">Launch a new event</h2>
+                <p className="dash-subtitle">
+                  AI or manual setup — publishes into the admin catalog and public event pages.
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link to={withHackathonQuery("/dashboard/admin", eventQuery)}>Back to overview</Link>
+            </Button>
+          </div>
+        </section>
+        <AiHackathonLauncher onCreate={onCreateAiHackathon} />
+        <ManualHackathonLauncher onCreate={onCreateManualHackathon} />
+      </div>
+    );
+  }
+
+  if (workspace === "judging") {
+    return (
+      <div className="space-y-8">
+        <section className={sectionClass} aria-label="Judging workspace">
+          <div className="dash-stack-header flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="dash-icon-chip dash-icon-chip--sunset" aria-hidden>
+                <Gavel className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="dash-eyebrow">Judging</p>
+                <h2 className="dash-title">{selectedHackathon.name}</h2>
+                <p className="dash-subtitle">
+                  Criteria, marks, analytics, and rankings for this event.
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link to={withHackathonQuery("/dashboard/admin", eventQuery)}>Back to overview</Link>
+            </Button>
+          </div>
+        </section>
+        <AdminJudgingSection
+          selectedHackathon={selectedHackathon}
+          judgingCriteria={judgingCriteria}
+          isLoadingCriteria={isLoadingCriteria}
+          isSavingCriteria={isSavingCriteria}
+          onSaveCriteria={onSaveCriteria}
+          participants={participants}
+          submissions={submissions}
+          isLoadingSubmissions={isLoadingSubmissions}
+          isLoadingUsers={isLoadingUsers}
+          analytics={analytics}
+          isCreatingSubmission={isCreatingSubmission}
+          deletingSubmissionId={deletingSubmissionId}
+          newSubmission={newSubmission}
+          onNewSubmissionChange={setNewSubmission}
+          onCreateSubmission={onCreateSubmission}
+          onDeleteSubmission={onDeleteSubmission}
+          top3RankingSummary={top3RankingSummary}
+          isLoadingTop3Rankings={isLoadingTop3Rankings}
+          top3SubmissionLookup={top3SubmissionLookup}
+        />
+      </div>
+    );
+  }
+
+  if (workspace === "people") {
+    return (
+      <div className="space-y-8">
+        <section className={sectionClass} aria-label="People workspace">
+          <div className="dash-stack-header flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="dash-icon-chip" aria-hidden>
+                <Users className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="dash-eyebrow">People</p>
+                <h2 className="dash-title">{selectedHackathon.name}</h2>
+                <p className="dash-subtitle">
+                  Participants, judges, hosts, invites, and access for this event.
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link to={withHackathonQuery("/dashboard/admin", eventQuery)}>Back to overview</Link>
+            </Button>
+          </div>
+        </section>
+
+        <HostAnalyticsPanel analytics={hostAnalytics} isLoading={isLoadingUsers} />
+
+        <HostApprovalPanel
+          hosts={hostAccounts}
+          savingUserId={savingUserId}
+          onApproveHost={onApproveHost}
+        />
+
+        <JudgeApprovalPanel
+          judges={judgeAccounts}
+          selectedHackathon={selectedHackathon}
+          savingUserId={savingUserId}
+          onApproveJudge={onApproveJudge}
+          onRejectJudge={onRejectJudge}
+        />
+
+        <section className={`${sectionClass} overflow-hidden p-0`} id="grant-admin-access">
+          <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
+            <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Access control</p>
+              <h2 className="dash-title">Grant admin access</h2>
+              <p className="dash-subtitle">
+                Promote an existing account or pre-authorize an email before first sign-in.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-4 p-4 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1 space-y-2">
+                <label
+                  htmlFor="admin-grant-email"
+                  className="text-xs uppercase tracking-[0.22em] text-muted-foreground"
+                >
+                  Email address
+                </label>
+                <Input
+                  id="admin-grant-email"
+                  type="email"
+                  placeholder="organizer@example.com"
+                  value={adminGrantEmail}
+                  onChange={(event) => onAdminGrantEmailChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      void onGrantAdminAccess();
+                    }
+                  }}
+                />
+              </div>
+              <Button
+                className="h-10 px-4 text-[0.7rem] uppercase tracking-[0.22em]"
+                disabled={isGrantingAdmin || !adminGrantEmail.trim()}
+                onClick={() => void onGrantAdminAccess()}
+              >
+                {isGrantingAdmin ? "Granting..." : "Grant admin"}
+              </Button>
+            </div>
+            {pendingAdminGrants.length > 0 ? (
+              <div className="rounded-xl border border-white/10 bg-muted/10 p-4">
+                <p className="dash-eyebrow">Pending invitations</p>
+                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                  {pendingAdminGrants.map((grant) => (
+                    <li key={grant.email}>{grant.email}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <section className={`${sectionClass} overflow-hidden p-0`} id="participant-broadcast">
+          <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
+            <span className="dash-icon-chip" aria-hidden>
+              <Mail className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Participant email</p>
+              <h2 className="dash-title">Broadcast to participants</h2>
+              <p className="dash-subtitle">
+                Send one email to every participant registered for {selectedHackathon.name}.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-4 p-4 sm:p-6">
+            <div className="space-y-2">
+              <label
+                htmlFor="participant-broadcast-subject"
+                className="text-xs uppercase tracking-[0.22em] text-muted-foreground"
+              >
+                Subject
+              </label>
+              <Input
+                id="participant-broadcast-subject"
+                value={broadcastSubject}
+                onChange={(event) => onBroadcastSubjectChange(event.target.value)}
+                placeholder="Submission reminder"
+              />
+            </div>
+            <div className="space-y-2">
+              <label
+                htmlFor="participant-broadcast-message"
+                className="text-xs uppercase tracking-[0.22em] text-muted-foreground"
+              >
+                Message
+              </label>
+              <Textarea
+                id="participant-broadcast-message"
+                value={broadcastMessage}
+                onChange={(event) => onBroadcastMessageChange(event.target.value)}
+                placeholder="Write the update participants should receive..."
+                rows={5}
+              />
+            </div>
+            <Button
+              className="h-10 px-4 text-[0.7rem] uppercase tracking-[0.22em]"
+              disabled={
+                isSendingBroadcast || !broadcastSubject.trim() || !broadcastMessage.trim()
+              }
+              onClick={() => void onSendParticipantBroadcast()}
+            >
+              {isSendingBroadcast ? "Sending..." : "Send broadcast"}
+            </Button>
+          </div>
+        </section>
+
+        {onCreateJudgeInvite && onToggleJudgeInviteHackathon && onJudgeInviteLabelChange ? (
+          <JudgeInvitePanel
+            hackathons={hackathons && hackathons.length > 0 ? hackathons : PORTAL_HACKATHONS}
+            selectedHackathonIds={judgeInviteHackathonIds}
+            onToggleHackathon={onToggleJudgeInviteHackathon}
+            label={judgeInviteLabel}
+            onLabelChange={onJudgeInviteLabelChange}
+            inviteUrl={judgeInviteUrl}
+            isBusy={isCreatingJudgeInvite}
+            message={judgeInviteMessage}
+            onGenerate={onCreateJudgeInvite}
+          />
+        ) : null}
+
+        {isLoadingUsers ? (
+          <section className={sectionClass}>
+            <p className="text-sm text-muted-foreground">Loading users...</p>
+          </section>
+        ) : (
+          <>
+            <UserManagementTable
+              users={users}
+              hackathons={hackathons}
+              title={`All users · ${selectedHackathon.shortName}`}
+              description={`Accounts linked to ${selectedHackathon.name} via signup, submissions, or judging activity.`}
+              emptyMessage={`No users linked to ${selectedHackathon.name} yet.`}
+              sectionId="manage-all-users"
+              savingUserId={savingUserId}
+              pendingRoles={pendingRoles}
+              onRoleChange={onRoleChange}
+              onSaveRole={onSaveRole}
+              onApproveJudge={onApproveJudge}
+              onRejectJudge={onRejectJudge}
+              onUpdateHackathonAccess={onUpdateHackathonAccess}
+            />
+            <UserManagementTable
+              users={participants}
+              hackathons={hackathons}
+              title={`Participants · ${selectedHackathon.shortName}`}
+              description={`Participant accounts for ${selectedHackathon.name}.`}
+              emptyMessage={`No participants for ${selectedHackathon.name} yet.`}
+              sectionId="manage-participants"
+              savingUserId={savingUserId}
+              pendingRoles={pendingRoles}
+              onRoleChange={onRoleChange}
+              onSaveRole={onSaveRole}
+              onApproveJudge={onApproveJudge}
+              onRejectJudge={onRejectJudge}
+              onUpdateHackathonAccess={onUpdateHackathonAccess}
+            />
+            <UserManagementTable
+              users={pendingStaff}
+              hackathons={hackathons}
+              title={`Pending approval · ${selectedHackathon.shortName}`}
+              description={`All judges and mentors waiting for approval. Approving grants access to ${selectedHackathon.name} (and any events they already hold).`}
+              emptyMessage="No pending judge or mentor approvals."
+              sectionId="manage-judge-pending"
+              savingUserId={savingUserId}
+              pendingRoles={pendingRoles}
+              onRoleChange={onRoleChange}
+              onSaveRole={onSaveRole}
+              onApproveJudge={onApproveJudge}
+              onRejectJudge={onRejectJudge}
+              onUpdateHackathonAccess={onUpdateHackathonAccess}
+            />
+            <UserManagementTable
+              users={approvedStaff}
+              hackathons={hackathons}
+              title={`Mentors & judges · ${selectedHackathon.shortName}`}
+              description={`Approved mentor and judge accounts for ${selectedHackathon.name}. Toggle event chips to grant or revoke access.`}
+              emptyMessage={`No approved mentors or judges for ${selectedHackathon.name} yet.`}
+              sectionId="manage-judges"
+              savingUserId={savingUserId}
+              pendingRoles={pendingRoles}
+              onRoleChange={onRoleChange}
+              onSaveRole={onSaveRole}
+              onApproveJudge={onApproveJudge}
+              onRejectJudge={onRejectJudge}
+              onUpdateHackathonAccess={onUpdateHackathonAccess}
+            />
+          </>
+        )}
+      </div>
+    );
+  }
+
+  const hubs: Array<{
+    to: string;
+    title: string;
+    description: string;
+    icon: typeof Wand2;
+  }> = [
+    {
+      to: withHackathonQuery("/dashboard/admin/create", eventQuery),
+      title: "Create event",
+      description: "AI event builder or manual launch.",
+      icon: Wand2,
+    },
+    {
+      to: withHackathonQuery("/dashboard/admin/events", eventQuery),
+      title: "Event management",
+      description: "Publish, status, and edit live listings.",
+      icon: CalendarCheck2,
+    },
+    {
+      to: withHackathonQuery("/dashboard/admin/screening", eventQuery),
+      title: "Screening agent",
+      description: "Score and shortlist applicants.",
+      icon: Radar,
+    },
+    {
+      to: withHackathonQuery("/dashboard/admin/operations", eventQuery),
+      title: "Operations",
+      description: "Check-in, teams, and live ops console.",
+      icon: Activity,
+    },
+    {
+      to: withHackathonQuery("/dashboard/admin/people", eventQuery),
+      title: "People",
+      description: "Participants, judges, hosts, and invites.",
+      icon: Users,
+    },
+    {
+      to: withHackathonQuery("/dashboard/admin/judging", eventQuery),
+      title: "Judging",
+      description: "Criteria, marks, analytics, and top 3.",
+      icon: Gavel,
+    },
+  ];
+
   return (
     <div className="space-y-8" id="overview">
-      <AiHackathonLauncher onCreate={onCreateAiHackathon} />
-      <ManualHackathonLauncher onCreate={onCreateManualHackathon} />
-
       <HackathonContextBanner hackathon={selectedHackathon} role="admin" />
 
       <section className={`${sectionClass} relative overflow-hidden`} aria-label="Admin overview">
@@ -892,7 +1307,7 @@ export function AdminDashboard({
               <p className="dash-eyebrow">Command center</p>
               <h2 className="dash-title">Admin overview</h2>
               <p className="dash-subtitle">
-                Users and submissions scoped to {selectedHackathon.name}.
+                Independent workspaces for {selectedHackathon.name} — pick a tool below.
               </p>
             </div>
           </div>
@@ -901,285 +1316,70 @@ export function AdminDashboard({
               <p className="dash-stat-value">
                 {isLoadingUsers ? "—" : participants.length}
               </p>
-              <p className="dash-stat-label">
-                Participants
-              </p>
+              <p className="dash-stat-label">Participants</p>
             </div>
             <div className="dash-stat-tile">
-              <p className="dash-stat-value">
-                {isLoadingUsers ? "—" : staff.length}
-              </p>
-              <p className="dash-stat-label">
-                Judges
-              </p>
+              <p className="dash-stat-value">{isLoadingUsers ? "—" : staff.length}</p>
+              <p className="dash-stat-label">Judges</p>
             </div>
             <div className="dash-stat-tile sm:col-span-1 col-span-2">
               <p className="dash-stat-value">
                 {isLoadingSubmissions ? "—" : analytics.totalSubmissions}
               </p>
-              <p className="dash-stat-label">
-                Submissions
-              </p>
+              <p className="dash-stat-label">Submissions</p>
             </div>
           </div>
         </div>
-        {message && (
-          <p className="dash-message mt-4">
-            {message}
+        {message ? <p className="dash-message mt-4">{message}</p> : null}
+      </section>
+
+      <section className={sectionClass} aria-label="Admin workspaces">
+        <div className="dash-stack-header mb-6">
+          <p className="dash-eyebrow">Workspaces</p>
+          <h2 className="dash-title">Open a tool</h2>
+          <p className="dash-subtitle">
+            Each area is separate, still scoped to the selected hackathon.
           </p>
-        )}
-      </section>
-
-      <section className={`${sectionClass}`} id="platform" aria-label="Platform features">
-        <div className="dash-stack-header mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="dash-icon-chip" aria-hidden>
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="dash-eyebrow">Platform</p>
-              <h2 className="dash-title">Screen, match, score, and rank</h2>
-              <p className="dash-subtitle">
-                Live ops for {selectedHackathon.name} — open the screening agent or operations console.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm" className="gap-1.5">
-              <Link to="/dashboard/admin/events">
-                <CalendarCheck2 className="h-4 w-4" />
-                Event management
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="gap-1.5">
-              <Link to="/dashboard/admin/screening">
-                <Radar className="h-4 w-4" />
-                Screening agent
-              </Link>
-            </Button>
-            <Button asChild size="sm" className="gap-1.5">
-              <Link to="/dashboard/admin/operations">
-                <Activity className="h-4 w-4" />
-                Operations
-              </Link>
-            </Button>
-          </div>
         </div>
-        <PlatformOpsConsole live={platformOpsLive} />
-      </section>
-
-      <HostAnalyticsPanel analytics={hostAnalytics} isLoading={isLoadingUsers} />
-
-      <HostApprovalPanel
-        hosts={hostAccounts}
-        savingUserId={savingUserId}
-        onApproveHost={onApproveHost}
-      />
-
-      <JudgeApprovalPanel
-        judges={judgeAccounts}
-        selectedHackathon={selectedHackathon}
-        savingUserId={savingUserId}
-        onApproveJudge={onApproveJudge}
-      />
-
-      <section className={`${sectionClass} overflow-hidden p-0`} id="grant-admin-access">
-        <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
-          <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
-            <ShieldCheck className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="dash-eyebrow">Access control</p>
-            <h2 className="dash-title">Grant admin access</h2>
-            <p className="dash-subtitle">
-              Promote an existing account or pre-authorize an email before first sign-in.
-            </p>
-          </div>
-        </div>
-        <div className="space-y-4 p-4 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-2">
-              <label
-                htmlFor="admin-grant-email"
-                className="text-xs uppercase tracking-[0.22em] text-muted-foreground"
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {hubs.map((hub) => {
+            const Icon = hub.icon;
+            return (
+              <Link
+                key={hub.to}
+                to={hub.to}
+                className="group rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-primary/40 hover:bg-primary/5"
               >
-                Email address
-              </label>
-              <Input
-                id="admin-grant-email"
-                type="email"
-                placeholder="organizer@example.com"
-                value={adminGrantEmail}
-                onChange={(event) => onAdminGrantEmailChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    void onGrantAdminAccess();
-                  }
-                }}
-              />
-            </div>
-            <Button
-              className="h-10 px-4 text-[0.7rem] uppercase tracking-[0.22em]"
-              disabled={isGrantingAdmin || !adminGrantEmail.trim()}
-              onClick={() => void onGrantAdminAccess()}
-            >
-              {isGrantingAdmin ? "Granting..." : "Grant admin"}
-            </Button>
-          </div>
-          {pendingAdminGrants.length > 0 ? (
-            <div className="rounded-xl border border-white/10 bg-muted/10 p-4">
-              <p className="dash-eyebrow">Pending invitations</p>
-              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {pendingAdminGrants.map((grant) => (
-                  <li key={grant.email}>{grant.email}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      <section className={`${sectionClass} overflow-hidden p-0`} id="participant-broadcast">
-        <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
-          <span className="dash-icon-chip" aria-hidden>
-            <Mail className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="dash-eyebrow">Participant email</p>
-            <h2 className="dash-title">Broadcast to participants</h2>
-            <p className="dash-subtitle">
-              Send one email to every participant registered for {selectedHackathon.name}.
-            </p>
-          </div>
-        </div>
-        <div className="space-y-4 p-4 sm:p-6">
-          <div className="space-y-2">
-            <label
-              htmlFor="participant-broadcast-subject"
-              className="text-xs uppercase tracking-[0.22em] text-muted-foreground"
-            >
-              Subject
-            </label>
-            <Input
-              id="participant-broadcast-subject"
-              value={broadcastSubject}
-              onChange={(event) => onBroadcastSubjectChange(event.target.value)}
-              placeholder="Submission reminder"
-            />
-          </div>
-          <div className="space-y-2">
-            <label
-              htmlFor="participant-broadcast-message"
-              className="text-xs uppercase tracking-[0.22em] text-muted-foreground"
-            >
-              Message
-            </label>
-            <Textarea
-              id="participant-broadcast-message"
-              value={broadcastMessage}
-              onChange={(event) => onBroadcastMessageChange(event.target.value)}
-              placeholder="Write the update participants should receive..."
-              rows={5}
-            />
-          </div>
-          <Button
-            className="h-10 px-4 text-[0.7rem] uppercase tracking-[0.22em]"
-            disabled={
-              isSendingBroadcast || !broadcastSubject.trim() || !broadcastMessage.trim()
-            }
-            onClick={() => void onSendParticipantBroadcast()}
+                <span className="dash-icon-chip mb-3 inline-flex" aria-hidden>
+                  <Icon className="h-4 w-4" />
+                </span>
+                <h3 className="font-display text-lg font-semibold tracking-tight text-foreground group-hover:text-primary">
+                  {hub.title}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">{hub.description}</p>
+              </Link>
+            );
+          })}
+          <Link
+            to="/dashboard/host"
+            className="group rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-primary/40 hover:bg-primary/5"
           >
-            {isSendingBroadcast ? "Sending..." : "Send broadcast"}
-          </Button>
+            <span className="dash-icon-chip mb-3 inline-flex" aria-hidden>
+              <PenLine className="h-4 w-4" />
+            </span>
+            <h3 className="font-display text-lg font-semibold tracking-tight text-foreground group-hover:text-primary">
+              Host ops
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Organizer ticket desk and host event workspace.
+            </p>
+          </Link>
         </div>
       </section>
 
-      <AdminJudgingSection
-        selectedHackathon={selectedHackathon}
-        judgingCriteria={judgingCriteria}
-        isLoadingCriteria={isLoadingCriteria}
-        isSavingCriteria={isSavingCriteria}
-        onSaveCriteria={onSaveCriteria}
-        participants={participants}
-        submissions={submissions}
-        isLoadingSubmissions={isLoadingSubmissions}
-        isLoadingUsers={isLoadingUsers}
-        analytics={analytics}
-        isCreatingSubmission={isCreatingSubmission}
-        deletingSubmissionId={deletingSubmissionId}
-        newSubmission={newSubmission}
-        onNewSubmissionChange={setNewSubmission}
-        onCreateSubmission={onCreateSubmission}
-        onDeleteSubmission={onDeleteSubmission}
-        top3RankingSummary={top3RankingSummary}
-        isLoadingTop3Rankings={isLoadingTop3Rankings}
-        top3SubmissionLookup={top3SubmissionLookup}
-      />
-
-      {onCreateJudgeInvite && onToggleJudgeInviteHackathon && onJudgeInviteLabelChange ? (
-        <JudgeInvitePanel
-          hackathons={hackathons && hackathons.length > 0 ? hackathons : PORTAL_HACKATHONS}
-          selectedHackathonIds={judgeInviteHackathonIds}
-          onToggleHackathon={onToggleJudgeInviteHackathon}
-          label={judgeInviteLabel}
-          onLabelChange={onJudgeInviteLabelChange}
-          inviteUrl={judgeInviteUrl}
-          isBusy={isCreatingJudgeInvite}
-          message={judgeInviteMessage}
-          onGenerate={onCreateJudgeInvite}
-        />
-      ) : null}
-
-      {isLoadingUsers ? (
-        <section className={`${sectionClass}`}>
-          <p className="text-sm text-muted-foreground">Loading users...</p>
-        </section>
-      ) : (
-        <>
-          <UserManagementTable
-            users={users}
-            hackathons={hackathons}
-            title={`All users · ${selectedHackathon.shortName}`}
-            description={`Accounts linked to ${selectedHackathon.name} via signup, submissions, or judging activity.`}
-            emptyMessage={`No users linked to ${selectedHackathon.name} yet.`}
-            sectionId="manage-all-users"
-            savingUserId={savingUserId}
-            pendingRoles={pendingRoles}
-            onRoleChange={onRoleChange}
-            onSaveRole={onSaveRole}
-            onApproveJudge={onApproveJudge}
-            onUpdateHackathonAccess={onUpdateHackathonAccess}
-          />
-          <UserManagementTable
-            users={participants}
-            hackathons={hackathons}
-            title={`Participants · ${selectedHackathon.shortName}`}
-            description={`Participant accounts for ${selectedHackathon.name}.`}
-            emptyMessage={`No participants for ${selectedHackathon.name} yet.`}
-            sectionId="manage-participants"
-            savingUserId={savingUserId}
-            pendingRoles={pendingRoles}
-            onRoleChange={onRoleChange}
-            onSaveRole={onSaveRole}
-            onApproveJudge={onApproveJudge}
-            onUpdateHackathonAccess={onUpdateHackathonAccess}
-          />
-          <UserManagementTable
-            users={staff}
-            hackathons={hackathons}
-            title={`Mentors & judges · ${selectedHackathon.shortName}`}
-            description={`Mentor and judge accounts for ${selectedHackathon.name}. Toggle event chips to grant or revoke access.`}
-            emptyMessage={`No mentors or judges for ${selectedHackathon.name} yet.`}
-            sectionId="manage-judges"
-            savingUserId={savingUserId}
-            pendingRoles={pendingRoles}
-            onRoleChange={onRoleChange}
-            onSaveRole={onSaveRole}
-            onApproveJudge={onApproveJudge}
-            onUpdateHackathonAccess={onUpdateHackathonAccess}
-          />
-        </>
-      )}
+      <span className="sr-only" aria-hidden>
+        {platformOpsLive.hackathon.id}
+      </span>
     </div>
   );
 }

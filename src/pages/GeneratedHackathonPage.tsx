@@ -319,10 +319,14 @@ function EventHero({
           </div>
 
           {/* Launch dock — fully below the poster so banner art stays unobstructed */}
-          <div className="event-hero-dock relative z-10 mx-auto mt-4 max-w-5xl sm:mt-5">
+          <div className="event-hero-dock relative z-10 mt-4 w-full sm:mt-5">
             <div className="overflow-hidden rounded-2xl border border-primary/25 bg-[linear-gradient(135deg,hsl(var(--card)/0.96)_0%,hsl(210_24%_6%/0.94)_100%)] shadow-[0_28px_80px_-36px_hsl(var(--primary)/0.45),var(--surface-elevated)] backdrop-blur-xl">
-              <div className="h-px w-full bg-[linear-gradient(90deg,transparent,hsl(var(--primary)/0.75),transparent)]" />
-              <div className="grid gap-5 p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1.15fr)_auto] lg:items-end lg:gap-8 lg:p-7">
+              <div className="flex h-1.5 w-full overflow-hidden">
+                <span className="w-1/5 bg-primary/30" />
+                <span className="w-3/5 bg-gradient-to-r from-primary/80 via-primary to-primary/80" />
+                <span className="w-1/5 bg-primary/30" />
+              </div>
+              <div className="grid gap-5 p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(240px,0.75fr)] lg:items-center lg:gap-10 lg:p-7">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2.5">
                     {event.logoUrl ? (
@@ -360,7 +364,7 @@ function EventHero({
 
                   {event.tagline ? (
                     <p
-                      className="mt-2 max-w-xl text-sm font-medium leading-snug text-foreground/85 sm:text-base"
+                      className="mt-2 max-w-2xl text-sm font-medium leading-snug text-foreground/85 sm:text-base"
                       style={displayStyle}
                     >
                       {event.tagline}
@@ -379,13 +383,16 @@ function EventHero({
                   </div>
                 </div>
 
-                <div className="flex w-full flex-col sm:w-auto sm:min-w-[220px] lg:items-stretch">
+                <div className="flex w-full flex-col border-t border-white/10 pt-4 sm:min-w-[220px] lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Enter the event
+                  </p>
                   <EventHeroActions
                     event={event}
                     onCopy={onCopy}
                     copied={copied}
                     tone="card"
-                    className="mt-0 w-full sm:mt-0 lg:flex-col lg:items-stretch [&_a]:w-full [&_button]:w-full"
+                    className="mt-0 w-full flex-col items-stretch sm:mt-0 sm:flex-col [&_a]:w-full [&_button]:w-full"
                   />
                 </div>
               </div>

@@ -11,7 +11,7 @@ export const canAccessHostDashboard = (
 export const canAccessStaffDashboard = (
   role?: PortalRole,
   judgeApprovalStatus?: JudgeApprovalStatus
-) => isStaffRole(role) && judgeApprovalStatus !== "pending";
+) => isStaffRole(role) && judgeApprovalStatus === "approved";
 
 /** New participants without a completed profile go through the onboarding wizard. */
 export function participantNeedsOnboarding(

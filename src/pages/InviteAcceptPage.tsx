@@ -290,7 +290,7 @@ export default function InviteAcceptPage() {
                 )}
                 {sessionUser &&
                 sessionUser.role === "judge" &&
-                sessionUser.judgeApprovalStatus !== "pending" ? (
+                sessionUser.judgeApprovalStatus === "approved" ? (
                   <Button asChild variant="ghost">
                     <Link to={judgeDashboardPath}>Go to event dashboard</Link>
                   </Button>

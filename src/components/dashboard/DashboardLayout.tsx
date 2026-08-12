@@ -24,12 +24,9 @@ import {
   BookOpen,
   Briefcase,
   Wand2,
-  PenLine,
   UserCog,
   Gavel,
   Medal,
-  ChartColumn,
-  Server,
   Mail,
   ShieldCheck,
   ChevronDown,
@@ -79,6 +76,7 @@ import {
   getHackathonPublicUrl,
   getHackathonsByIds,
   getUserAllowedHackathonIds,
+  withHackathonQuery,
   type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
@@ -163,37 +161,105 @@ const groupLabelClass = "dash-nav-label !text-primary/70";
 
 const ADMIN_HOME = "/dashboard/admin";
 
-const ADMIN_OPERATE: NavItem[] = [
-  { href: `${ADMIN_HOME}#overview`, label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/admin/screening", label: "Screening agent", icon: Radar },
-  { href: "/dashboard/admin/operations", label: "Operations", icon: Activity },
-  { href: "/dashboard/admin/events", label: "Event management", icon: CalendarCheck2 },
-  { href: `${ADMIN_HOME}#platform`, label: "Platform", icon: Server },
+type AdminNavBuilder = (hackathonId?: HackathonId) => NavItem[];
+
+const buildAdminOperateNav: AdminNavBuilder = (hackathonId) => [
+  { href: withHackathonQuery(ADMIN_HOME, hackathonId), label: "Overview", icon: LayoutDashboard },
+  {
+    href: withHackathonQuery("/dashboard/admin/screening", hackathonId),
+    label: "Screening agent",
+    icon: Radar,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/operations", hackathonId),
+    label: "Operations",
+    icon: Activity,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/events", hackathonId),
+    label: "Event management",
+    icon: CalendarCheck2,
+  },
 ];
 
-const ADMIN_CREATE: NavItem[] = [
-  { href: `${ADMIN_HOME}#ai-event-builder`, label: "AI event builder", icon: Wand2 },
-  { href: `${ADMIN_HOME}#manual-event-builder`, label: "Manual event", icon: PenLine },
+const buildAdminCreateNav: AdminNavBuilder = (hackathonId) => [
+  {
+    href: withHackathonQuery("/dashboard/admin/create", hackathonId),
+    label: "Create event",
+    icon: Wand2,
+  },
   { href: "/dashboard/host", label: "Host ops", icon: Ticket, toHost: true },
 ];
 
-const ADMIN_PEOPLE: NavItem[] = [
-  { href: `${ADMIN_HOME}#manage-participants`, label: "Participants", icon: Users },
-  { href: `${ADMIN_HOME}#manage-judges`, label: "Judges", icon: Scale },
-  { href: `${ADMIN_HOME}#manage-hosts`, label: "Host approvals", icon: UserCog },
-  { href: `${ADMIN_HOME}#manage-judge-approvals`, label: "Judge approvals", icon: ShieldCheck },
-  { href: `${ADMIN_HOME}#judge-invites`, label: "Judge invites", icon: Mail },
-  { href: `${ADMIN_HOME}#host-analytics`, label: "Host analytics", icon: ChartColumn },
+const buildAdminPeopleNav: AdminNavBuilder = (hackathonId) => [
+  {
+    href: withHackathonQuery("/dashboard/admin/people", hackathonId),
+    label: "People & access",
+    icon: Users,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/people#manage-participants", hackathonId),
+    label: "Participants",
+    icon: Users,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/people#manage-judges", hackathonId),
+    label: "Judges",
+    icon: Scale,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/people#manage-hosts", hackathonId),
+    label: "Host approvals",
+    icon: UserCog,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/people#manage-judge-approvals", hackathonId),
+    label: "Judge approvals",
+    icon: ShieldCheck,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/people#judge-invites", hackathonId),
+    label: "Judge invites",
+    icon: Mail,
+  },
 ];
 
-const ADMIN_SCORING: NavItem[] = [
-  { href: `${ADMIN_HOME}#judging`, label: "Judging overview", icon: Gavel },
-  { href: `${ADMIN_HOME}#marking-criteria`, label: "Criteria", icon: ListChecks },
-  { href: `${ADMIN_HOME}#analytics`, label: "Analytics", icon: BarChart3 },
-  { href: `${ADMIN_HOME}#judge-marks`, label: "Mark check", icon: ClipboardCheck },
-  { href: `${ADMIN_HOME}#top-3-marks`, label: "Top 3 by score", icon: Medal },
-  { href: `${ADMIN_HOME}#top-3-ranking`, label: "Top 3 ballots", icon: Trophy },
-  { href: `${ADMIN_HOME}#submission-marks`, label: "Submissions", icon: ClipboardList },
+const buildAdminScoringNav: AdminNavBuilder = (hackathonId) => [
+  {
+    href: withHackathonQuery("/dashboard/admin/judging", hackathonId),
+    label: "Judging overview",
+    icon: Gavel,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judging#marking-criteria", hackathonId),
+    label: "Criteria",
+    icon: ListChecks,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judging#analytics", hackathonId),
+    label: "Analytics",
+    icon: BarChart3,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judging#judge-marks", hackathonId),
+    label: "Mark check",
+    icon: ClipboardCheck,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judging#top-3-marks", hackathonId),
+    label: "Top 3 by score",
+    icon: Medal,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judging#top-3-ranking", hackathonId),
+    label: "Top 3 ballots",
+    icon: Trophy,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judging#submission-marks", hackathonId),
+    label: "Submissions",
+    icon: ClipboardList,
+  },
 ];
 
 function scrollToHashId(id: string) {
@@ -280,14 +346,15 @@ function DashboardNavLink({
 
   const hashIndex = href.indexOf("#");
   const hasHash = hashIndex >= 0;
-  const pathPart = hasHash ? href.slice(0, hashIndex) : href;
+  const pathAndQuery = hasHash ? href.slice(0, hashIndex) : href;
   const hashId = hasHash ? href.slice(hashIndex + 1) : "";
+  const pathOnly = pathAndQuery.split("?")[0] || pathAndQuery;
 
-  // In-page section links (and /dashboard/admin#section from other admin routes).
+  // In-page section links (and /dashboard/admin/people#section from other admin routes).
   if (hasHash && hashId) {
     const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
-      const targetPath = pathPart || location.pathname;
+      const targetPath = pathOnly || location.pathname;
       const onTargetPage = targetPath === location.pathname;
 
       if (onTargetPage && scrollToHashId(hashId)) {
@@ -304,7 +371,7 @@ function DashboardNavLink({
         return;
       }
 
-      navigate(`${targetPath}#${hashId}`);
+      navigate(pathAndQuery ? `${pathAndQuery}#${hashId}` : `#${hashId}`);
       scheduleHashScroll(hashId);
       onNavigate();
     };
@@ -323,21 +390,61 @@ function DashboardNavLink({
   );
 }
 
-/** When landing on /dashboard/admin#judging or /dashboard/host#tickets, scroll once the section exists. */
+/** When landing on /dashboard/admin#judging (legacy) or in-page hashes, scroll or redirect. */
 function AdminHashScroll() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    const id = location.hash.replace(/^#/, "").trim();
+    if (!id) return;
+
+    // Legacy overview hashes → dedicated admin workspaces.
+    if (location.pathname === "/dashboard/admin" || location.pathname === "/dashboard/admin/") {
+      const createHashes = new Set(["ai-event-builder", "manual-event-builder"]);
+      const peopleHashes = new Set([
+        "manage-participants",
+        "manage-judges",
+        "manage-hosts",
+        "manage-judge-approvals",
+        "judge-invites",
+        "host-analytics",
+        "grant-admin-access",
+        "participant-broadcast",
+        "manage-all-users",
+        "manage-judge-pending",
+      ]);
+      const judgingHashes = new Set([
+        "judging",
+        "marking-criteria",
+        "analytics",
+        "judge-marks",
+        "top-3-marks",
+        "top-3-ranking",
+        "submission-marks",
+      ]);
+      if (createHashes.has(id)) {
+        navigate(`/dashboard/admin/create${location.search}`, { replace: true });
+        return;
+      }
+      if (peopleHashes.has(id)) {
+        navigate(`/dashboard/admin/people${location.search}#${id}`, { replace: true });
+        return;
+      }
+      if (judgingHashes.has(id)) {
+        navigate(`/dashboard/admin/judging${location.search}#${id}`, { replace: true });
+        return;
+      }
+    }
+
     if (
       !location.pathname.startsWith("/dashboard/admin") &&
       location.pathname !== "/dashboard/host"
     ) {
       return;
     }
-    const id = location.hash.replace(/^#/, "").trim();
-    if (!id) return;
     scheduleHashScroll(id);
-  }, [location.hash, location.pathname]);
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   return null;
 }
@@ -474,10 +581,14 @@ function DashboardLayoutContent({
   const boardHackathons = catalogHackathons.filter(
     (hackathon) => hackathon.status === "active" || hackathon.status === "upcoming",
   );
-  // Ops switcher: live/upcoming only (keep the current selection visible if it's past).
-  const switcherHackathons = filterCurrentHackathons(catalogHackathons, {
-    includeId: selectedHackathonId,
-  });
+  // Admins need every edition in the switcher (including past) so switching
+  // never hides the event they just left. Other roles stay on live/upcoming.
+  const switcherHackathons =
+    role === "admin"
+      ? catalogHackathons
+      : filterCurrentHackathons(catalogHackathons, {
+          includeId: selectedHackathonId,
+        });
 
   const closeMobileNav = () => {
     if (isMobile) {
@@ -531,23 +642,26 @@ function DashboardLayoutContent({
           {role === "admin" ? (
             <>
               <NavSection label="Operate">
-                <NavMenuItems items={ADMIN_OPERATE} onNavigate={closeMobileNav} />
+                <NavMenuItems
+                  items={buildAdminOperateNav(selectedHackathonId)}
+                  onNavigate={closeMobileNav}
+                />
               </NavSection>
               <CollapsibleNavSection
                 label="Create"
-                items={ADMIN_CREATE}
+                items={buildAdminCreateNav(selectedHackathonId)}
                 onNavigate={closeMobileNav}
                 defaultOpen={false}
               />
               <CollapsibleNavSection
                 label="People"
-                items={ADMIN_PEOPLE}
+                items={buildAdminPeopleNav(selectedHackathonId)}
                 onNavigate={closeMobileNav}
                 defaultOpen
               />
               <CollapsibleNavSection
                 label="Judging"
-                items={ADMIN_SCORING}
+                items={buildAdminScoringNav(selectedHackathonId)}
                 onNavigate={closeMobileNav}
                 defaultOpen={false}
               />

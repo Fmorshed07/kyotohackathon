@@ -311,6 +311,13 @@ export default function SignIn() {
           );
         }
 
+        // Staff without an explicit approval must wait in the admin queue (legacy docs too).
+        // Do not write judgeApprovalStatus here — clients cannot self-update that field.
+        const resolvedJudgeApprovalStatus =
+          isStaffRole(existingRole) && existingJudgeApprovalStatus !== "approved"
+            ? "pending"
+            : existingJudgeApprovalStatus;
+
         const pendingJudgeInviteOnSignIn =
           readPendingInvite("judge") ||
           (searchInvite?.trim() && (authRole === "judge" || existingRole === "judge")
@@ -397,7 +404,7 @@ export default function SignIn() {
         navigate(
           pathForSession({
             role: existingRole,
-            judgeApprovalStatus: existingJudgeApprovalStatus,
+            judgeApprovalStatus: resolvedJudgeApprovalStatus,
             onboardingCompletedAt:
               typeof existingData.onboardingCompletedAt === "string"
                 ? existingData.onboardingCompletedAt
@@ -424,6 +431,67 @@ export default function SignIn() {
         return;
       }
 
+      // Already registered for this role — skip role writes (Firestore blocks self-updating
+      // judgeApprovalStatus) and route like a normal login, including invite redeem.
+      if (mode === "signup" && existingRole && (existingRole === authRole || existingRole === "mentor") && !hasAdminGrant) {
+        const pendingJudgeInviteExisting =
+          readPendingInvite("judge") ||
+          (searchInvite?.trim() && authRole === "judge" ? searchInvite.trim() : null);
+        if (
+          pendingJudgeInviteExisting &&
+          (existingRole === "judge" || existingRole === "mentor")
+        ) {
+          try {
+            const existingIds = Array.isArray(existingData.hackathon_ids)
+              ? existingData.hackathon_ids.filter(
+                  (value): value is string => typeof value === "string"
+                )
+              : [];
+            const redeemResult = await redeemJudgeInvite(db, pendingJudgeInviteExisting, {
+              userId: user.uid,
+              email: user.email ?? "",
+              existingHackathonIds: existingIds,
+            });
+            clearPendingInvite("judge");
+            navigate(getJudgeDashboardPathAfterInvite(redeemResult.primaryHackathonId), {
+              replace: true,
+            });
+            return;
+          } catch (inviteError) {
+            setAuthError(
+              inviteError instanceof Error
+                ? inviteError.message
+                : "Signed in, but the judge invite could not be applied."
+            );
+          }
+        }
+
+        const resolvedExistingApproval =
+          isStaffRole(existingRole) && existingJudgeApprovalStatus !== "approved"
+            ? "pending"
+            : existingJudgeApprovalStatus;
+
+        navigate(
+          pathForSession({
+            role: existingRole,
+            judgeApprovalStatus: resolvedExistingApproval,
+            onboardingCompletedAt:
+              typeof existingData.onboardingCompletedAt === "string"
+                ? existingData.onboardingCompletedAt
+                : null,
+            profile: {
+              fullName: typeof existingData.fullName === "string" ? existingData.fullName : null,
+              profileUpdatedAt:
+                typeof existingData.profileUpdatedAt === "string"
+                  ? existingData.profileUpdatedAt
+                  : null,
+            },
+          }),
+          { replace: true }
+        );
+        return;
+      }
+
       // Event enrollment for participants happens in onboarding / dashboard — not here.
       const pendingJudgeInvite =
         readPendingInvite("judge") ||
@@ -435,17 +503,20 @@ export default function SignIn() {
       const targetRole = hasAdminGrant ? "admin" : (existingRole ?? authRole);
       const isNewParticipantSignup =
         mode === "signup" && targetRole === "participant" && !existingRole;
-      const isNewJudgeSignup = mode === "signup" && targetRole === "judge" && !existingRole;
+      const isNewJudgeSignup =
+        mode === "signup" && isStaffRole(targetRole) && !existingRole;
       const isNewHostSignup = mode === "signup" && targetRole === "host" && !existingRole;
       const creatingApprovedJudgeViaInvite =
         Boolean(pendingJudgeInvite) &&
         (isNewJudgeSignup ||
-          (targetRole === "judge" &&
-            (!existingRole || existingJudgeApprovalStatus === "pending")));
+          (isStaffRole(targetRole) &&
+            (!existingRole || existingJudgeApprovalStatus !== "approved")));
       const targetJudgeApprovalStatus = isStaffRole(targetRole)
         ? creatingApprovedJudgeViaInvite
           ? "approved"
-          : existingJudgeApprovalStatus ?? (existingRole ? "approved" : "pending")
+          : existingJudgeApprovalStatus === "approved"
+            ? "approved"
+            : "pending"
         : undefined;
 
       await setDoc(
@@ -453,7 +524,7 @@ export default function SignIn() {
         {
           email: user.email,
           role: targetRole,
-          ...(isNewJudgeSignup || (isStaffRole(targetRole) && !existingRole) || creatingApprovedJudgeViaInvite
+          ...(isStaffRole(targetRole)
             ? { judgeApprovalStatus: targetJudgeApprovalStatus ?? "pending" }
             : {}),
           ...(creatingApprovedJudgeViaInvite && pendingJudgeInvite

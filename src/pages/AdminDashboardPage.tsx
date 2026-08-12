@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { addDoc, collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore";
+import { Navigate, useLocation } from "react-router-dom";
+import { addDoc, collection, deleteDoc, deleteField, doc, getDocs, setDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import {
@@ -11,6 +11,7 @@ import {
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import {
   AdminDashboard,
+  type AdminWorkspace,
   type NewSubmissionInput,
   type AdminSubmissionRow,
   type AdminUser,
@@ -123,6 +124,14 @@ const mapUserProfile = (data: Record<string, unknown>): UserProfile => ({
 });
 
 export default function AdminDashboardPage() {
+  const location = useLocation();
+  const workspace: AdminWorkspace = location.pathname.includes("/create")
+    ? "create"
+    : location.pathname.includes("/people")
+      ? "people"
+      : location.pathname.includes("/judging")
+        ? "judging"
+        : "overview";
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
   const {
@@ -191,7 +200,7 @@ export default function AdminDashboardPage() {
             const role = normalizePortalRole(data.role);
             if (!role || !data.email || typeof data.email !== "string") return null;
             const judgeApprovalStatus = isStaffRole(role)
-                ? normalizeJudgeApprovalStatus(data.judgeApprovalStatus) ?? "approved"
+                ? normalizeJudgeApprovalStatus(data.judgeApprovalStatus) ?? "pending"
                 : undefined;
             const hostApprovalStatus = role === "host"
               ? normalizeHostApprovalStatus(data.hostApprovalStatus) ?? "pending"
@@ -507,7 +516,7 @@ export default function AdminDashboardPage() {
     try {
       const userRef = doc(db, "users", user.id);
       const nextJudgeApprovalStatus = isStaffRole(nextRole)
-          ? isStaffRole(user.role) && user.judgeApprovalStatus === "pending"
+          ? isStaffRole(user.role) && user.judgeApprovalStatus !== "approved"
             ? "pending"
             : "approved"
           : null;
@@ -565,7 +574,7 @@ export default function AdminDashboardPage() {
   };
 
   const handleApproveJudge = async (user: AdminUser) => {
-    if (!isStaffRole(user.role) || user.judgeApprovalStatus !== "pending") return;
+    if (!isStaffRole(user.role) || user.judgeApprovalStatus === "approved") return;
     setMessage(null);
     setSavingUserId(user.id);
     try {
@@ -603,6 +612,48 @@ export default function AdminDashboardPage() {
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
           : "Failed to approve judge access.";
+      setMessage(text);
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleRejectJudge = async (user: AdminUser) => {
+    if (!isStaffRole(user.role) || user.judgeApprovalStatus === "approved") return;
+    setMessage(null);
+    setSavingUserId(user.id);
+    try {
+      const userRef = doc(db, "users", user.id);
+      await setDoc(
+        userRef,
+        {
+          role: "participant",
+          judgeApprovalStatus: deleteField(),
+        },
+        { merge: true }
+      );
+      setUsers((current) =>
+        current.map((currentUser) =>
+          currentUser.id === user.id
+            ? {
+                ...currentUser,
+                role: "participant",
+                judgeApprovalStatus: undefined,
+              }
+            : currentUser
+        )
+      );
+      setPendingRoles((current) => {
+        const copy = { ...current };
+        delete copy[user.id];
+        return copy;
+      });
+      setMessage(`Rejected ${user.role} request for ${user.email}. Account converted to participant.`);
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to reject judge access.";
       setMessage(text);
     } finally {
       setSavingUserId(null);
@@ -1256,6 +1307,7 @@ export default function AdminDashboardPage() {
       onHackathonChange={setSelectedHackathonId}
     >
       <AdminDashboard
+        workspace={workspace}
         selectedHackathon={selectedHackathon}
         hackathons={adminHackathons}
         judgingCriteria={judgingCriteria}
@@ -1275,6 +1327,7 @@ export default function AdminDashboardPage() {
         onRoleChange={handleRoleChange}
         onSaveRole={handleSaveRole}
         onApproveJudge={handleApproveJudge}
+        onRejectJudge={handleRejectJudge}
         onApproveHost={handleApproveHost}
         onUpdateHackathonAccess={handleUpdateHackathonAccess}
         adminGrantEmail={adminGrantEmail}

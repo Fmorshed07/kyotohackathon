@@ -48,46 +48,70 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
     apply: () =>
       base({
         name: "AI Ideathon 2026",
-        tagline: "Build AI solutions that solve real-world problems",
+        tagline: "Build AI Solutions That Solve Real World Problems",
         description:
-          "Have an idea that could solve a real problem?\n\nJoin a three-day online ideathon for students, developers, designers, founders, entrepreneurs, and AI enthusiasts.\n\nLearn from experts, join workshops, receive mentorship, and present your idea or prototype to judges.",
+          "Have an idea that could solve a real problem?\n\nJoin AI Ideathon 2026, a three-day online AI hackathon where students, developers, designers, founders, entrepreneurs, and AI enthusiasts come together to turn ideas into working AI powered solutions.\n\nAcross three days, participants will learn from industry experts, join practical workshops, receive mentorship, build rapidly, and present their solutions to industry judges.\n\nWhether you are exploring AI for the first time or already building products, this hackathon gives you the structure, guidance, tools, and exposure to move from an idea to a real prototype.\n\nFor international participants, register at https://www.cognisorai.com/events/hackathon",
         theme: "AI for Real World Impact",
         format: "Online · 3 days",
         eligibility: "Open to participants worldwide",
-        teamSize: "Solo or teams of 1–4",
-        prize: "Mentorship, exposure, and community recognition",
-        registrationUrl: "",
-        highlightNote: "Limited late-registration slots may open after the main window closes.",
+        teamSize: "Solo or teams of 1–4 members",
+        prize:
+          "More than USD 10,000 in prizes and credits — Champion: USD 5,000 ai& credits + ¥12,000; First Runner Up: USD 3,000 ai& credits + ¥8,000; Second Runner Up: USD 2,000 ai& credits + ¥5,000; plus Open Design awards up to USD 1,200",
+        registrationUrl: "https://luma.com/e56k7x3v",
+        highlightNote:
+          "Regular registration has officially closed. Limited slots are now available through late registration.",
         focusAreas:
-          "Education, Healthcare, Finance, Agriculture, Accessibility, Sustainability, Tourism, Smart Cities, Social Impact, Climate Tech",
+          "Education, Healthcare, Finance, Agriculture, Accessibility, Sustainability, Tourism, Smart Cities, Social Impact, Climate Technology",
         schedule: [
           {
-            time: "Day 1 · Webinar",
-            title: "Building with AI in 2026",
-            description: "Trends, startup stories, and how to launch products that create real impact.",
+            time: "Aug 13 · Webinar",
+            title: "Building with AI in 2026: Inside Japan’s AI Startup Ecosystem",
+            description:
+              "Explore Japan’s AI landscape, startup stories, and practical advice for launching AI products.",
           },
           {
-            time: "Day 1 · Workshop",
-            title: "What to Solve: From Idea to AI Product",
-            description: "Identify real problems, validate ideas, and define target users before you build.",
+            time: "Aug 13 · Workshop",
+            title: "From Problem to Product: Building AI Solutions People Actually Need",
+            description:
+              "Identify meaningful problems, validate ideas, define users, and leave with an MVP roadmap.",
           },
           {
-            time: "Day 2 · Sessions",
-            title: "Founder stories & build time",
-            description: "Lessons from early AI products plus guided team build blocks.",
+            time: "Aug 13 · Fireside Chat",
+            title: "Why Strong Startups Stall in Japan and What Actually Earns Trust Here",
+            description:
+              "What founders need to understand about trust, relationships, and business culture in Japan.",
           },
           {
-            time: "Day 3 · Demo",
-            title: "Pitch & feedback",
-            description: "Present your idea or prototype and get structured judge feedback.",
+            time: "Aug 13 · Webinar",
+            title: "Bangladesh Startup Ecosystem: Is it Now the Right Time to Fundraise?",
+            description:
+              "Fundraising readiness, investor expectations, and how founders can position for growth.",
+          },
+          {
+            time: "Aug 14 · Workshop",
+            title: "Vibe Design: Turning Ideas into Products with Open Design",
+            description:
+              "Rapidly design and prototype AI products with Open Design for demos and presentations.",
+          },
+          {
+            time: "Aug 14 · Workshop",
+            title: "Beyond the Demo: Turning Hackathon Projects into Real AI Products",
+            description:
+              "Move past the demo — validate needs, strengthen product direction, and plan what comes next.",
+          },
+          {
+            time: "Aug 15 · Webinar",
+            title: "From Pitch to Funding: How Founders Win Investors",
+            description:
+              "Structure a compelling pitch, demonstrate value, and answer judges’ questions with confidence.",
           },
         ],
-        organizerName: "",
+        organizerName: "Cognisor AI Lab",
         accentColor: "#00A3FF",
         fontPreset: "signal",
         layoutStyle: "stage",
-        startAt: "",
-        endAt: "",
+        startAt: "2026-08-13T00:00",
+        endAt: "2026-08-15T23:59",
         location: "Online",
         capacity: "200",
       }),

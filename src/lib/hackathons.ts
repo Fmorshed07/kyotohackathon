@@ -218,6 +218,16 @@ export const getParticipantEventWorkspacePath = (hackathonId: HackathonId) =>
 export const getAdminEventWorkspacePath = (hackathonId: HackathonId) =>
   `/dashboard/admin?hackathon=${encodeURIComponent(hackathonId)}`;
 
+/** Append `?hackathon=` so admin sub-pages stay on the same event workspace. */
+export const withHackathonQuery = (path: string, hackathonId?: HackathonId | null) => {
+  if (!hackathonId || !isHackathonId(hackathonId)) return path;
+  const hashIndex = path.indexOf("#");
+  const pathname = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+  const hash = hashIndex >= 0 ? path.slice(hashIndex) : "";
+  const join = pathname.includes("?") ? "&" : "?";
+  return `${pathname}${join}hackathon=${encodeURIComponent(hackathonId)}${hash}`;
+};
+
 export const getJudgeEventWorkspacePath = (hackathonId: HackathonId) =>
   `/dashboard/judge?hackathon=${encodeURIComponent(hackathonId)}`;
 
