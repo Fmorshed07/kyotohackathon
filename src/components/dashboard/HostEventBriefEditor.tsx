@@ -619,13 +619,17 @@ export function HostEventBriefEditor({
           className="overflow-hidden rounded-2xl border border-primary/25 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.18),transparent_42%),linear-gradient(180deg,hsl(var(--card))_0%,hsl(210_20%_3%)_100%)] shadow-[0_24px_80px_-40px_hsl(var(--primary)/0.45)]"
           style={themeStyle}
         >
-          <div className="relative min-h-[140px] overflow-hidden border-b border-white/10">
+          <div className="relative overflow-hidden border-b border-white/10 bg-black">
             {heroImage ? (
-              <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img
+                src={heroImage}
+                alt=""
+                className="mx-auto block h-auto max-h-48 w-full object-contain object-center"
+              />
             ) : (
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.25),transparent_50%)]" />
+              <div className="min-h-[140px] bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.25),transparent_50%)]" />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--card))] via-[hsl(var(--card)/0.55)] to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[hsl(var(--card))] to-transparent" />
             <div className="relative px-5 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">Live public preview</p>
               <p className="mt-1 text-sm text-muted-foreground">

@@ -186,17 +186,24 @@ function EventHeroActions({
   onCopy,
   copied,
   tone,
+  className,
 }: {
   event: HostedHackathon;
   onCopy: () => void;
   copied: boolean;
   tone: "stage" | "card";
+  className?: string;
 }) {
   const isStage = tone === "stage";
   const btn = "w-full gap-2 sm:w-auto";
 
   return (
-    <div className="mt-6 flex flex-col gap-2.5 sm:mt-8 sm:flex-row sm:flex-wrap sm:gap-3">
+    <div
+      className={cn(
+        "mt-6 flex flex-col gap-2.5 sm:mt-8 sm:flex-row sm:flex-wrap sm:gap-3",
+        className,
+      )}
+    >
       {event.lumaUrl ? (
         <Button asChild size="lg" className={btn}>
           <a href={event.lumaUrl} target="_blank" rel="noreferrer">
@@ -235,7 +242,7 @@ function EventHeroActions({
       <Button
         type="button"
         size="lg"
-        variant={isStage ? "ghost" : "ghost"}
+        variant="ghost"
         className={cn(
           btn,
           isStage ? "text-white hover:bg-white/10 hover:text-white" : "",
@@ -262,34 +269,131 @@ function EventHero({
 }) {
   const heroImage = event.bannerImageUrl || event.coverImageUrl;
   const isHosted = Boolean(event.hostEventId);
+  const displayStyle = { fontFamily: "var(--event-display)" };
 
   if (layout === "stage") {
     return (
       <section className="relative isolate overflow-hidden border-b border-white/10">
-        {/* Poster band: clean on mobile so HTML never fights artwork text */}
-        <div className="relative h-[min(52vh,380px)] w-full overflow-hidden bg-black sm:h-[min(56vh,460px)] md:absolute md:inset-0 md:h-full md:min-h-[min(72vh,720px)]">
-          {heroImage ? (
-            <img
-              src={heroImage}
-              alt=""
-              className="absolute inset-0 h-full w-full object-contain object-center md:object-cover"
-            />
-          ) : (
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.28),transparent_55%),linear-gradient(180deg,#05070b_0%,#000_100%)]" />
-          )}
-          {/* Soft fade into content on small screens only */}
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent md:hidden" />
-          {/* Desktop cinematic scrim — strong enough for readable overlay copy */}
-          <div className="absolute inset-0 hidden bg-gradient-to-t from-background via-background/80 to-background/25 md:block" />
-          <div className="absolute inset-0 hidden bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.18),transparent_42%)] md:block" />
-        </div>
+        {/* Ambient stage field — keeps letterboxing intentional, not empty */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,hsl(var(--primary)/0.16),transparent_52%),linear-gradient(180deg,#030507_0%,#05070b_48%,hsl(var(--background))_100%)]"
+        />
+        <div
+          aria-hidden
+          className="event-hero-grid pointer-events-none absolute inset-0 opacity-[0.35]"
+        />
 
-        <div className="relative mx-auto flex w-full max-w-6xl flex-col justify-end px-4 pb-8 pt-5 sm:px-6 sm:pb-10 md:min-h-[min(72vh,720px)] md:pb-14 md:pt-28 lg:px-8">
-          <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700 md:rounded-2xl md:border md:border-white/10 md:bg-black/55 md:p-8 md:shadow-2xl md:backdrop-blur-xl lg:p-10">
-            <EventHeroMeta event={event} isHosted={isHosted} tone="stage" />
-            <EventHeroActions event={event} onCopy={onCopy} copied={copied} tone="stage" />
+        <div className="relative mx-auto w-full max-w-[1400px] px-3 pt-3 sm:px-5 sm:pt-4 lg:px-6 lg:pt-5">
+          {/* Poster showcase — artwork stays fully readable, no overlay card */}
+          <div className="event-hero-poster group relative overflow-hidden rounded-2xl border border-white/12 bg-[#05070b] shadow-[0_40px_120px_-48px_hsl(var(--primary)/0.55),0_24px_80px_-40px_rgba(0,0,0,0.85)] sm:rounded-[1.35rem]">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit] shadow-[inset_0_0_0_1px_hsla(0,0%,100%,0.06),inset_0_1px_0_hsla(0,0%,100%,0.08)]"
+            />
+            {/* Corner brackets */}
+            <span aria-hidden className="event-hero-corner event-hero-corner-tl" />
+            <span aria-hidden className="event-hero-corner event-hero-corner-tr" />
+            <span aria-hidden className="event-hero-corner event-hero-corner-bl" />
+            <span aria-hidden className="event-hero-corner event-hero-corner-br" />
+            <span
+              aria-hidden
+              className="event-hero-scan pointer-events-none absolute inset-x-0 top-0 z-[2] h-px opacity-70"
+            />
+
+            {heroImage ? (
+              <div className="relative z-0 w-full min-w-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.08),transparent_65%)]">
+                <img
+                  src={heroImage}
+                  alt={`${event.name} banner`}
+                  className="block h-auto w-full"
+                />
+              </div>
+            ) : (
+              <div className="relative flex min-h-[min(48vh,420px)] items-end bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.28),transparent_55%),linear-gradient(180deg,#05070b_0%,#000_100%)] px-6 py-10 sm:px-10 sm:py-14">
+                <div className="max-w-3xl">
+                  <EventHeroMeta event={event} isHosted={isHosted} tone="stage" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Launch dock — fully below the poster so banner art stays unobstructed */}
+          <div className="event-hero-dock relative z-10 mx-auto mt-4 max-w-5xl sm:mt-5">
+            <div className="overflow-hidden rounded-2xl border border-primary/25 bg-[linear-gradient(135deg,hsl(var(--card)/0.96)_0%,hsl(210_24%_6%/0.94)_100%)] shadow-[0_28px_80px_-36px_hsl(var(--primary)/0.45),var(--surface-elevated)] backdrop-blur-xl">
+              <div className="h-px w-full bg-[linear-gradient(90deg,transparent,hsl(var(--primary)/0.75),transparent)]" />
+              <div className="grid gap-5 p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1.15fr)_auto] lg:items-end lg:gap-8 lg:p-7">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {event.logoUrl ? (
+                      <img
+                        src={event.logoUrl}
+                        alt=""
+                        className="h-9 w-9 rounded-md border border-white/15 object-cover shadow-md sm:h-10 sm:w-10"
+                      />
+                    ) : null}
+                    <Badge className="uppercase tracking-[0.16em]">
+                      {event.status === "active" ? "Live now" : event.status}
+                    </Badge>
+                    <Badge variant="outline" className="border-primary/35 text-primary">
+                      {event.format}
+                    </Badge>
+                    {isHosted ? (
+                      <Badge variant="outline" className="border-white/15 text-muted-foreground">
+                        Hosted event
+                      </Badge>
+                    ) : null}
+                  </div>
+
+                  {event.theme ? (
+                    <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-primary sm:mt-4">
+                      {event.theme}
+                    </p>
+                  ) : null}
+
+                  <h1
+                    className="mt-2 text-balance text-2xl font-semibold leading-[1.08] text-foreground sm:text-3xl lg:text-4xl"
+                    style={displayStyle}
+                  >
+                    {event.name}
+                  </h1>
+
+                  {event.tagline ? (
+                    <p
+                      className="mt-2 max-w-xl text-sm font-medium leading-snug text-foreground/85 sm:text-base"
+                      style={displayStyle}
+                    >
+                      {event.tagline}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-4 flex flex-col gap-2 text-sm text-foreground sm:flex-row sm:flex-wrap sm:gap-2.5">
+                    <span className="inline-flex min-w-0 items-start gap-2 rounded-lg border border-white/10 bg-black/25 px-3 py-2 sm:items-center">
+                      <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-primary sm:mt-0" />
+                      <span className="min-w-0 break-words leading-snug">{event.eventDate}</span>
+                    </span>
+                    <span className="inline-flex min-w-0 items-start gap-2 rounded-lg border border-white/10 bg-black/25 px-3 py-2 sm:items-center">
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary sm:mt-0" />
+                      <span className="min-w-0 break-words leading-snug">{event.location}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex w-full flex-col sm:w-auto sm:min-w-[220px] lg:items-stretch">
+                  <EventHeroActions
+                    event={event}
+                    onCopy={onCopy}
+                    copied={copied}
+                    tone="card"
+                    className="mt-0 w-full sm:mt-0 lg:flex-col lg:items-stretch [&_a]:w-full [&_button]:w-full"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        <div className="h-6 sm:h-8" />
       </section>
     );
   }
@@ -302,13 +406,13 @@ function EventHero({
       )}
     >
       {heroImage ? (
-        <div className="relative aspect-[16/10] w-full overflow-hidden border-b border-white/10 sm:aspect-[21/9]">
+        <div className="relative w-full overflow-hidden border-b border-white/10 bg-black">
           <img
             src={heroImage}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            alt={`${event.name} banner`}
+            className="mx-auto block h-auto max-h-[min(52vh,560px)] w-full object-contain object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-card to-transparent" />
         </div>
       ) : null}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.18),transparent_40%)]" />

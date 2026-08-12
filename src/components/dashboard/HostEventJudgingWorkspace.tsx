@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, getDocs } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore";
 import {
   AdminJudgingSection,
 } from "@/components/dashboard/AdminJudgingSection";
-import type {
-  AdminSubmissionRow,
-  AdminUser,
-  NewSubmissionInput,
+import {
+  JudgeApprovalPanel,
+  type AdminSubmissionRow,
+  type AdminUser,
+  type NewSubmissionInput,
 } from "@/components/dashboard/AdminDashboard";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
@@ -32,6 +33,7 @@ import type {
   JudgeApprovalStatus,
   PortalRole,
   Submission,
+  UserProfile,
 } from "@/types/portal";
 
 const emptyNewSubmission = (): NewSubmissionInput => ({
@@ -41,6 +43,31 @@ const emptyNewSubmission = (): NewSubmissionInput => ({
   projectUrl: "",
   submissionPdfUrl: "",
   demoVideoUrl: "",
+});
+
+const getStringField = (value: unknown) => (typeof value === "string" ? value : "");
+
+const mapUserProfile = (data: Record<string, unknown>): UserProfile => ({
+  fullName: getStringField(data.fullName),
+  avatarUrl: getStringField(data.avatarUrl),
+  headline: getStringField(data.headline),
+  bio: getStringField(data.bio),
+  publicRole: getStringField(data.publicRole),
+  experienceLevel: getStringField(data.experienceLevel),
+  organization: getStringField(data.organization),
+  location: getStringField(data.location),
+  timezone: getStringField(data.timezone),
+  languages: getStringField(data.languages),
+  lookingFor: getStringField(data.lookingFor),
+  githubUsername: getStringField(data.githubUsername),
+  githubProfileUrl: getStringField(data.githubProfileUrl),
+  linkedinUrl: getStringField(data.linkedinUrl),
+  portfolioUrl: getStringField(data.portfolioUrl),
+  xUrl: getStringField(data.xUrl),
+  discordHandle: getStringField(data.discordHandle),
+  skills: getStringField(data.skills),
+  interests: getStringField(data.interests),
+  profileUpdatedAt: getStringField(data.profileUpdatedAt),
 });
 
 const normalizePortalRole = (value: unknown): PortalRole | undefined => {
@@ -102,6 +129,7 @@ export function HostEventJudgingWorkspace({
     ReturnType<typeof fetchJudgeRankingsForHackathon>
   >>([]);
   const [isLoadingTop3Rankings, setIsLoadingTop3Rankings] = useState(false);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,6 +177,7 @@ export function HostEventJudgingWorkspace({
               hostApprovalStatus,
               hackathonId: hackathonIds[0] ?? getUserHackathonId({ hackathon_id: data.hackathon_id }),
               hackathonIds,
+              profile: mapUserProfile(data),
             };
           })
           .filter((user): user is AdminUser => user !== null);
@@ -309,6 +338,52 @@ export function HostEventJudgingWorkspace({
   );
 
   const staffJudges = hackathonUsers.filter((user) => isStaffRole(user.role));
+  const judgeAccounts = useMemo(
+    () => users.filter((user) => isStaffRole(user.role)),
+    [users],
+  );
+
+  const handleApproveJudge = async (user: AdminUser) => {
+    if (!isStaffRole(user.role) || user.judgeApprovalStatus !== "pending") return;
+    setSavingUserId(user.id);
+    try {
+      const existingIds = user.hackathonIds ?? (user.hackathonId ? [user.hackathonId] : []);
+      // Put this event first so Firestore rules can verify host ownership via hackathon_id.
+      const nextHackathonIds = Array.from(new Set([hackathonId, ...existingIds]));
+      await setDoc(
+        doc(db, "users", user.id),
+        {
+          judgeApprovalStatus: "approved",
+          hackathon_id: hackathonId,
+          hackathon_ids: nextHackathonIds,
+        },
+        { merge: true },
+      );
+      setUsers((current) =>
+        current.map((currentUser) =>
+          currentUser.id === user.id
+            ? {
+                ...currentUser,
+                judgeApprovalStatus: "approved",
+                hackathonId,
+                hackathonIds: nextHackathonIds,
+              }
+            : currentUser,
+        ),
+      );
+      onMessage?.(
+        `Approved ${user.role} access for ${user.email} on ${hackathon.shortName}.`,
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to approve judge access.";
+      onMessage?.(text);
+    } finally {
+      setSavingUserId(null);
+    }
+  };
 
   const top3SubmissionLookup = useMemo(() => {
     const lookup = new Map<
@@ -432,27 +507,35 @@ export function HostEventJudgingWorkspace({
   };
 
   return (
-    <AdminJudgingSection
-      selectedHackathon={hackathon}
-      judgingCriteria={judgingCriteria}
-      isLoadingCriteria={isLoadingCriteria}
-      isSavingCriteria={isSavingCriteria}
-      onSaveCriteria={handleSaveCriteria}
-      participants={participants}
-      submissions={adminSubmissionRows}
-      isLoadingSubmissions={isLoadingSubmissions}
-      isLoadingUsers={isLoadingUsers}
-      analytics={analytics}
-      isCreatingSubmission={isCreatingSubmission}
-      deletingSubmissionId={deletingSubmissionId}
-      newSubmission={newSubmission}
-      onNewSubmissionChange={setNewSubmission}
-      onCreateSubmission={handleCreateSubmission}
-      onDeleteSubmission={handleDeleteSubmission}
-      top3RankingSummary={top3RankingSummary}
-      isLoadingTop3Rankings={isLoadingTop3Rankings}
-      top3SubmissionLookup={top3SubmissionLookup}
-    />
+    <>
+      <JudgeApprovalPanel
+        judges={judgeAccounts}
+        selectedHackathon={hackathon}
+        savingUserId={savingUserId}
+        onApproveJudge={handleApproveJudge}
+      />
+      <AdminJudgingSection
+        selectedHackathon={hackathon}
+        judgingCriteria={judgingCriteria}
+        isLoadingCriteria={isLoadingCriteria}
+        isSavingCriteria={isSavingCriteria}
+        onSaveCriteria={handleSaveCriteria}
+        participants={participants}
+        submissions={adminSubmissionRows}
+        isLoadingSubmissions={isLoadingSubmissions}
+        isLoadingUsers={isLoadingUsers}
+        analytics={analytics}
+        isCreatingSubmission={isCreatingSubmission}
+        deletingSubmissionId={deletingSubmissionId}
+        newSubmission={newSubmission}
+        onNewSubmissionChange={setNewSubmission}
+        onCreateSubmission={handleCreateSubmission}
+        onDeleteSubmission={handleDeleteSubmission}
+        top3RankingSummary={top3RankingSummary}
+        isLoadingTop3Rankings={isLoadingTop3Rankings}
+        top3SubmissionLookup={top3SubmissionLookup}
+      />
+    </>
   );
 }
 
@@ -462,8 +545,8 @@ export function HostJudgingUnavailableNotice() {
       <p className="dash-eyebrow">Judging & submissions</p>
       <h2 className="dash-title mt-2">Publish this event to unlock scoring</h2>
       <p className="dash-subtitle mt-2 max-w-2xl">
-        Criteria, submissions, judge mark check, and top-3 boards appear here after this event has a
-        public listing. Save the brief, then publish from Event details.
+        Judge approvals, criteria, submissions, mark check, and top-3 boards appear here after this
+        event has a public listing. Save the brief, then publish from Event details.
       </p>
     </section>
   );

@@ -151,6 +151,7 @@ export default function SignIn() {
   const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authErrorAction, setAuthErrorAction] = useState<"signup" | "signin" | null>(null);
 
   const hasJudgeInvite =
     Boolean(searchInvite?.trim()) || Boolean(readPendingInvite("judge"));
@@ -269,6 +270,7 @@ export default function SignIn() {
   const handleGoogleAuth = async () => {
     setIsAuthLoading(true);
     setAuthError(null);
+    setAuthErrorAction(null);
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
@@ -292,7 +294,11 @@ export default function SignIn() {
 
       if (mode === "signin" && !existingRole && !hasAdminGrant) {
         await firebaseSignOut(auth);
-        setAuthError("No account found for this Google account. Please sign up first.");
+        setMode("signup");
+        setAuthError(
+          "No Cognisor account found for this Google login. Create one with Sign Up — then you can log in next time."
+        );
+        setAuthErrorAction("signup");
         return;
       }
 
@@ -414,6 +420,7 @@ export default function SignIn() {
         setAuthError(
           `This Google account is already registered as a ${existingRole}. Use Log In instead.`
         );
+        setAuthErrorAction("signin");
         return;
       }
 
@@ -662,6 +669,7 @@ export default function SignIn() {
                 onValueChange={(value) => {
                   setAuthRole(value as AuthRole);
                   setAuthError(null);
+                  setAuthErrorAction(null);
                 }}
                 className="w-full sm:w-auto"
               >
@@ -680,7 +688,11 @@ export default function SignIn() {
                     className={`rounded-full px-3 py-1 transition ${
                       mode === "signup" ? "bg-primary text-primary-foreground" : "text-foreground/70"
                     }`}
-                    onClick={() => setMode("signup")}
+                    onClick={() => {
+                      setMode("signup");
+                      setAuthError(null);
+                      setAuthErrorAction(null);
+                    }}
                   >
                     Sign Up
                   </button>
@@ -689,7 +701,11 @@ export default function SignIn() {
                     className={`rounded-full px-3 py-1 transition ${
                       mode === "signin" ? "bg-primary text-primary-foreground" : "text-foreground/70"
                     }`}
-                    onClick={() => setMode("signin")}
+                    onClick={() => {
+                      setMode("signin");
+                      setAuthError(null);
+                      setAuthErrorAction(null);
+                    }}
                   >
                     Log In
                   </button>
@@ -703,7 +719,7 @@ export default function SignIn() {
                           ? "This invite approves you automatically and opens the assigned event’s judge dashboard."
                           : "Judge accounts need admin approval before scoring."
                         : "Host accounts need admin approval before running events."
-                    : `Log in to your ${authRole} account.`}
+                    : `Log in to your ${authRole} account. New here? Use Sign Up first.`}
                 </p>
               </div>
 
@@ -732,7 +748,43 @@ export default function SignIn() {
                     : `Log in as ${authRole}`}
               </Button>
 
-              {authError && <p className="text-xs text-destructive">{authError}</p>}
+              {authError ? (
+                <div
+                  className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-xs text-destructive"
+                  role="alert"
+                >
+                  <p>{authError}</p>
+                  {authErrorAction === "signup" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 tracking-[0.16em] uppercase"
+                      onClick={() => {
+                        setAuthError(null);
+                        setAuthErrorAction(null);
+                        void handleGoogleAuth();
+                      }}
+                      disabled={isAuthLoading}
+                    >
+                      Continue with Sign Up
+                    </Button>
+                  ) : null}
+                  {authErrorAction === "signin" ? (
+                    <button
+                      type="button"
+                      className="mt-2 font-medium underline underline-offset-2 hover:text-foreground"
+                      onClick={() => {
+                        setMode("signin");
+                        setAuthError(null);
+                        setAuthErrorAction(null);
+                      }}
+                    >
+                      Switch to Log In
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
 
               <p className="border-t border-border/40 pt-4 text-[0.7rem] text-muted-foreground">
                 Participant accounts are active immediately — choose your event during onboarding.

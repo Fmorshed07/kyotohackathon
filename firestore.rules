@@ -165,6 +165,32 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.createdBy == request.auth.uid;
     }
 
+    // Approved hosts may approve pending judges/mentors for events they own.
+    function canHostApproveJudge() {
+      return isApprovedHost()
+        && (resource.data.role == "judge" || resource.data.role == "mentor")
+        && resource.data.judgeApprovalStatus == "pending"
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.judgeApprovalStatus == "approved"
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["judgeApprovalStatus", "hackathon_id", "hackathon_ids"])
+        && request.resource.data.hackathon_id is string
+        && ownsHackathon(request.resource.data.hackathon_id)
+        && request.resource.data.hackathon_ids is list
+        && request.resource.data.hackathon_ids.hasAll([request.resource.data.hackathon_id])
+        && (
+          !("hackathon_ids" in resource.data)
+          || !(resource.data.hackathon_ids is list)
+          || request.resource.data.hackathon_ids.hasAll(resource.data.hackathon_ids)
+        )
+        && (
+          !("hackathon_id" in resource.data)
+          || resource.data.hackathon_id == null
+          || resource.data.hackathon_id == ""
+          || request.resource.data.hackathon_ids.hasAll([resource.data.hackathon_id])
+        );
+    }
+
     match /users/{userId} {
       allow create: if (isPortalAdminAccount() && request.auth.uid == userId)
         || (hasPendingAdminGrant() && request.auth.uid == userId)
@@ -175,7 +201,8 @@ service cloud.firestore {
         || (hasPendingAdminGrant() && request.auth.uid == userId)
         || canUpdateOwnProfile(userId)
         || canClaimParticipantRole(userId)
-        || canRedeemJudgeInvite(userId);
+        || canRedeemJudgeInvite(userId)
+        || canHostApproveJudge();
       allow delete: if isAdmin();
     }
 

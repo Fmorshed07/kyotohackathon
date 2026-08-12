@@ -461,6 +461,8 @@ export default function AdminDashboardPage() {
 
   const staffJudges = hackathonUsers.filter((user) => isStaffRole(user.role));
   const hostAccounts = users.filter((user) => user.role === "host");
+  // Full staff list (not hackathon-scoped) so pending self-signup judges still appear in the approval queue.
+  const judgeAccounts = users.filter((user) => isStaffRole(user.role));
 
   const top3SubmissionLookup = useMemo(() => {
     const lookup = new Map<
@@ -1262,6 +1264,7 @@ export default function AdminDashboardPage() {
         onSaveCriteria={handleSaveCriteria}
         users={hackathonUsers}
         hostAccounts={hostAccounts}
+        judgeAccounts={judgeAccounts}
         isLoadingUsers={isLoadingUsers}
         submissions={adminSubmissionRows}
         isLoadingSubmissions={isLoadingSubmissions}

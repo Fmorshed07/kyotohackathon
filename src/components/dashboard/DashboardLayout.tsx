@@ -22,6 +22,7 @@ import {
   Radar,
   CalendarCheck2,
   BookOpen,
+  Briefcase,
   Wand2,
   PenLine,
   UserCog,
@@ -30,6 +31,7 @@ import {
   ChartColumn,
   Server,
   Mail,
+  ShieldCheck,
   ChevronDown,
   ClipboardCheck,
   ListChecks,
@@ -179,6 +181,7 @@ const ADMIN_PEOPLE: NavItem[] = [
   { href: `${ADMIN_HOME}#manage-participants`, label: "Participants", icon: Users },
   { href: `${ADMIN_HOME}#manage-judges`, label: "Judges", icon: Scale },
   { href: `${ADMIN_HOME}#manage-hosts`, label: "Host approvals", icon: UserCog },
+  { href: `${ADMIN_HOME}#manage-judge-approvals`, label: "Judge approvals", icon: ShieldCheck },
   { href: `${ADMIN_HOME}#judge-invites`, label: "Judge invites", icon: Mail },
   { href: `${ADMIN_HOME}#host-analytics`, label: "Host analytics", icon: ChartColumn },
 ];
@@ -245,6 +248,7 @@ function MobileMenuTrigger() {
 }
 
 const DISCORD_URL = "https://discord.gg/cQEFjQDFm";
+const PEER_PORTAL_URL = "https://peerportal.app";
 
 function DashboardNavLink({
   href,
@@ -705,6 +709,11 @@ function DashboardLayoutContent({
               <NavMenuItems
                 items={[
                   { href: "/dashboard/host#judges", label: "Judges", icon: Scale },
+                  {
+                    href: "/dashboard/host#manage-judge-approvals",
+                    label: "Judge approvals",
+                    icon: ShieldCheck,
+                  },
                   { href: "/dashboard/host#judging", label: "Judging", icon: Gavel },
                   { href: "/dashboard/host#judge-marks", label: "Mark check", icon: ClipboardCheck },
                   { href: "/dashboard/host#submission-marks", label: "Submissions", icon: ClipboardList },
@@ -830,6 +839,19 @@ function DashboardLayoutContent({
                 >
                   <Sparkles className={navIconClass} />
                   <span>Event site</span>
+                </DashboardNavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild className={menuButtonClass}>
+                <DashboardNavLink
+                  href={PEER_PORTAL_URL}
+                  onNavigate={closeMobileNav}
+                  external
+                >
+                  <Briefcase className={navIconClass} />
+                  <span>Get hired here</span>
+                  <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 </DashboardNavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>

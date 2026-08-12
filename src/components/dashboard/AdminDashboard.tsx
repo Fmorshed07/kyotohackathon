@@ -99,6 +99,8 @@ type AdminDashboardProps = {
   onSaveCriteria: (criteria: JudgingCriterion[]) => Promise<void>;
   users: AdminUser[];
   hostAccounts: AdminUser[];
+  /** All judge/mentor accounts (not scoped to selected hackathon) for the approval queue. */
+  judgeAccounts: AdminUser[];
   isLoadingUsers: boolean;
   submissions: AdminSubmissionRow[];
   isLoadingSubmissions: boolean;
@@ -713,6 +715,91 @@ function HostApprovalPanel({
   );
 }
 
+export function JudgeApprovalPanel({
+  judges,
+  selectedHackathon,
+  savingUserId,
+  onApproveJudge,
+}: {
+  judges: AdminUser[];
+  selectedHackathon: PortalHackathon;
+  savingUserId: string | null;
+  onApproveJudge: (user: AdminUser) => Promise<void>;
+}) {
+  const pendingJudges = judges.filter((judge) => judge.judgeApprovalStatus === "pending");
+  const approvedJudges = judges.filter((judge) => judge.judgeApprovalStatus !== "pending");
+
+  return (
+    <section className={`${sectionClass} overflow-hidden p-0`} id="manage-judge-approvals">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+        <div className="flex items-start gap-3">
+          <span className="dash-icon-chip dash-icon-chip--sunset" aria-hidden>
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Judge access control</p>
+            <h2 className="dash-title">Judge & mentor approval queue</h2>
+            <p className="dash-subtitle">
+              Approve self-signup judges and mentors. Approving grants access to{" "}
+              {selectedHackathon.shortName} (and any events they already hold).
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Badge variant="secondary">{pendingJudges.length} pending</Badge>
+          <Badge variant="outline">{approvedJudges.length} approved</Badge>
+        </div>
+      </div>
+      <div className="grid gap-3 p-4 sm:p-6 lg:grid-cols-2">
+        {judges.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No judge or mentor access requests yet.</p>
+        ) : pendingJudges.length === 0 ? (
+          <p className="text-sm text-muted-foreground lg:col-span-2">
+            No pending judge or mentor approvals. Approved accounts appear under Mentors &amp; judges
+            once they have event access.
+          </p>
+        ) : (
+          pendingJudges.map((judge) => (
+            <article key={judge.id} className="rounded-xl border border-white/10 bg-muted/10 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {judge.profile?.fullName?.trim() || judge.email}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{judge.email}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Badge variant="outline" className="uppercase tracking-[0.12em]">
+                      {judge.role}
+                    </Badge>
+                    {judge.profile?.organization?.trim() ? (
+                      <span className="text-xs text-muted-foreground">
+                        {judge.profile.organization.trim()}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <Badge variant="secondary" className="uppercase tracking-[0.12em]">
+                  Pending
+                </Badge>
+              </div>
+              <Button
+                size="sm"
+                className="mt-4"
+                disabled={savingUserId === judge.id}
+                onClick={() => void onApproveJudge(judge)}
+              >
+                {savingUserId === judge.id
+                  ? "Approving..."
+                  : `Approve for ${selectedHackathon.shortName}`}
+              </Button>
+            </article>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function AdminDashboard({
   selectedHackathon,
   hackathons = PORTAL_HACKATHONS,
@@ -722,6 +809,7 @@ export function AdminDashboard({
   onSaveCriteria,
   users,
   hostAccounts,
+  judgeAccounts,
   isLoadingUsers,
   submissions,
   isLoadingSubmissions,
@@ -886,6 +974,13 @@ export function AdminDashboard({
         hosts={hostAccounts}
         savingUserId={savingUserId}
         onApproveHost={onApproveHost}
+      />
+
+      <JudgeApprovalPanel
+        judges={judgeAccounts}
+        selectedHackathon={selectedHackathon}
+        savingUserId={savingUserId}
+        onApproveJudge={onApproveJudge}
       />
 
       <section className={`${sectionClass} overflow-hidden p-0`} id="grant-admin-access">
