@@ -583,7 +583,8 @@ export function JudgeDashboard({
                 </span>
               </h2>
               <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-                Score one idea at a time, criterion by criterion, then review and save.
+                Score one idea at a time. Change any mark, go back a step, or redo scoring
+                before and after you save.
               </p>
             </div>
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 font-display text-xs font-semibold uppercase tracking-[0.14em] text-primary shadow-[0_0_16px_-6px_hsl(199_100%_50%/0.45)]">

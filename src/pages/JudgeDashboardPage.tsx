@@ -418,17 +418,22 @@ export default function JudgeDashboardPage() {
 
         const currentCriteria = { ...(submission.judge_criteria_scores ?? {}) };
         if (value === null) {
-          currentCriteria[criterionId] = null;
+          delete currentCriteria[criterionId];
         } else {
           const criterionMax =
             judgingCriteria.find((criterion) => criterion.id === criterionId)?.weight ?? 20;
           currentCriteria[criterionId] = clampCriterionScore(value, criterionMax);
         }
-        const totalScore = calculateTotalFromCriteria(currentCriteria, judgingCriteria);
+        const hasNumericScores = Object.values(currentCriteria).some(
+          (score) => typeof score === "number"
+        );
+        const totalScore = hasNumericScores
+          ? calculateTotalFromCriteria(currentCriteria, judgingCriteria)
+          : null;
 
         return {
           ...submission,
-          judge_criteria_scores: currentCriteria,
+          judge_criteria_scores: hasNumericScores ? currentCriteria : null,
           judge_score: totalScore,
           judge_scores: {
             ...(submission.judge_scores ?? {}),
@@ -436,7 +441,7 @@ export default function JudgeDashboardPage() {
           },
           judge_criteria_scores_by_judge: {
             ...(submission.judge_criteria_scores_by_judge ?? {}),
-            [sessionUser.id]: currentCriteria,
+            [sessionUser.id]: hasNumericScores ? currentCriteria : null,
           },
         };
       })
@@ -542,7 +547,7 @@ export default function JudgeDashboardPage() {
 
         // Keep local draft for other unsaved submissions; rewrite snapshot after this save.
         clearJudgeDraft();
-        setJudgeMessage("Scores saved.");
+        setJudgeMessage("Scores saved. You can still edit or redo them anytime.");
       } catch (error: unknown) {
         const message =
           typeof error === "object" && error && "message" in error

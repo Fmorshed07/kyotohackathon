@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -71,7 +71,21 @@ export function JudgeScoringWorkspace({
   }, [submissions, selectedSubmissionId]);
 
   useEffect(() => {
-    setCriterionStep(0);
+    if (!selectedSubmissionId) {
+      setCriterionStep(0);
+      return;
+    }
+    const submission = submissions.find((item) => item.id === selectedSubmissionId);
+    if (!submission) {
+      setCriterionStep(0);
+      return;
+    }
+    const firstUnscored = judgingCriteria.findIndex(
+      (criterion) => !isCriterionScored(submission, criterion.id)
+    );
+    setCriterionStep(firstUnscored === -1 ? judgingCriteria.length : Math.max(0, firstUnscored));
+    // Reset the wizard only when the selected idea changes, not when scores update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSubmissionId]);
 
   const activeSubmission =
@@ -88,6 +102,18 @@ export function JudgeScoringWorkspace({
 
   const goToStep = (step: number) => {
     setCriterionStep(Math.max(0, Math.min(step, reviewStepIndex)));
+  };
+
+  const scoredCount = judgingCriteria.filter((criterion) =>
+    isCriterionScored(activeSubmission, criterion.id)
+  ).length;
+  const isComplete = scoredCount === judgingCriteria.length;
+
+  const redoScoring = () => {
+    judgingCriteria.forEach((criterion) => {
+      onCriterionScoreChange(activeSubmission.id, criterion.id, null);
+    });
+    goToStep(0);
   };
 
   return (
@@ -128,7 +154,9 @@ export function JudgeScoringWorkspace({
                   {submission.team_name?.trim() || "Unnamed team"}
                 </p>
                 <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                  {isComplete ? "Ready to save" : `${scoredCount}/${judgingCriteria.length} criteria`}
+                  {isComplete
+                    ? "Complete · edit anytime"
+                    : `${scoredCount}/${judgingCriteria.length} criteria`}
                 </p>
               </button>
             );
@@ -197,6 +225,9 @@ export function JudgeScoringWorkspace({
               Step {criterionStep + 1} of {totalSteps}
             </p>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Marks stay editable. Open any step to change a score, or redo the whole idea.
+          </p>
           <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
             {judgingCriteria.map((criterion, index) => {
               const scored = isCriterionScored(activeSubmission, criterion.id);
@@ -206,17 +237,23 @@ export function JudgeScoringWorkspace({
                   key={criterion.id}
                   type="button"
                   onClick={() => goToStep(index)}
+                  title={scored ? `Edit ${criterion.title}` : `Score ${criterion.title}`}
                   className={cn(
                     "shrink-0 rounded-lg border px-3 py-2 text-left text-xs transition",
                     isActive
                       ? "border-primary/50 bg-primary/15 text-primary"
                       : scored
-                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400/70"
                         : "border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/30"
                   )}
                 >
                   <span className="block font-semibold">{index + 1}</span>
                   <span className="mt-0.5 block max-w-[120px] truncate">{criterion.title}</span>
+                  {scored && !isActive ? (
+                    <span className="mt-1 block text-[10px] uppercase tracking-[0.08em] text-emerald-300/80">
+                      Edit
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -251,19 +288,30 @@ export function JudgeScoringWorkspace({
         ) : (
           <div className="mt-6 space-y-5">
             <div className="grid gap-3 sm:grid-cols-2">
-              {judgingCriteria.map((criterion) => {
+              {judgingCriteria.map((criterion, index) => {
                 const accent = getCriterionAccentStyle(criterion.id);
                 const score = activeSubmission.judge_criteria_scores?.[criterion.id];
                 return (
-                  <div
+                  <button
                     key={criterion.id}
-                    className={cn("rounded-lg border px-3 py-2.5", accent.card)}
+                    type="button"
+                    onClick={() => goToStep(index)}
+                    className={cn(
+                      "rounded-lg border px-3 py-2.5 text-left transition hover:border-primary/40",
+                      accent.card
+                    )}
                   >
-                    <p className="text-xs font-medium text-muted-foreground">{criterion.title}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-medium text-muted-foreground">{criterion.title}</p>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary">
+                        <Pencil className="h-3 w-3" />
+                        Edit
+                      </span>
+                    </div>
                     <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
                       {score ?? "—"}/{criterion.weight}
                     </p>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -288,55 +336,78 @@ export function JudgeScoringWorkspace({
               />
             </div>
 
-            <Button
-              size="lg"
-              className="h-11 w-full text-sm font-semibold sm:w-auto"
-              disabled={
-                savingSubmissionId === activeSubmission.id ||
-                judgingCriteria.some(
-                  (criterion) => typeof activeSubmission.judge_criteria_scores?.[criterion.id] !== "number"
-                )
-              }
-              onClick={() => void onSave(activeSubmission.id)}
-            >
-              <Save className="h-4 w-4" />
-              {savingSubmissionId === activeSubmission.id ? "Saving..." : "Save scores for this idea"}
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <Button
+                size="lg"
+                className="h-11 w-full text-sm font-semibold sm:w-auto"
+                disabled={
+                  savingSubmissionId === activeSubmission.id ||
+                  judgingCriteria.some(
+                    (criterion) => typeof activeSubmission.judge_criteria_scores?.[criterion.id] !== "number"
+                  )
+                }
+                onClick={() => void onSave(activeSubmission.id)}
+              >
+                <Save className="h-4 w-4" />
+                {savingSubmissionId === activeSubmission.id
+                  ? "Saving..."
+                  : isComplete
+                    ? "Update scores for this idea"
+                    : "Save scores for this idea"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="h-11 w-full gap-2 text-sm font-semibold sm:w-auto"
+                disabled={scoredCount === 0}
+                onClick={redoScoring}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Redo scoring
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Saving does not lock marks. Edit any criterion or redo this idea whenever you need.
+            </p>
           </div>
         )}
 
-        {!isReviewStep ? (
-          <div className="mt-6 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+        <div className="mt-6 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 gap-1"
+            disabled={criterionStep === 0}
+            onClick={() => goToStep(criterionStep - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          {isReviewStep ? (
             <Button
               type="button"
               variant="outline"
               size="sm"
               className="h-10 gap-1"
-              disabled={criterionStep === 0}
-              onClick={() => goToStep(criterionStep - 1)}
+              onClick={() => goToStep(0)}
             >
-              <ChevronLeft className="h-4 w-4" />
-              Previous
+              <Pencil className="h-4 w-4" />
+              Edit from start
             </Button>
+          ) : (
             <Button
               type="button"
               size="sm"
               className="h-10 gap-1"
-              onClick={() =>
-                criterionStep < reviewStepIndex
-                  ? goToStep(criterionStep + 1)
-                  : goToStep(reviewStepIndex)
-              }
+              onClick={() => goToStep(criterionStep + 1)}
             >
-              {criterionStep < reviewStepIndex - 1
-                ? "Next criterion"
-                : criterionStep === reviewStepIndex - 1
-                  ? "Review & save"
-                  : "Review"}
+              {criterionStep < reviewStepIndex - 1 ? "Next criterion" : "Review & save"}
               <ChevronRight className="h-4 w-4" />
             </Button>
-          </div>
-        ) : null}
+          )}
+        </div>
       </article>
     </div>
   );
@@ -372,6 +443,9 @@ function CriterionStepPanel({
           <h4 className="mt-1 text-base font-semibold text-foreground sm:text-lg">
             {criterion.title}
           </h4>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pick a new value anytime. This mark is not locked.
+          </p>
         </div>
         <span
           className={cn(
@@ -379,7 +453,7 @@ function CriterionStepPanel({
             criterionAccent.pill
           )}
         >
-          {activeScore ?? 0}/{criterion.weight} pts
+          {activeScore == null ? "—" : activeScore}/{criterion.weight} pts
         </span>
       </div>
 
@@ -405,6 +479,7 @@ function CriterionStepPanel({
             <button
               key={`${criterion.id}-${value}`}
               type="button"
+              aria-pressed={isActive}
               className={cn(
                 "min-h-11 rounded-md border text-sm font-semibold transition active:scale-[0.97] sm:h-10 sm:min-w-12",
                 isActive ? criterionAccent.activeButton : criterionAccent.inactiveButton
@@ -417,7 +492,7 @@ function CriterionStepPanel({
         })}
       </div>
 
-      <div className="mt-3 flex justify-stretch sm:justify-end">
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
         <Input
           type="number"
           min={0}
@@ -441,6 +516,17 @@ function CriterionStepPanel({
           className={cn("h-10 w-full text-base sm:w-28 sm:text-right sm:text-sm", criterionAccent.input)}
           placeholder="Custom"
         />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-10 gap-1 text-muted-foreground"
+          disabled={activeScore == null}
+          onClick={() => onCriterionScoreChange(submission.id, criterion.id, null)}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Clear mark
+        </Button>
       </div>
     </div>
   );
