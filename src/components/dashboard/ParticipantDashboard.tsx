@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   ArrowRight,
-  BookOpen,
   CalendarDays,
   ExternalLink,
   FileText,
@@ -20,7 +19,6 @@ import {
   Crown,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { PARTICIPANT_GUIDE_STEPS } from "@/lib/participantGuide";
 import {
   Select,
   SelectContent,
@@ -447,56 +445,6 @@ export function ParticipantDashboard({
             )}
           </div>
         ) : null}
-      </section>
-
-      <section
-        className={`${sectionClass}`}
-        id="resources-guide"
-        aria-labelledby="resources-guide-heading"
-      >
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="dash-icon-chip" aria-hidden>
-              <BookOpen className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="dash-eyebrow">Resources & guide</p>
-              <h2 id="resources-guide-heading" className="dash-title">
-                Get more from the portal
-              </h2>
-              <p className="dash-subtitle">
-                Quick path from join → profile → submit → boards. Open the full guide anytime.
-              </p>
-            </div>
-          </div>
-          <Button asChild variant="outline" className="shrink-0">
-            <Link to="/resources">
-              Full guide
-              <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden />
-            </Link>
-          </Button>
-        </div>
-
-        <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {PARTICIPANT_GUIDE_STEPS.map((step, index) => (
-            <li
-              key={step.id}
-              className="rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-primary/30 hover:bg-primary/5"
-            >
-              <Link to={`/resources#${step.id}`} className="block h-full">
-                <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                  Step {String(index + 1).padStart(2, "0")}
-                </span>
-                <p className="mt-2 font-display text-base font-semibold tracking-tight text-foreground">
-                  {step.title}
-                </p>
-                <p className="mt-1.5 line-clamp-2 font-body text-xs text-muted-foreground">
-                  {step.description}
-                </p>
-              </Link>
-            </li>
-          ))}
-        </ol>
       </section>
 
       <section

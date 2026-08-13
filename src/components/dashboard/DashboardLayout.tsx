@@ -755,17 +755,6 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink
-                        href="/dashboard/participant#resources-guide"
-                        onNavigate={closeMobileNav}
-                      >
-                        <BookOpen className={navIconClass} />
-                        <span>Resources & guide</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
                       <DashboardNavLink href="/projects" onNavigate={closeMobileNav}>
                         <LayoutGrid className={navIconClass} />
                         <span>Projects & demos</span>
