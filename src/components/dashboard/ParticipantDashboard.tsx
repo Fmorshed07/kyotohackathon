@@ -586,7 +586,7 @@ export function ParticipantDashboard({
             <h2 id="project-details-heading" className="dash-title">
               Project details
             </h2>
-            <p className="dash-subtitle">Title, link, and short description.</p>
+            <p className="dash-subtitle">Title, team name, link, and short description.</p>
           </div>
         </div>
         <div className="space-y-5">
@@ -604,6 +604,21 @@ export function ParticipantDashboard({
               />
             </div>
             <div className="space-y-2">
+              <label className="dash-field-label">
+                Team name
+              </label>
+              <Input
+                value={participantForm.teamName}
+                onChange={(e) =>
+                  setParticipantForm((prev) => ({ ...prev, teamName: e.target.value }))
+                }
+                placeholder="Your name, or a team name"
+              />
+              <p className="text-xs text-muted-foreground">
+                Solo builders can name themselves too. This shows on the board and gallery.
+              </p>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
               <label className="dash-field-label">
                 Project URL
               </label>
@@ -644,12 +659,13 @@ export function ParticipantDashboard({
               <Users className="h-4 w-4" />
             </span>
             <div>
-              <p className="dash-eyebrow">Collaborators</p>
+              <p className="dash-eyebrow">Team</p>
               <h2 id="team-details-heading" className="dash-title">
                 My team
               </h2>
               <p className="dash-subtitle">
-                Roster, invites, and teammate matching live on a dedicated team page.
+                Solo is fine. Name yourself here or on the team page, then invite others if you
+                want.
               </p>
             </div>
           </div>
@@ -663,11 +679,16 @@ export function ParticipantDashboard({
             <div className="min-w-0">
               <p className="dash-eyebrow">Team name</p>
               <p className="mt-1 truncate font-display text-lg font-semibold text-foreground">
-                {participantForm.teamName.trim() || "Name your team"}
+                {participantForm.teamName.trim() || "Name your team (solo is fine)"}
               </p>
-              <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Crown className="h-3.5 w-3.5 text-amber-200" />
-                Leader: {teamLeader?.name?.trim() || displayName}
+              <p className="mt-1 inline-flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <Crown className="h-3.5 w-3.5 text-amber-200" />
+                  Leader: {teamLeader?.name?.trim() || displayName}
+                </span>
+                {teamRoster.length <= 1 ? (
+                  <Badge variant="secondary">Solo</Badge>
+                ) : null}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">

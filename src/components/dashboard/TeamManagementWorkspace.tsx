@@ -3,9 +3,9 @@ import {
   Crown,
   ExternalLink,
   FileText,
-  Save,
   Users,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,10 +30,10 @@ export type TeamManagementWorkspaceProps = {
   isReadOnly?: boolean;
   teamName: string;
   onTeamNameChange: (value: string) => void;
+  onTeamNameBlur?: () => void;
   isTeamNameDirty?: boolean;
   isSavingTeam?: boolean;
   saveMessage?: string | null;
-  onSaveTeam: () => Promise<void>;
   participantSubmissions: Submission[];
   activeSubmissionId: string | null;
   onSelectSubmission: (submissionId: string) => void;
@@ -72,10 +72,9 @@ export function TeamManagementWorkspace({
   isReadOnly = false,
   teamName,
   onTeamNameChange,
-  isTeamNameDirty = false,
+  onTeamNameBlur,
   isSavingTeam = false,
   saveMessage = null,
-  onSaveTeam,
   participantSubmissions,
   activeSubmissionId,
   onSelectSubmission,
@@ -112,6 +111,7 @@ export function TeamManagementWorkspace({
   });
   const leader = roster.find((entry) => entry.isLeader) ?? roster[0];
   const projectTitle = activeSubmission?.title?.trim() || "";
+  const isSolo = roster.length <= 1;
 
   return (
     <div className="space-y-8" id="overview">
@@ -129,11 +129,18 @@ export function TeamManagementWorkspace({
             </span>
             <div>
               <p className="dash-eyebrow">{selectedHackathon.shortName} team</p>
-              <h2 id="team-overview-heading" className="dash-title">
-                Team workspace
-              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id="team-overview-heading" className="dash-title">
+                  Team workspace
+                </h2>
+                {isSolo && !isLoading ? (
+                  <Badge variant="secondary" className="align-middle">
+                    Solo
+                  </Badge>
+                ) : null}
+              </div>
               <p className="dash-subtitle">
-                Name the team, manage the roster, and invite collaborators for this event.
+                Name yourself or the group. Invite others later if you want teammates.
               </p>
             </div>
           </div>
@@ -147,8 +154,10 @@ export function TeamManagementWorkspace({
 
         <div className="dash-stat-grid mt-5 grid gap-2 sm:grid-cols-3 sm:gap-3">
           <div className="dash-stat-tile dash-stat-tile--highlight">
-            <p className="dash-stat-value">{isLoading ? "—" : String(roster.length)}</p>
-            <p className="dash-stat-label">Members</p>
+            <p className="dash-stat-value">
+              {isLoading ? "—" : isSolo ? "Solo" : String(roster.length)}
+            </p>
+            <p className="dash-stat-label">{isSolo && !isLoading ? "Builder" : "Members"}</p>
           </div>
           <div className="dash-stat-tile">
             <p className="dash-stat-value truncate text-lg sm:text-2xl">
@@ -180,7 +189,8 @@ export function TeamManagementWorkspace({
               Team name & project
             </h2>
             <p className="dash-subtitle">
-              This name appears on the event board, gallery, and invite links.
+              Solo builders can name themselves too. This name appears on the event board,
+              gallery, and invite links.
             </p>
           </div>
         </div>
@@ -208,28 +218,29 @@ export function TeamManagementWorkspace({
               </div>
             ) : null}
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <div className="space-y-2">
+            <div className="max-w-lg space-y-2">
+              <div className="flex items-baseline justify-between gap-3">
                 <label className="dash-field-label" htmlFor="team-name">
                   Team name
                 </label>
-                <Input
-                  id="team-name"
-                  value={teamName}
-                  onChange={(event) => onTeamNameChange(event.target.value)}
-                  placeholder="Your team name"
-                  disabled={isReadOnly || !hasSubmission}
-                />
+                <p className="text-xs text-muted-foreground">
+                  {isSavingTeam
+                    ? "Saving…"
+                    : saveMessage
+                      ? saveMessage
+                      : isReadOnly
+                        ? ""
+                        : "Saves as you type"}
+                </p>
               </div>
-              <Button
-                type="button"
-                size="lg"
-                disabled={isReadOnly || !hasSubmission || isSavingTeam || !isTeamNameDirty}
-                onClick={() => void onSaveTeam()}
-              >
-                <Save className="h-4 w-4" />
-                {isSavingTeam ? "Saving…" : "Save team name"}
-              </Button>
+              <Input
+                id="team-name"
+                value={teamName}
+                onChange={(event) => onTeamNameChange(event.target.value)}
+                onBlur={() => onTeamNameBlur?.()}
+                placeholder="Your name, or a team name"
+                disabled={isReadOnly}
+              />
             </div>
 
             {projectTitle ? (
@@ -239,18 +250,18 @@ export function TeamManagementWorkspace({
               </p>
             ) : null}
 
-            {saveMessage ? <p className="dash-message">{saveMessage}</p> : null}
+            {saveMessage && saveMessage !== "Saved" ? (
+              <p className="dash-message">{saveMessage}</p>
+            ) : null}
 
-            {!hasSubmission ? (
-              <div className="rounded-xl border border-dashed border-white/15 bg-background/30 p-4">
-                <p className="text-sm text-foreground">
-                  Save a project once on your workspace to unlock the roster, leader, and invite
-                  link.
-                </p>
-                <Button asChild variant="outline" className="mt-3">
-                  <Link to="/dashboard/participant#my-project">Open project form</Link>
-                </Button>
-              </div>
+            {!hasSubmission && !isReadOnly ? (
+              <p className="text-sm text-muted-foreground">
+                Type a name to appear on the board — solo is fine.{" "}
+                <Link to="/dashboard/participant#my-project" className="text-primary hover:underline">
+                  Add project details
+                </Link>{" "}
+                whenever you are ready.
+              </p>
             ) : isReadOnly ? (
               <p className="text-sm text-muted-foreground">
                 Past events are view-only. You can still browse the roster and teammate board.
@@ -271,7 +282,7 @@ export function TeamManagementWorkspace({
               Roster & invites
             </h2>
             <p className="dash-subtitle">
-              Assign a leader and share a link so teammates join this same project.
+              Stay solo, or share a link so teammates join this same project.
             </p>
           </div>
         </div>
@@ -288,7 +299,7 @@ export function TeamManagementWorkspace({
           disabledReason={
             isReadOnly
               ? "Past events are view-only."
-              : "Save your project once to unlock a shareable team invite link."
+              : "Type a team name first to unlock a shareable invite link."
           }
           canAssignLeader={canAssignTeamLeader && !isReadOnly}
           onGenerate={onGenerateTeamInvite}

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc } from "firebase/firestore";
 import { ArrowLeft } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { TeamManagementWorkspace } from "@/components/dashboard/TeamManagementWorkspace";
@@ -18,6 +18,7 @@ import {
   getSubmissionHackathonId,
   getUserAllowedHackathonIds,
   HACKATHON_STORAGE_KEYS,
+  nextEnrolledHackathonIds,
   pickPreferredHackathonId,
   PORTAL_HACKATHONS,
   resolvePortalHackathon,
@@ -164,6 +165,10 @@ export default function ParticipantTeamPage() {
   const savedTeamName = activeSubmission?.team_name ?? "";
   const isTeamNameDirty = teamName.trim() !== savedTeamName.trim();
   const isReadOnly = selectedHackathon.status === "past";
+  const isTeamNameDirtyRef = useRef(isTeamNameDirty);
+  const isAutosavingTeamRef = useRef(false);
+  const teamNameAutosaveTimerRef = useRef<number | null>(null);
+  isTeamNameDirtyRef.current = isTeamNameDirty;
 
   useEffect(() => {
     const id = location.hash.replace(/^#/, "").trim();
@@ -259,11 +264,12 @@ export default function ParticipantTeamPage() {
     const nextName =
       participantSubmissions.find((submission) => submission.id === activeSubmissionId)?.team_name ??
       "";
-    setTeamName(nextName);
+    if (!isTeamNameDirtyRef.current) {
+      setTeamName(nextName);
+    }
     setTeamInviteUrl(null);
     setTeamInviteToken(null);
-    setSaveMessage(null);
-    // Reset invite/name only when switching projects, not after a save.
+    // Don't clobber a name the participant is still typing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSubmissionId]);
 
@@ -322,60 +328,129 @@ export default function ParticipantTeamPage() {
   }, [sessionUser, db, selectedHackathonId]);
 
   const persistTeamName = async (nextName = teamName) => {
-    if (!sessionUser || !activeSubmissionId || !activeSubmission) return null;
-    const ownerId = activeSubmission.user_id;
-    const ownerName =
-      ownerId === sessionUser.id
-        ? displayName
-        : activeSubmission.owner_name?.trim() || nextName.trim() || "Team creator";
-    const ownerEmail =
-      ownerId === sessionUser.id
-        ? sessionUser.email
-        : activeSubmission.owner_email?.trim() || "";
-    const leaderId = activeSubmission.team_leader_id?.trim() || ownerId;
-    const roster = buildTeamRoster({
-      owner: { user_id: ownerId, name: ownerName, email: ownerEmail },
-      linkedMembers: linkedTeamMembers,
-      teamLeaderId: leaderId,
-      currentUserId: sessionUser.id,
-    });
-    const memberNames = rosterDisplayNames(roster);
+    if (!sessionUser) return null;
+    const trimmed = nextName.trim();
+    if (!trimmed) return null;
+
+    if (activeSubmissionId && activeSubmission) {
+      const ownerId = activeSubmission.user_id;
+      const ownerName =
+        ownerId === sessionUser.id
+          ? displayName
+          : activeSubmission.owner_name?.trim() || trimmed || "Team creator";
+      const ownerEmail =
+        ownerId === sessionUser.id
+          ? sessionUser.email
+          : activeSubmission.owner_email?.trim() || "";
+      const leaderId = activeSubmission.team_leader_id?.trim() || ownerId;
+      const roster = buildTeamRoster({
+        owner: { user_id: ownerId, name: ownerName, email: ownerEmail },
+        linkedMembers: linkedTeamMembers,
+        teamLeaderId: leaderId,
+        currentUserId: sessionUser.id,
+      });
+      const memberNames = rosterDisplayNames(roster);
+      const now = new Date().toISOString();
+      const payload = {
+        team_name: trimmed,
+        member_names: memberNames.join("\n"),
+        member_name_list: memberNames,
+        updated_at: now,
+      };
+      await setDoc(doc(db, "submissions", activeSubmissionId), payload, { merge: true });
+      if (activeSubmission.public_preview_consent) {
+        await setDoc(doc(db, "public_projects", activeSubmissionId), payload, { merge: true });
+      }
+      const updated = { ...activeSubmission, ...payload };
+      setAllSubmissions((current) =>
+        current.map((submission) =>
+          submission.id === activeSubmissionId ? { ...submission, ...payload } : submission
+        )
+      );
+      return updated;
+    }
+
     const now = new Date().toISOString();
+    const ownerName = displayName;
     const payload = {
-      team_name: nextName.trim(),
-      member_names: memberNames.join("\n"),
-      member_name_list: memberNames,
+      user_id: sessionUser.id,
+      hackathon_id: selectedHackathonId,
+      title: "",
+      short_description: "",
+      project_url: "",
+      submission_pdf_url: "",
+      demo_video_url: "",
+      public_preview_consent: false,
+      team_name: trimmed,
+      member_names: ownerName,
+      member_name_list: [ownerName],
+      team_leader_id: sessionUser.id,
+      owner_name: ownerName,
+      owner_email: sessionUser.email,
+      role: "participant",
+      created_at: now,
       updated_at: now,
     };
-    await setDoc(doc(db, "submissions", activeSubmissionId), payload, { merge: true });
-    if (activeSubmission.public_preview_consent) {
-      await setDoc(doc(db, "public_projects", activeSubmissionId), payload, { merge: true });
-    }
-    const updated = { ...activeSubmission, ...payload };
-    setAllSubmissions((current) =>
-      current.map((submission) =>
-        submission.id === activeSubmissionId ? { ...submission, ...payload } : submission
-      )
+    const submissionRef = doc(collection(db, "submissions"));
+    await setDoc(submissionRef, payload);
+    const nextHackathonIds = nextEnrolledHackathonIds(enrolledHackathonIds, selectedHackathonId);
+    await setDoc(
+      doc(db, "users", sessionUser.id),
+      {
+        hackathon_id: selectedHackathonId,
+        hackathon_ids: nextHackathonIds,
+      },
+      { merge: true }
     );
-    return updated;
+    setEnrolledHackathonIds(nextHackathonIds);
+
+    const submissionSnap = await getDoc(submissionRef);
+    const created = (
+      submissionSnap.exists()
+        ? { id: submissionSnap.id, ...(submissionSnap.data() as Omit<Submission, "id">) }
+        : { id: submissionRef.id, ...payload }
+    ) as Submission;
+    setActiveSubmissionId(created.id);
+    setAllSubmissions((current) => [created, ...current]);
+    return created;
   };
 
-  const handleSaveTeam = async () => {
-    if (!activeSubmissionId) {
-      setSaveMessage("Save a project first, then you can name the team.");
-      return;
-    }
+  const handleSaveTeam = async (nextName = teamName) => {
+    const trimmed = nextName.trim();
+    if (!trimmed || isReadOnly || isAutosavingTeamRef.current) return;
+    isAutosavingTeamRef.current = true;
     setIsSavingTeam(true);
-    setSaveMessage(null);
     try {
-      await persistTeamName();
-      setSaveMessage("Team name saved.");
+      await persistTeamName(trimmed);
+      setSaveMessage("Saved");
     } catch (error: unknown) {
       setSaveMessage(error instanceof Error ? error.message : "Unable to save team name.");
     } finally {
+      isAutosavingTeamRef.current = false;
       setIsSavingTeam(false);
     }
   };
+
+  useEffect(() => {
+    if (isReadOnly || isLoadingWorkspace) return;
+    if (!isTeamNameDirty || !teamName.trim()) return;
+    if (isSavingTeam || isAutosavingTeamRef.current) return;
+
+    if (teamNameAutosaveTimerRef.current) {
+      window.clearTimeout(teamNameAutosaveTimerRef.current);
+    }
+    teamNameAutosaveTimerRef.current = window.setTimeout(() => {
+      void handleSaveTeam(teamName);
+    }, 700);
+
+    return () => {
+      if (teamNameAutosaveTimerRef.current) {
+        window.clearTimeout(teamNameAutosaveTimerRef.current);
+      }
+    };
+    // persistTeamName closes over the latest roster/submission on purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoadingWorkspace, isReadOnly, isSavingTeam, isTeamNameDirty, teamName]);
 
   const handleSelectSubmission = (submissionId: string) => {
     const selected = participantSubmissions.find((submission) => submission.id === submissionId);
@@ -410,7 +485,7 @@ export default function ParticipantTeamPage() {
 
   const handleGenerateTeamInvite = async () => {
     if (!sessionUser || !activeSubmissionId) {
-      setSaveMessage("Save your project first, then create an invite link.");
+      setSaveMessage("Save a team name first, then create an invite link.");
       return;
     }
     setIsTeamInviteBusy(true);
@@ -565,11 +640,16 @@ export default function ParticipantTeamPage() {
         isLoading={isLoadingWorkspace}
         isReadOnly={isReadOnly}
         teamName={teamName}
-        onTeamNameChange={setTeamName}
+        onTeamNameChange={(value) => {
+          setTeamName(value);
+          setSaveMessage(null);
+        }}
+        onTeamNameBlur={() => {
+          if (isTeamNameDirty) void handleSaveTeam(teamName);
+        }}
         isTeamNameDirty={isTeamNameDirty}
         isSavingTeam={isSavingTeam}
         saveMessage={saveMessage}
-        onSaveTeam={handleSaveTeam}
         participantSubmissions={participantSubmissions}
         activeSubmissionId={activeSubmissionId}
         onSelectSubmission={handleSelectSubmission}

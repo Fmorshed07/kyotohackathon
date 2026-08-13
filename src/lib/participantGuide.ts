@@ -50,9 +50,9 @@ export const PARTICIPANT_GUIDE_STEPS: GuideStep[] = [
       id: "team",
       title: "Build your team",
       description:
-        "Open My Team to name the group, invite members with a link, pick a leader, and post if you still need teammates.",
+        "Open My Team to name yourself or the group. Solo builders can set a team name too. Invite members with a link, pick a leader, and post if you still need teammates.",
       tips: [
-        "Save a project first so you can generate a shareable invite link.",
+        "You don't need teammates first — save a team name even if you're competing solo.",
         "Everyone on the roster can edit the same submission.",
       ],
     },
@@ -62,7 +62,7 @@ export const PARTICIPANT_GUIDE_STEPS: GuideStep[] = [
       description:
         "Use the project form: details, then visuals. Save when everything looks right so judging can score the latest version.",
       tips: [
-        "Team names and member lists should match who built the project.",
+        "Team names should match who built the project — solo builders can use their own name.",
         "Add a demo video, project URL, PDF, cover, and gallery when you have them.",
       ],
     },

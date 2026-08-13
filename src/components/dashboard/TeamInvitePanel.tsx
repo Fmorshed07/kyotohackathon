@@ -263,8 +263,9 @@ export function TeamInvitePanel({
           Team roster
         </p>
         <p className="text-sm text-muted-foreground">
-          Full people profiles for everyone on this project. Every member can edit, and you can assign a
-          team leader.
+          {roster.length <= 1
+            ? "You're the only member right now — that's fine. Name the team anyway, and invite others later if you want."
+            : "Full people profiles for everyone on this project. Every member can edit, and you can assign a team leader."}
         </p>
         <ul className="space-y-3">
           {roster.map((entry) => (
