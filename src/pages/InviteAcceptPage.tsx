@@ -10,6 +10,7 @@ import { getFirestoreDb } from "@/lib/firebaseClient";
 import { getHackathonById, getJudgeEventWorkspacePath, isHackathonId } from "@/lib/hackathons";
 import {
   clearPendingInvite,
+  getEventBoardPathAfterTeamInvite,
   getJudgeDashboardPathAfterInvite,
   stashPendingInvite,
 } from "@/lib/inviteTokens";
@@ -37,6 +38,7 @@ export default function InviteAcceptPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActing, setIsActing] = useState(false);
   const [isLoadingInvite, setIsLoadingInvite] = useState(true);
+  const autoJoinAttempted = useRef(false);
   const autoRedeemAttempted = useRef(false);
 
   const judgePrimaryHackathonId = judgeInvite?.hackathon_ids.find(isHackathonId) ?? null;
@@ -109,9 +111,14 @@ export default function InviteAcceptPage() {
         enrolledHackathonIds: sessionUser.hackathonIds,
       });
       clearPendingInvite("team");
-      navigate(`/dashboard/participant?joinedTeam=${encodeURIComponent(result.teamName)}`, {
-        replace: true,
-      });
+      navigate(
+        getEventBoardPathAfterTeamInvite({
+          hackathonId: result.hackathonId,
+          teamName: result.teamName,
+          submissionId: result.submissionId,
+        }),
+        { replace: true }
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to join this team.";
       setActionError(
@@ -144,6 +151,24 @@ export default function InviteAcceptPage() {
       setIsActing(false);
     }
   };
+
+  // Signed-in participants join as soon as the invite is valid — no extra click required.
+  useEffect(() => {
+    if (authLoading || isLoadingInvite || inviteKind !== "team" || !token || !teamInvite) return;
+    if (!sessionUser || sessionUser.role !== "participant") return;
+    if (autoJoinAttempted.current || isActing) return;
+    autoJoinAttempted.current = true;
+    void handleAcceptTeam();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot auto join for invite deep links
+  }, [
+    authLoading,
+    isLoadingInvite,
+    inviteKind,
+    token,
+    teamInvite,
+    sessionUser,
+    isActing,
+  ]);
 
   // Signed-in judges/mentors (or accounts without a role yet) redeem and open the event workspace.
   useEffect(() => {
@@ -238,7 +263,7 @@ export default function InviteAcceptPage() {
                 ) : null}
                 {sessionUser?.role === "participant" ? (
                   <Button type="button" disabled={isActing} onClick={() => void handleAcceptTeam()}>
-                    {isActing ? "Joining…" : "Join team"}
+                    {isActing ? "Joining team…" : "Join this team"}
                   </Button>
                 ) : sessionUser ? (
                   <p className="text-sm text-muted-foreground">

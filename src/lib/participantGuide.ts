@@ -36,26 +36,36 @@ export const PARTICIPANT_GUIDE_STEPS: GuideStep[] = [
       "Past events stay view-only so you can revisit teams and submissions.",
     ],
   },
-  {
-    id: "profile",
-    title: "Build your creator profile",
-    description:
-      "Add a photo, bio, role, and links on My Profile. A strong profile helps teammates find you and makes your projects look complete in the gallery.",
-    tips: [
-      "Aim for a high “Profile ready” score before submission day.",
-      "Include GitHub, LinkedIn, or portfolio links judges can verify.",
-    ],
-  },
-  {
-    id: "project",
-    title: "Submit your project",
-    description:
-      "Use the three-step form: team → project details → visuals. Save when everything looks right so judging can score the latest version.",
-    tips: [
-      "Team names and member lists should match who built the project.",
-      "Add a demo video, project URL, PDF, cover, and gallery when you have them.",
-    ],
-  },
+    {
+      id: "profile",
+      title: "Build your creator profile",
+      description:
+        "Add a photo, bio, role, and links on My Profile. A strong profile helps teammates find you and makes your projects look complete in the gallery.",
+      tips: [
+        "Aim for a high “Profile ready” score before submission day.",
+        "Include GitHub, LinkedIn, or portfolio links judges can verify.",
+      ],
+    },
+    {
+      id: "team",
+      title: "Build your team",
+      description:
+        "Open My Team to name the group, invite members with a link, pick a leader, and post if you still need teammates.",
+      tips: [
+        "Save a project first so you can generate a shareable invite link.",
+        "Everyone on the roster can edit the same submission.",
+      ],
+    },
+    {
+      id: "project",
+      title: "Submit your project",
+      description:
+        "Use the project form: details, then visuals. Save when everything looks right so judging can score the latest version.",
+      tips: [
+        "Team names and member lists should match who built the project.",
+        "Add a demo video, project URL, PDF, cover, and gallery when you have them.",
+      ],
+    },
   {
     id: "boards",
     title: "Use event boards",

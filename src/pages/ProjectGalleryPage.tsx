@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Submission } from "@/types/portal";
+import { countTeamBuilders, formatTeamMemberNames } from "@/lib/teamRoster";
 import { cn } from "@/lib/utils";
 
 type AssetKind = "demo" | "project" | "document";
@@ -88,10 +89,7 @@ const getAssetKinds = (submission: Submission): AssetKind[] => {
   return kinds;
 };
 
-const getBuilderCount = (submission: Submission) => {
-  const names = submission.member_names?.split(/[,;\n]/).map((name) => name.trim()).filter(Boolean) ?? [];
-  return Math.max(names.length, 1);
-};
+const getBuilderCount = (submission: Submission) => countTeamBuilders(submission);
 
 const getSubmittedAt = (submission: Submission) => {
   const timestamp = Date.parse(submission.created_at ?? "");
@@ -226,7 +224,7 @@ export default function ProjectGalleryPage() {
         if (eventFilter !== "all" && getSubmissionHackathonId(submission) !== eventFilter) return false;
         if (assetFilter !== "all" && !getAssetKinds(submission).includes(assetFilter)) return false;
         if (!query) return true;
-        return [submission.title, submission.team_name, submission.member_names, submission.short_description, event.name, event.theme]
+        return [submission.title, submission.team_name, submission.member_names, formatTeamMemberNames(submission), submission.short_description, event.name, event.theme]
           .filter(Boolean).join(" ").toLowerCase().includes(query);
       })
       .sort((left, right) => {

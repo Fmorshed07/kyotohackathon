@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getDocMock = vi.fn();
 const getDocsMock = vi.fn();
-const addDocMock = vi.fn();
 const updateDocMock = vi.fn();
 const setDocMock = vi.fn();
 const incrementMock = vi.fn((value: number) => ({ __increment: value }));
@@ -15,7 +14,6 @@ vi.mock("firebase/firestore", () => ({
   where: (field: string, op: string, value: unknown) => ({ field, op, value }),
   getDoc: (...args: unknown[]) => getDocMock(...args),
   getDocs: (...args: unknown[]) => getDocsMock(...args),
-  addDoc: (...args: unknown[]) => addDocMock(...args),
   updateDoc: (...args: unknown[]) => updateDocMock(...args),
   setDoc: (...args: unknown[]) => setDocMock(...args),
   increment: (value: number) => incrementMock(value),
@@ -50,10 +48,21 @@ describe("acceptTeamInvite", () => {
           data: () => openInvite,
         };
       }
+      if (ref.col === "users") {
+        return {
+          exists: () => true,
+          id: ref.id,
+          data: () => ({
+            fullName: "Alex Rivera",
+            avatarUrl: "https://example.com/alex.png",
+            headline: "Full-stack builder",
+            skills: "React, Firebase",
+          }),
+        };
+      }
       throw new Error(`Unexpected getDoc on ${ref.col}/${ref.id}`);
     });
     getDocsMock.mockResolvedValue({ docs: [] });
-    addDocMock.mockResolvedValue({ id: "membership-1" });
     updateDocMock.mockResolvedValue(undefined);
     setDocMock.mockResolvedValue(undefined);
   });
@@ -73,12 +82,43 @@ describe("acceptTeamInvite", () => {
     });
 
     const getDocCols = getDocMock.mock.calls.map((call: Array<{ col: string }>) => call[0]?.col);
-    expect(getDocCols).toEqual(["team_invites"]);
+    expect(getDocCols).toContain("team_invites");
+    expect(getDocCols).toContain("users");
     expect(getDocCols).not.toContain("submissions");
 
-    expect(addDocMock).toHaveBeenCalledTimes(1);
-    expect(updateDocMock).toHaveBeenCalled();
-    expect(setDocMock).toHaveBeenCalled();
+    const setDocRefs = setDocMock.mock.calls.map((call: Array<{ col: string; id?: string }>) => call[0]);
+    expect(setDocRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ col: "team_memberships", id: "sub-1_teammate-1" }),
+        expect.objectContaining({ col: "users", id: "teammate-1" }),
+      ])
+    );
+
+    const submissionUpdate = updateDocMock.mock.calls.find(
+      (call: Array<{ col: string }>) => call[0]?.col === "submissions"
+    );
+    expect(submissionUpdate?.[1]).toEqual(
+      expect.objectContaining({
+        member_user_ids: { __arrayUnion: ["teammate-1"] },
+        member_name_list: { __arrayUnion: ["Alex Rivera"] },
+      })
+    );
+    expect(updateDocMock.mock.calls.some((call: Array<{ col: string }>) => call[0]?.col === "public_projects")).toBe(
+      true
+    );
+  });
+
+  it("lets the creator open their own invite without creating a membership", async () => {
+    await expect(
+      acceptTeamInvite({} as never, "invite-token", {
+        userId: "owner-1",
+        name: "Fatima",
+        email: "fatima@example.com",
+      })
+    ).resolves.toMatchObject({ teamName: "BridgeRevolution", submissionId: "sub-1" });
+
+    expect(setDocMock).not.toHaveBeenCalled();
+    expect(updateDocMock).not.toHaveBeenCalled();
   });
 
   it("still succeeds when the submission member-field sync is denied", async () => {
@@ -96,7 +136,6 @@ describe("acceptTeamInvite", () => {
       })
     ).resolves.toMatchObject({ teamName: "BridgeRevolution" });
 
-    expect(addDocMock).toHaveBeenCalledTimes(1);
-    expect(setDocMock).toHaveBeenCalledTimes(1);
+    expect(setDocMock).toHaveBeenCalled();
   });
 });

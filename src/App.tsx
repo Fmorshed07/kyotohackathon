@@ -16,6 +16,7 @@ import HostSignIn from "./pages/HostSignIn";
 import Dashboard from "./pages/Dashboard";
 import ParticipantDashboardPage from "./pages/ParticipantDashboardPage";
 import ParticipantProfilePage from "./pages/ParticipantProfilePage";
+import ParticipantTeamPage from "./pages/ParticipantTeamPage";
 import ParticipantOnboardingPage from "./pages/ParticipantOnboardingPage";
 import JudgeDashboardPage from "./pages/JudgeDashboardPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
@@ -144,6 +145,7 @@ const App = () => (
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/dashboard/participant" element={<ParticipantProtectedRoute><ParticipantDashboardPage /></ParticipantProtectedRoute>} />
           <Route path="/dashboard/participant/profile" element={<ParticipantProtectedRoute><ParticipantProfilePage /></ParticipantProtectedRoute>} />
+          <Route path="/dashboard/participant/team" element={<ParticipantProtectedRoute><ParticipantTeamPage /></ParticipantProtectedRoute>} />
           <Route path="/dashboard/judge" element={<StaffProtectedRoute><JudgeDashboardPage /></StaffProtectedRoute>} />
           <Route path="/dashboard/admin" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/create" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />

@@ -1,6 +1,7 @@
 /** URL-safe invite tokens for team + judge portal links. */
 
 import {
+  getEventBoardPath,
   getJudgeEventWorkspacePath,
   HACKATHON_STORAGE_KEYS,
   isHackathonId,
@@ -80,7 +81,38 @@ export function clearJudgeWorkspaceBootstrap() {
   }
 }
 
-/** Open the judge dashboard pinned to the invite's dedicated event. */
+/** Pin the participant workspace to the invited event until they switch. */
+export function stashParticipantEvent(hackathonId: string) {
+  if (!isHackathonId(hackathonId)) return;
+  try {
+    window.localStorage.setItem(HACKATHON_STORAGE_KEYS.participant, hackathonId);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+/** After a team invite, open that event’s board with the joined team highlighted. */
+export function getEventBoardPathAfterTeamInvite(input: {
+  hackathonId: string;
+  teamName?: string;
+  submissionId?: string;
+}) {
+  if (!input.hackathonId || !isHackathonId(input.hackathonId)) {
+    const params = new URLSearchParams();
+    if (input.teamName) params.set("joinedTeam", input.teamName);
+    if (input.submissionId) params.set("joinedSubmission", input.submissionId);
+    const query = params.toString();
+    return query ? `/dashboard/participant?${query}` : "/dashboard/participant";
+  }
+
+  stashParticipantEvent(input.hackathonId);
+  const params = new URLSearchParams();
+  params.set("joined", "1");
+  if (input.teamName) params.set("team", input.teamName);
+  if (input.submissionId) params.set("project", input.submissionId);
+  return `${getEventBoardPath(input.hackathonId)}?${params.toString()}`;
+}
+
 export function getJudgeDashboardPathAfterInvite(primaryHackathonId: string | null | undefined) {
   if (primaryHackathonId && isHackathonId(primaryHackathonId)) {
     stashJudgeWorkspaceBootstrap(primaryHackathonId);

@@ -31,11 +31,16 @@ export type UserProfile = {
   onboardingCompletedAt?: string | null;
 };
 
+export type TeamMemberRole = "leader" | "member";
+
 export type TeamMemberRecord = {
   user_id: string;
   name: string;
   email: string;
   joined_at: string;
+  role?: TeamMemberRole | null;
+  /** Public people-profile snapshot copied when the member joined. */
+  profile?: UserProfile | null;
 };
 
 export type Submission = {
@@ -45,10 +50,17 @@ export type Submission = {
   title: string | null;
   team_name?: string | null;
   member_names?: string | null;
+  /** Display names synced from the live roster (arrayUnion-friendly on join). */
+  member_name_list?: string[] | null;
   /** Linked portal accounts that joined via invite link. */
   team_members?: TeamMemberRecord[] | null;
-  /** Auth uids allowed to read this submission after joining via invite. */
+  /** Auth uids allowed to read/edit this submission after joining via invite. */
   member_user_ids?: string[] | null;
+  /** Portal account that currently leads the team (defaults to the creator). */
+  team_leader_id?: string | null;
+  /** Display name/email for the submission creator (visible to teammates). */
+  owner_name?: string | null;
+  owner_email?: string | null;
   short_description: string | null;
   project_url: string | null;
   submission_pdf_url: string | null;

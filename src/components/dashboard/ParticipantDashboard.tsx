@@ -17,6 +17,7 @@ import {
   Rocket,
   UserRound,
   Users,
+  Crown,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PARTICIPANT_GUIDE_STEPS } from "@/lib/participantGuide";
@@ -28,21 +29,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
-import { FindTeammatesSection } from "@/components/dashboard/FindTeammatesSection";
 import { FollowCommunityPanel } from "@/components/dashboard/FollowCommunityPanel";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
 import { GalleryUploadField, ImageUploadField } from "@/components/dashboard/ImageUploadField";
 import { getPeopleProfileCompleteness } from "@/components/dashboard/PeopleProfileSection";
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
-import { TeamInvitePanel } from "@/components/dashboard/TeamInvitePanel";
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
+import { buildTeamRoster } from "@/lib/teamRoster";
 import {
   getEventBoardPath,
   type HackathonId,
   type ParticipantHackathonSummary,
   type PortalHackathon,
 } from "@/lib/hackathons";
-import type { Submission, TeamMemberRecord, TeammatePost } from "@/types/portal";
+import type { Submission, TeamMemberRecord, UserProfile } from "@/types/portal";
 
 const statusLabel: Record<PortalHackathon["status"], string> = {
   active: "Active",
@@ -160,28 +160,12 @@ export type ParticipantDashboardProps = {
   isSubmittingProject: boolean;
   onUploadProjectImage?: (file: File, kind: "cover" | "gallery") => Promise<string>;
   onSave: () => Promise<void>;
-  /** Find teammates board (public to all participants for the selected event). */
-  teammatePosts?: TeammatePost[];
-  isLoadingTeammatePosts?: boolean;
-  isSavingTeammatePost?: boolean;
-  teammatePostMessage?: string | null;
   currentUserId?: string;
   currentUserEmail?: string;
-  onCreateTeammatePost?: (input: {
-    looking_for: string;
-    message: string;
-    skills: string;
-    author_name: string;
-    author_email: string;
-  }) => Promise<void>;
-  onCloseTeammatePost?: (postId: string) => Promise<void>;
-  onDeleteTeammatePost?: (postId: string) => Promise<void>;
-  /** Team invite link for the active submission. */
-  teamInviteUrl?: string | null;
   linkedTeamMembers?: TeamMemberRecord[];
-  isTeamInviteBusy?: boolean;
-  onGenerateTeamInvite?: () => Promise<void>;
-  onRevokeTeamInvite?: () => Promise<void>;
+  teamOwner?: { user_id: string; name: string; email: string; profile?: UserProfile | null } | null;
+  teamLeaderId?: string | null;
+  memberProfiles?: Record<string, UserProfile | null | undefined>;
 };
 
 export function ParticipantDashboard({
@@ -204,20 +188,12 @@ export function ParticipantDashboard({
   isSubmittingProject,
   onUploadProjectImage,
   onSave,
-  teammatePosts = [],
-  isLoadingTeammatePosts = false,
-  isSavingTeammatePost = false,
-  teammatePostMessage = null,
   currentUserId = "",
   currentUserEmail = "",
-  onCreateTeammatePost,
-  onCloseTeammatePost,
-  onDeleteTeammatePost,
-  teamInviteUrl = null,
   linkedTeamMembers = [],
-  isTeamInviteBusy = false,
-  onGenerateTeamInvite,
-  onRevokeTeamInvite,
+  teamOwner = null,
+  teamLeaderId = null,
+  memberProfiles = {},
 }: ParticipantDashboardProps) {
   const [submissionSearchQuery, setSubmissionSearchQuery] = useState("");
   const normalizedPdfUrl = ensureAbsoluteUrl(participantForm.submissionPdfUrl);
@@ -234,6 +210,30 @@ export function ParticipantDashboard({
       submissionMatchesSearch(submissionSearchQuery, submission)
     );
   }, [participantSubmissions, submissionSearchQuery]);
+  const teamRoster = useMemo(
+    () =>
+      buildTeamRoster({
+        owner: teamOwner ?? {
+          user_id: currentUserId,
+          name: participantForm.fullName || currentUserEmail.split("@")[0] || "You",
+          email: currentUserEmail,
+        },
+        linkedMembers: linkedTeamMembers,
+        teamLeaderId,
+        currentUserId,
+        profiles: memberProfiles,
+      }),
+    [
+      currentUserEmail,
+      currentUserId,
+      linkedTeamMembers,
+      memberProfiles,
+      participantForm.fullName,
+      teamLeaderId,
+      teamOwner,
+    ]
+  );
+  const teamLeader = teamRoster.find((entry) => entry.isLeader) ?? teamRoster[0];
 
   return (
     <div className="space-y-8" id="overview">
@@ -499,22 +499,6 @@ export function ParticipantDashboard({
         </ol>
       </section>
 
-      {onCreateTeammatePost && onCloseTeammatePost && onDeleteTeammatePost ? (
-        <FindTeammatesSection
-          posts={teammatePosts}
-          isLoading={isLoadingTeammatePosts}
-          isReadOnly={isReadOnly}
-          currentUserId={currentUserId}
-          defaultName={participantForm.fullName}
-          defaultEmail={currentUserEmail}
-          isSaving={isSavingTeammatePost}
-          message={teammatePostMessage}
-          onCreatePost={onCreateTeammatePost}
-          onClosePost={onCloseTeammatePost}
-          onDeletePost={onDeleteTeammatePost}
-        />
-      ) : null}
-
       <section
         className={`${sectionClass}`}
         id="my-profile"
@@ -648,64 +632,85 @@ export function ParticipantDashboard({
         </div>
       </section>
 
-      {/* Team details */}
+      {/* Team summary */}
       <section
         className={`${sectionClass}`}
+        id="my-team"
         aria-labelledby="team-details-heading"
       >
-        <div className="mb-6 flex items-start gap-3 border-b border-white/10 pb-4">
-          <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
-            <Users className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="dash-eyebrow">Step 2</p>
-            <h2 id="team-details-heading" className="dash-title">
-              Team details
-            </h2>
-            <p className="dash-subtitle">Add your team name and all member names.</p>
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+              <Users className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">Collaborators</p>
+              <h2 id="team-details-heading" className="dash-title">
+                My team
+              </h2>
+              <p className="dash-subtitle">
+                Roster, invites, and teammate matching live on a dedicated team page.
+              </p>
+            </div>
           </div>
+          <Button asChild className="shrink-0">
+            <Link to="/dashboard/participant/team">Manage team</Link>
+          </Button>
         </div>
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <label className="dash-field-label">
-              Team Name
-            </label>
-            <Input
-              value={participantForm.teamName}
-              onChange={(e) =>
-                setParticipantForm((prev) => ({ ...prev, teamName: e.target.value }))
-              }
-              placeholder="Your team name"
-            />
+
+        <div className="overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-background/40 to-background/10 p-5 sm:p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="dash-eyebrow">Team name</p>
+              <p className="mt-1 truncate font-display text-lg font-semibold text-foreground">
+                {participantForm.teamName.trim() || "Name your team"}
+              </p>
+              <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Crown className="h-3.5 w-3.5 text-amber-200" />
+                Leader: {teamLeader?.name?.trim() || displayName}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex -space-x-2">
+                {teamRoster.slice(0, 5).map((entry) => (
+                  <Avatar
+                    key={entry.user_id}
+                    className="h-10 w-10 rounded-full border-2 border-background"
+                  >
+                    {entry.profile?.avatarUrl?.trim() ? (
+                      <AvatarImage
+                        src={entry.profile.avatarUrl.trim()}
+                        alt={entry.name}
+                        className="object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback className="bg-primary/20 text-[10px] font-semibold text-primary">
+                      {getInitials(entry.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+              </div>
+              <div>
+                <p className="text-2xl font-semibold tracking-tight text-foreground">
+                  {teamRoster.length}
+                </p>
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  {teamRoster.length === 1 ? "member" : "members"}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <label className="dash-field-label">
-              Member Names
-            </label>
-            <Textarea
-              value={participantForm.memberNames}
-              onChange={(e) =>
-                setParticipantForm((prev) => ({ ...prev, memberNames: e.target.value }))
-              }
-              placeholder="List all members, one per line."
-              rows={4}
-            />
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button asChild>
+              <Link to="/dashboard/participant/team">
+                Open team workspace
+                <ArrowRight className="ml-1.5 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/dashboard/participant/team#find-teammates">Find teammates</Link>
+            </Button>
           </div>
-          {onGenerateTeamInvite ? (
-            <TeamInvitePanel
-              inviteUrl={teamInviteUrl}
-              linkedMembers={linkedTeamMembers}
-              isBusy={isTeamInviteBusy}
-              disabled={!activeSubmissionId || isReadOnly}
-              disabledReason={
-                isReadOnly
-                  ? "Past events are view-only."
-                  : "Save your project once to unlock a shareable team invite link."
-              }
-              onGenerate={onGenerateTeamInvite}
-              onRevoke={onRevokeTeamInvite}
-            />
-          ) : null}
         </div>
       </section>
 
@@ -719,7 +724,7 @@ export function ParticipantDashboard({
             <Link2 className="h-4 w-4" />
           </span>
           <div>
-            <p className="dash-eyebrow">Step 3</p>
+            <p className="dash-eyebrow">Step 2</p>
             <h2 id="links-media-heading" className="dash-title">
               Links & media
             </h2>

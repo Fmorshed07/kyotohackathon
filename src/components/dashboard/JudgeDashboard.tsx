@@ -14,23 +14,13 @@ import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import type { JudgeStatistics } from "@/lib/judgingStatistics";
 import type { PortalHackathon } from "@/lib/hackathons";
 import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
-import {
-  calculateTotalFromCriteria,
-  type JudgingCriterion,
-  type JudgingCriterionId,
-} from "@/components/dashboard/judgingCriteria";
+import { collectTeamDisplayNames } from "@/lib/teamRoster";
 
 type TeamSummary = {
   name: string;
   submissions: Submission[];
   members: string[];
 };
-
-const parseMemberNames = (rawMemberNames: string | null | undefined) =>
-  (rawMemberNames ?? "")
-    .split(/[\n,;]+/)
-    .map((name) => name.trim())
-    .filter(Boolean);
 
 const formatSubmittedAt = (createdAt: string | null | undefined) => {
   if (!createdAt) return null;
@@ -100,14 +90,14 @@ export function JudgeDashboard({
         acc.set(teamName, {
           name: teamName,
           submissions: [submission],
-          members: parseMemberNames(submission.member_names),
+          members: collectTeamDisplayNames(submission),
         });
         return acc;
       }
 
       const combinedMembers = [
         ...existing.members,
-        ...parseMemberNames(submission.member_names),
+        ...collectTeamDisplayNames(submission),
       ];
       existing.members = Array.from(new Set(combinedMembers));
       existing.submissions.push(submission);

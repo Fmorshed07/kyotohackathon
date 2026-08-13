@@ -8,6 +8,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import type { Submission } from "@/types/portal";
+import { formatTeamMemberNames, isSubmissionCollaborator } from "@/lib/teamRoster";
 
 /** IDs are slug-safe so AI-created events can use their own Firestore document ID. */
 export type HackathonId = string;
@@ -436,8 +437,8 @@ export const toEventBoardEntry = (
   teamName: submission.team_name?.trim() || "Unnamed team",
   shortDescription: submission.short_description?.trim() || "",
   projectUrl: submission.project_url?.trim() || "",
-  memberNames: submission.member_names?.trim() || "",
-  isOwn: submission.user_id === currentUserId,
+  memberNames: formatTeamMemberNames(submission),
+  isOwn: isSubmissionCollaborator(submission, currentUserId),
 });
 
 export type HackathonUserRef = {

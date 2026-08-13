@@ -15,6 +15,7 @@ import {
   SITE_HACKATHON_ID,
   withHackathonQuery,
 } from "@/lib/hackathons";
+import { getEventBoardPathAfterTeamInvite } from "@/lib/inviteTokens";
 
 /** Dynamic hosted event id — not part of the static Impact catalog. */
 const hostedIdeathonId = "ai-ideathon-2026-q9pxii";
@@ -40,6 +41,18 @@ describe("event paths and enrollment", () => {
       `/dashboard/judge?hackathon=${hostedIdeathonId}`
     );
     expect(getHackathonPublicUrl(hostedIdeathonId)).toBe(`/events/${hostedIdeathonId}`);
+  });
+
+  it("opens the invited event board after a teammate joins via link", () => {
+    expect(
+      getEventBoardPathAfterTeamInvite({
+        hackathonId: hostedIdeathonId,
+        teamName: "BridgeRevolution",
+        submissionId: "sub-1",
+      })
+    ).toBe(
+      `/boards/${hostedIdeathonId}?joined=1&team=BridgeRevolution&project=sub-1`
+    );
   });
 
   it("keeps Impact editions in the static catalog and leaves hosted events dynamic", () => {

@@ -559,8 +559,12 @@ function DashboardLayoutContent({
   onHackathonChange,
 }: DashboardLayoutProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
   const isStaffDashboard = role === "judge" || role === "mentor";
+  const isParticipantHome = location.pathname === "/dashboard/participant";
+  const isParticipantTeamPage = location.pathname === "/dashboard/participant/team";
+  const isParticipantProfilePage = location.pathname === "/dashboard/participant/profile";
   const roleTheme = roleThemes[role];
   const userInitial = (sessionUser.email?.[0] ?? "?").toUpperCase();
 
@@ -669,9 +673,19 @@ function DashboardLayoutContent({
           ) : (
             <NavSection label="Dashboard">
               <SidebarMenuItem>
-                <SidebarMenuButton asChild className={menuButtonClass}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={role === "participant" ? isParticipantHome : undefined}
+                  className={menuButtonClass}
+                >
                   <DashboardNavLink
-                    href={role === "host" ? "/dashboard/host#overview" : "#overview"}
+                    href={
+                      role === "host"
+                        ? "/dashboard/host#overview"
+                        : role === "participant"
+                          ? "/dashboard/participant#overview"
+                          : "#overview"
+                    }
                     onNavigate={closeMobileNav}
                   >
                     <LayoutDashboard className={navIconClass} />
@@ -683,22 +697,36 @@ function DashboardLayoutContent({
                 <>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#my-hackathons" onNavigate={closeMobileNav}>
+                      <DashboardNavLink
+                        href="/dashboard/participant#my-hackathons"
+                        onNavigate={closeMobileNav}
+                      >
                         <CalendarRange className={navIconClass} />
                         <span>My Hackathons</span>
                       </DashboardNavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#find-teammates" onNavigate={closeMobileNav}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isParticipantTeamPage}
+                      className={menuButtonClass}
+                    >
+                      <DashboardNavLink
+                        href="/dashboard/participant/team"
+                        onNavigate={closeMobileNav}
+                      >
                         <Users className={navIconClass} />
-                        <span>Find Teammates</span>
+                        <span>My Team</span>
                       </DashboardNavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isParticipantProfilePage}
+                      className={menuButtonClass}
+                    >
                       <DashboardNavLink
                         href="/dashboard/participant/profile"
                         onNavigate={closeMobileNav}
@@ -710,7 +738,10 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#my-project" onNavigate={closeMobileNav}>
+                      <DashboardNavLink
+                        href="/dashboard/participant#my-project"
+                        onNavigate={closeMobileNav}
+                      >
                         <FileText className={navIconClass} />
                         <span>My Project</span>
                       </DashboardNavLink>
@@ -718,7 +749,10 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#resources-guide" onNavigate={closeMobileNav}>
+                      <DashboardNavLink
+                        href="/dashboard/participant#resources-guide"
+                        onNavigate={closeMobileNav}
+                      >
                         <BookOpen className={navIconClass} />
                         <span>Resources & guide</span>
                       </DashboardNavLink>

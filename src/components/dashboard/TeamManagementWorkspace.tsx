@@ -1,0 +1,315 @@
+import { Link } from "react-router-dom";
+import {
+  Crown,
+  ExternalLink,
+  FileText,
+  Save,
+  Users,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { sectionClass } from "@/components/dashboard/DashboardLayout";
+import { FindTeammatesSection } from "@/components/dashboard/FindTeammatesSection";
+import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
+import { TeamInvitePanel } from "@/components/dashboard/TeamInvitePanel";
+import { getEventBoardPath, type PortalHackathon } from "@/lib/hackathons";
+import { buildTeamRoster } from "@/lib/teamRoster";
+import type { Submission, TeamMemberRecord, TeammatePost, UserProfile } from "@/types/portal";
+
+export type TeamManagementWorkspaceProps = {
+  selectedHackathon: PortalHackathon;
+  publicSiteUrl?: string;
+  isLoading?: boolean;
+  isReadOnly?: boolean;
+  teamName: string;
+  onTeamNameChange: (value: string) => void;
+  isTeamNameDirty?: boolean;
+  isSavingTeam?: boolean;
+  saveMessage?: string | null;
+  onSaveTeam: () => Promise<void>;
+  participantSubmissions: Submission[];
+  activeSubmissionId: string | null;
+  onSelectSubmission: (submissionId: string) => void;
+  currentUserId: string;
+  currentUserEmail: string;
+  displayName: string;
+  linkedTeamMembers: TeamMemberRecord[];
+  teamOwner: { user_id: string; name: string; email: string; profile?: UserProfile | null };
+  teamLeaderId: string | null;
+  memberProfiles?: Record<string, UserProfile | null | undefined>;
+  teamInviteUrl: string | null;
+  isTeamInviteBusy: boolean;
+  canAssignTeamLeader: boolean;
+  onGenerateTeamInvite: () => Promise<void>;
+  onRevokeTeamInvite: () => Promise<void>;
+  onAssignTeamLeader: (userId: string) => Promise<void>;
+  teammatePosts: TeammatePost[];
+  isLoadingTeammatePosts: boolean;
+  isSavingTeammatePost: boolean;
+  teammatePostMessage: string | null;
+  onCreateTeammatePost: (input: {
+    looking_for: string;
+    message: string;
+    skills: string;
+    author_name: string;
+    author_email: string;
+  }) => Promise<void>;
+  onCloseTeammatePost: (postId: string) => Promise<void>;
+  onDeleteTeammatePost: (postId: string) => Promise<void>;
+};
+
+export function TeamManagementWorkspace({
+  selectedHackathon,
+  publicSiteUrl,
+  isLoading = false,
+  isReadOnly = false,
+  teamName,
+  onTeamNameChange,
+  isTeamNameDirty = false,
+  isSavingTeam = false,
+  saveMessage = null,
+  onSaveTeam,
+  participantSubmissions,
+  activeSubmissionId,
+  onSelectSubmission,
+  currentUserId,
+  currentUserEmail,
+  displayName,
+  linkedTeamMembers,
+  teamOwner,
+  teamLeaderId,
+  memberProfiles = {},
+  teamInviteUrl,
+  isTeamInviteBusy,
+  canAssignTeamLeader,
+  onGenerateTeamInvite,
+  onRevokeTeamInvite,
+  onAssignTeamLeader,
+  teammatePosts,
+  isLoadingTeammatePosts,
+  isSavingTeammatePost,
+  teammatePostMessage,
+  onCreateTeammatePost,
+  onCloseTeammatePost,
+  onDeleteTeammatePost,
+}: TeamManagementWorkspaceProps) {
+  const hasSubmission = Boolean(activeSubmissionId);
+  const activeSubmission =
+    participantSubmissions.find((submission) => submission.id === activeSubmissionId) ?? null;
+  const roster = buildTeamRoster({
+    owner: teamOwner,
+    linkedMembers: linkedTeamMembers,
+    teamLeaderId,
+    currentUserId,
+    profiles: memberProfiles,
+  });
+  const leader = roster.find((entry) => entry.isLeader) ?? roster[0];
+  const projectTitle = activeSubmission?.title?.trim() || "";
+
+  return (
+    <div className="space-y-8" id="overview">
+      <HackathonContextBanner
+        hackathon={selectedHackathon}
+        role="participant"
+        publicSiteUrl={publicSiteUrl}
+      />
+
+      <section className={sectionClass} aria-labelledby="team-overview-heading">
+        <div className="dash-stack-header flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+              <Users className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="dash-eyebrow">{selectedHackathon.shortName} team</p>
+              <h2 id="team-overview-heading" className="dash-title">
+                Team workspace
+              </h2>
+              <p className="dash-subtitle">
+                Name the team, manage the roster, and invite collaborators for this event.
+              </p>
+            </div>
+          </div>
+          <Button asChild variant="outline" className="shrink-0">
+            <Link to={getEventBoardPath(selectedHackathon.id)}>
+              Open board
+              <ExternalLink className="ml-1.5 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+
+        <div className="dash-stat-grid mt-5 grid gap-2 sm:grid-cols-3 sm:gap-3">
+          <div className="dash-stat-tile dash-stat-tile--highlight">
+            <p className="dash-stat-value">{isLoading ? "—" : String(roster.length)}</p>
+            <p className="dash-stat-label">Members</p>
+          </div>
+          <div className="dash-stat-tile">
+            <p className="dash-stat-value truncate text-lg sm:text-2xl">
+              {leader?.name?.trim() || "—"}
+            </p>
+            <p className="dash-stat-label">Team leader</p>
+          </div>
+          <div className="dash-stat-tile">
+            <p className="dash-stat-value truncate text-lg sm:text-2xl">
+              {teamInviteUrl ? "Ready" : hasSubmission ? "None" : "Locked"}
+            </p>
+            <p className="dash-stat-label">Invite link</p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        className={sectionClass}
+        id="team-details"
+        aria-labelledby="team-identity-heading"
+      >
+        <div className="mb-6 flex items-start gap-3 border-b border-white/10 pb-4">
+          <span className="dash-icon-chip" aria-hidden>
+            <FileText className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">Identity</p>
+            <h2 id="team-identity-heading" className="dash-title">
+              Team name & project
+            </h2>
+            <p className="dash-subtitle">
+              This name appears on the event board, gallery, and invite links.
+            </p>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading your team…</p>
+        ) : (
+          <div className="space-y-5">
+            {participantSubmissions.length > 1 && activeSubmissionId ? (
+              <div className="space-y-2">
+                <label className="dash-field-label">Active project</label>
+                <Select value={activeSubmissionId} onValueChange={onSelectSubmission}>
+                  <SelectTrigger className="max-w-lg">
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {participantSubmissions.map((submission) => (
+                      <SelectItem key={submission.id} value={submission.id}>
+                        {submission.title?.trim() || `Untitled (${submission.id.slice(0, 8)})`}
+                        {submission.team_name?.trim() ? ` — ${submission.team_name.trim()}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+              <div className="space-y-2">
+                <label className="dash-field-label" htmlFor="team-name">
+                  Team name
+                </label>
+                <Input
+                  id="team-name"
+                  value={teamName}
+                  onChange={(event) => onTeamNameChange(event.target.value)}
+                  placeholder="Your team name"
+                  disabled={isReadOnly || !hasSubmission}
+                />
+              </div>
+              <Button
+                type="button"
+                size="lg"
+                disabled={isReadOnly || !hasSubmission || isSavingTeam || !isTeamNameDirty}
+                onClick={() => void onSaveTeam()}
+              >
+                <Save className="h-4 w-4" />
+                {isSavingTeam ? "Saving…" : "Save team name"}
+              </Button>
+            </div>
+
+            {projectTitle ? (
+              <p className="text-sm text-muted-foreground">
+                Linked project:{" "}
+                <span className="font-medium text-foreground">{projectTitle}</span>
+              </p>
+            ) : null}
+
+            {saveMessage ? <p className="dash-message">{saveMessage}</p> : null}
+
+            {!hasSubmission ? (
+              <div className="rounded-xl border border-dashed border-white/15 bg-background/30 p-4">
+                <p className="text-sm text-foreground">
+                  Save a project once on your workspace to unlock the roster, leader, and invite
+                  link.
+                </p>
+                <Button asChild variant="outline" className="mt-3">
+                  <Link to="/dashboard/participant#my-project">Open project form</Link>
+                </Button>
+              </div>
+            ) : isReadOnly ? (
+              <p className="text-sm text-muted-foreground">
+                Past events are view-only. You can still browse the roster and teammate board.
+              </p>
+            ) : null}
+          </div>
+        )}
+      </section>
+
+      <section className={sectionClass} aria-labelledby="team-people-heading">
+        <div className="mb-6 flex items-start gap-3 border-b border-white/10 pb-4">
+          <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+            <Crown className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="dash-eyebrow">People</p>
+            <h2 id="team-people-heading" className="dash-title">
+              Roster & invites
+            </h2>
+            <p className="dash-subtitle">
+              Assign a leader and share a link so teammates join this same project.
+            </p>
+          </div>
+        </div>
+        <TeamInvitePanel
+          layout="split"
+          inviteUrl={teamInviteUrl}
+          linkedMembers={linkedTeamMembers}
+          owner={teamOwner}
+          currentUserId={currentUserId}
+          teamLeaderId={teamLeaderId}
+          memberProfiles={memberProfiles}
+          isBusy={isTeamInviteBusy}
+          disabled={!hasSubmission || isReadOnly}
+          disabledReason={
+            isReadOnly
+              ? "Past events are view-only."
+              : "Save your project once to unlock a shareable team invite link."
+          }
+          canAssignLeader={canAssignTeamLeader && !isReadOnly}
+          onGenerate={onGenerateTeamInvite}
+          onRevoke={onRevokeTeamInvite}
+          onAssignLeader={onAssignTeamLeader}
+        />
+      </section>
+
+      <FindTeammatesSection
+        posts={teammatePosts}
+        isLoading={isLoadingTeammatePosts}
+        isReadOnly={isReadOnly}
+        currentUserId={currentUserId}
+        defaultName={displayName}
+        defaultEmail={currentUserEmail}
+        isSaving={isSavingTeammatePost}
+        message={teammatePostMessage}
+        onCreatePost={onCreateTeammatePost}
+        onClosePost={onCloseTeammatePost}
+        onDeletePost={onDeleteTeammatePost}
+      />
+    </div>
+  );
+}

@@ -234,7 +234,15 @@ service cloud.firestore {
         || (hasPendingAdminGrant() && request.auth.uid == userId)
         || canCreateOwnPortalAccount(userId);
       // Approved hosts need participant/judge emails for submissions & mark check.
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isApprovedHost());
+      // Signed-in teammates can read participant profiles for the team roster.
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId
+        || isAdmin()
+        || isApprovedHost()
+        || isApprovedStaff()
+        || resource.data.role == "participant"
+        || resource.data.role == "participants"
+      );
       allow update: if isAdmin()
         || (hasPendingAdminGrant() && request.auth.uid == userId)
         || canUpdateOwnProfile(userId)
@@ -305,16 +313,79 @@ service cloud.firestore {
     }
 
     match /submissions/{submissionId} {
+      function isSubmissionOwner() {
+        return isSignedIn() && resource.data.user_id == request.auth.uid;
+      }
+
+      function isSubmissionTeammate() {
+        return isSignedIn()
+          && (
+            (
+              resource.data.member_user_ids is list
+              && request.auth.uid in resource.data.member_user_ids
+            )
+            || exists(/databases/$(database)/documents/team_memberships/$(submissionId + '_' + request.auth.uid))
+          );
+      }
+
+      function submissionCoreUnchanged() {
+        return request.resource.data.user_id == resource.data.user_id
+          && (
+            !("hackathon_id" in resource.data)
+            || request.resource.data.hackathon_id == resource.data.hackathon_id
+          );
+      }
+
+      function validTeamLeader() {
+        return !("team_leader_id" in request.resource.data)
+          || request.resource.data.team_leader_id == resource.data.user_id
+          || (
+            resource.data.member_user_ids is list
+            && request.resource.data.team_leader_id in resource.data.member_user_ids
+          )
+          || request.resource.data.team_leader_id == request.auth.uid;
+      }
+
+      function teammateEditableKeys() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "title",
+          "short_description",
+          "project_url",
+          "submission_pdf_url",
+          "demo_video_url",
+          "public_preview_consent",
+          "cover_url",
+          "gallery_urls",
+          "team_name",
+          "member_names",
+          "member_name_list",
+          "team_members",
+          "member_user_ids",
+          "team_leader_id",
+          "role",
+          "created_at",
+          "updated_at",
+          "join_invite_token"
+        ]);
+      }
+
+      function isInviteJoinUpdate() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["member_names", "member_name_list", "team_members", "member_user_ids", "join_invite_token"])
+          && request.resource.data.keys().hasAll(["join_invite_token"])
+          && request.resource.data.join_invite_token is string
+          && exists(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token))
+          && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.status == "open"
+          && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.submission_id == submissionId
+          && request.resource.data.user_id == resource.data.user_id;
+      }
+
       // Private by default. Public gallery/boards use public_projects only after explicit opt-in.
       allow read: if isAdmin()
         || isApprovedStaff()
         || isApprovedHost()
-        || (isSignedIn() && resource.data.user_id == request.auth.uid)
-        || (
-          isSignedIn()
-          && resource.data.member_user_ids is list
-          && request.auth.uid in resource.data.member_user_ids
-        );
+        || isSubmissionOwner()
+        || isSubmissionTeammate();
       allow create: if isSignedIn() && (
         request.auth.uid == request.resource.data.user_id
         || isAdmin()
@@ -325,7 +396,7 @@ service cloud.firestore {
         )
       );
       allow update: if isSignedIn() && (
-        request.auth.uid == resource.data.user_id
+        isSubmissionOwner()
         || isApprovedStaff()
         || isAdmin()
         || (
@@ -333,17 +404,12 @@ service cloud.firestore {
           && resource.data.hackathon_id is string
           && ownsHackathon(resource.data.hackathon_id)
         )
+        || isInviteJoinUpdate()
         || (
-          // Teammate accepting an invite: only membership fields + invite proof token.
-          // Must not require a prior read — joiners are not the submission owner.
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["member_names", "team_members", "member_user_ids", "join_invite_token"])
-          && request.resource.data.keys().hasAll(["join_invite_token"])
-          && request.resource.data.join_invite_token is string
-          && exists(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token))
-          && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.status == "open"
-          && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.submission_id == submissionId
-          && request.resource.data.user_id == resource.data.user_id
+          isSubmissionTeammate()
+          && submissionCoreUnchanged()
+          && teammateEditableKeys()
+          && validTeamLeader()
         )
       );
       allow delete: if isAdmin()
@@ -371,9 +437,18 @@ service cloud.firestore {
       allow get: if true;
       allow list: if isSignedIn() && (isAdmin() || resource.data.owner_id == request.auth.uid);
       allow create: if isSignedIn()
-        && request.resource.data.owner_id == request.auth.uid
         && request.resource.data.submission_id is string
-        && request.resource.data.type == "team";
+        && request.resource.data.type == "team"
+        && (
+          request.resource.data.owner_id == request.auth.uid
+          || (
+            exists(/databases/$(database)/documents/submissions/$(request.resource.data.submission_id))
+            && get(/databases/$(database)/documents/submissions/$(request.resource.data.submission_id)).data.user_id
+              == request.resource.data.owner_id
+            && get(/databases/$(database)/documents/submissions/$(request.resource.data.submission_id)).data.member_user_ids is list
+            && request.auth.uid in get(/databases/$(database)/documents/submissions/$(request.resource.data.submission_id)).data.member_user_ids
+          )
+        );
       allow update: if isSignedIn() && (
         isAdmin()
         || resource.data.owner_id == request.auth.uid
@@ -401,7 +476,9 @@ service cloud.firestore {
         || resource.data.user_id == request.auth.uid
         || resource.data.owner_id == request.auth.uid
       );
-      allow update: if isAdmin();
+      allow update: if isAdmin()
+        || (isSignedIn() && resource.data.user_id == request.auth.uid)
+        || (isSignedIn() && resource.data.owner_id == request.auth.uid);
     }
 
     // Judge portal invite links (document id == token). Anyone with the link can resolve it.
@@ -431,9 +508,40 @@ service cloud.firestore {
     // This deliberately avoids publishing private submissions, judging notes, or score data.
     match /public_projects/{projectId} {
       allow read: if true;
-      allow create, update: if isAdmin() || (isSignedIn()
-        && request.resource.data.owner_id == request.auth.uid
-        && request.resource.data.public_preview_consent == true);
+      allow create: if isAdmin() || (isSignedIn()
+        && request.resource.data.public_preview_consent == true
+        && (
+          request.resource.data.owner_id == request.auth.uid
+          || (
+            request.resource.data.owner_id is string
+            && request.resource.data.member_user_ids is list
+            && request.auth.uid in request.resource.data.member_user_ids
+            && exists(/databases/$(database)/documents/submissions/$(projectId))
+            && get(/databases/$(database)/documents/submissions/$(projectId)).data.user_id
+              == request.resource.data.owner_id
+          )
+        ));
+      allow update: if isAdmin()
+        || (isSignedIn()
+          && request.resource.data.owner_id == resource.data.owner_id
+          && request.resource.data.public_preview_consent == true
+          && (
+            request.resource.data.owner_id == request.auth.uid
+            || (
+              resource.data.member_user_ids is list
+              && request.auth.uid in resource.data.member_user_ids
+            )
+            || (
+              request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(["member_names", "member_name_list", "team_members", "member_user_ids", "team_leader_id", "join_invite_token"])
+              && request.resource.data.keys().hasAll(["join_invite_token"])
+              && request.resource.data.join_invite_token is string
+              && exists(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token))
+              && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.status == "open"
+              && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.submission_id == projectId
+            )
+          )
+        );
       allow delete: if isAdmin() || (isSignedIn() && resource.data.owner_id == request.auth.uid);
     }
 

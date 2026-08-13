@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -11,7 +11,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import {
@@ -34,6 +34,8 @@ import {
 import { fetchPortalHackathonCatalog } from "@/lib/aiHackathons";
 import { getDashboardPathForUser } from "@/lib/portalRoutes";
 import type { Submission } from "@/types/portal";
+import { countTeamBuilders, formatTeamMemberNames, isSubmissionCollaborator } from "@/lib/teamRoster";
+import { listAccessibleSubmissions } from "@/lib/portalInvites";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,15 +71,6 @@ const statusLabel: Record<PortalHackathon["status"], string> = {
   past: "Past",
 };
 
-function countBuilders(memberNames: string | null | undefined) {
-  if (!memberNames?.trim()) return 1;
-  const parts = memberNames
-    .split(/[,;\n]/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  return Math.max(parts.length, 1);
-}
-
 function projectStatus(submission: Submission) {
   if (submission.project_url?.trim() && submission.demo_video_url?.trim()) {
     return { label: "Ready", className: "border-primary/40 bg-primary/10 text-primary" };
@@ -88,8 +81,17 @@ function projectStatus(submission: Submission) {
   return { label: "Draft", className: "border-white/10 bg-transparent text-muted-foreground" };
 }
 
-function ProjectCard({ submission, hackathon }: { submission: Submission; hackathon: PortalHackathon }) {
-  const builders = countBuilders(submission.member_names);
+function ProjectCard({
+  submission,
+  hackathon,
+  highlighted = false,
+}: {
+  submission: Submission;
+  hackathon: PortalHackathon;
+  highlighted?: boolean;
+}) {
+  const builders = countTeamBuilders(submission);
+  const memberLabel = formatTeamMemberNames(submission).split("\n").filter(Boolean).join(" · ");
   const status = projectStatus(submission);
   const title = submission.title?.trim() || "Untitled project";
   const team = submission.team_name?.trim() || "Solo builder";
@@ -97,7 +99,13 @@ function ProjectCard({ submission, hackathon }: { submission: Submission; hackat
   const projectUrl = submission.project_url?.trim();
 
   return (
-    <article className="group relative flex overflow-hidden rounded-xl border border-white/[0.08] bg-card/70 transition-colors hover:border-primary/40">
+    <article
+      id={`board-project-${submission.id}`}
+      className={cn(
+        "group relative flex overflow-hidden rounded-xl border bg-card/70 transition-colors hover:border-primary/40",
+        highlighted ? "border-primary/60 ring-2 ring-primary/30" : "border-white/[0.08]",
+      )}
+    >
       <div
         className="pointer-events-none absolute inset-x-10 top-0 h-px opacity-50"
         style={{ background: "var(--flare)" }}
@@ -134,6 +142,11 @@ function ProjectCard({ submission, hackathon }: { submission: Submission; hackat
               <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
               {status.label}
             </span>
+            {highlighted ? (
+              <span className="inline-flex rounded-full border border-primary/40 bg-primary/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                Your team
+              </span>
+            ) : null}
           </div>
 
           <h3 className="mt-2 font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
@@ -144,10 +157,13 @@ function ProjectCard({ submission, hackathon }: { submission: Submission; hackat
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Users className="h-3.5 w-3.5 text-primary/80" />
+            <p className="inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground">
+              <Users className="h-3.5 w-3.5 shrink-0 text-primary/80" />
               <span className="font-semibold text-foreground/90">{builders}</span>
               {builders === 1 ? "Builder" : "Builders"}
+              {memberLabel ? (
+                <span className="truncate text-muted-foreground/90">· {memberLabel}</span>
+              ) : null}
             </p>
             {projectUrl ? (
               <a
@@ -179,12 +195,16 @@ function ProjectCard({ submission, hackathon }: { submission: Submission; hackat
 
 export default function HackathonBoardsPage() {
   const { hackathonId: hackathonIdParam } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { sessionUser, loading: authLoading } = usePortalAuth();
   const db = getFirestoreDb();
 
   const requestedHackathonId: HackathonId | null =
     hackathonIdParam && isHackathonId(hackathonIdParam) ? hackathonIdParam : null;
+  const joinedViaInvite = searchParams.get("joined") === "1";
+  const joinedTeamName = searchParams.get("team")?.trim() || null;
+  const joinedProjectId = searchParams.get("project")?.trim() || null;
 
   const [eventCatalog, setEventCatalog] = useState<PortalHackathon[]>(PORTAL_HACKATHONS);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -205,10 +225,18 @@ export default function HackathonBoardsPage() {
     const load = async () => {
       setIsLoading(true);
 
+      const userSnap = await getDoc(doc(db, "users", sessionUser.id)).catch(() => null);
+      const userData = userSnap?.exists() ? userSnap.data() : undefined;
       const allowedIds = getUserAllowedHackathonIds({
-        hackathon_id: sessionUser.hackathonId,
-        hackathon_ids: sessionUser.hackathonIds,
+        hackathon_id:
+          typeof userData?.hackathon_id === "string"
+            ? userData.hackathon_id
+            : sessionUser.hackathonId,
+        hackathon_ids: userData?.hackathon_ids ?? sessionUser.hackathonIds,
       });
+      if (requestedHackathonId && (joinedViaInvite || allowedIds.includes(requestedHackathonId))) {
+        if (!allowedIds.includes(requestedHackathonId)) allowedIds.push(requestedHackathonId);
+      }
 
       const catalog = await fetchPortalHackathonCatalog(db).catch(() => PORTAL_HACKATHONS);
 
@@ -217,21 +245,12 @@ export default function HackathonBoardsPage() {
         ? getDocs(collection(db, "public_projects"))
         : Promise.resolve(null);
 
-      const [boardSnapshot, ownSnapshot] = await Promise.all([
+      const [boardSnapshot, ownRows] = await Promise.all([
         boardQuery
           .then((snapshot) => snapshot)
           .catch(() => null),
-        getDocs(query(collection(db, "submissions"), where("user_id", "==", sessionUser.id))).catch(
-          () => null,
-        ),
+        listAccessibleSubmissions(db, sessionUser.id).catch(() => [] as Submission[]),
       ]);
-
-      const ownRows = ownSnapshot
-        ? (ownSnapshot.docs.map((docSnap) => ({
-            id: docSnap.id,
-            ...(docSnap.data() as Omit<Submission, "id">),
-          })) as Submission[])
-        : [];
 
       const boardRows = boardSnapshot
         ? boardSnapshot.docs
@@ -242,12 +261,32 @@ export default function HackathonBoardsPage() {
                 ? submissionBelongsToHackathon(project, requestedHackathonId)
                 : false,
             )
-            .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
         : [];
+
+      const merged = new Map<string, Submission>();
+      for (const row of boardRows) merged.set(row.id, row);
+      if (requestedHackathonId) {
+        for (const row of ownRows) {
+          if (submissionBelongsToHackathon(row, requestedHackathonId)) {
+            merged.set(row.id, merged.get(row.id) ?? row);
+          }
+        }
+      }
+
+      const nextRows = Array.from(merged.values()).sort((a, b) => {
+        const aJoined =
+          a.id === joinedProjectId ||
+          (joinedTeamName != null && a.team_name?.trim() === joinedTeamName);
+        const bJoined =
+          b.id === joinedProjectId ||
+          (joinedTeamName != null && b.team_name?.trim() === joinedTeamName);
+        if (aJoined !== bJoined) return aJoined ? -1 : 1;
+        return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+      });
 
       if (!cancelled) {
         setEventCatalog(catalog);
-        setSubmissions(boardRows);
+        setSubmissions(nextRows);
         setMySubmissions(ownRows);
         setEnrolledHackathonIds(allowedIds);
         setIsLoading(false);
@@ -258,18 +297,26 @@ export default function HackathonBoardsPage() {
     return () => {
       cancelled = true;
     };
-  }, [db, requestedHackathonId, sessionUser]);
+  }, [db, joinedProjectId, joinedTeamName, joinedViaInvite, requestedHackathonId, sessionUser]);
 
-  const accessibleHackathonIds = useMemo(
-    () =>
-      collectAccessibleHackathonIds({
-        enrolledIds: enrolledHackathonIds,
-        sessionHackathonId: sessionUser?.hackathonId,
-        sessionHackathonIds: sessionUser?.hackathonIds,
-        submissions: mySubmissions,
-      }),
-    [enrolledHackathonIds, mySubmissions, sessionUser],
-  );
+  const accessibleHackathonIds = useMemo(() => {
+    const ids = collectAccessibleHackathonIds({
+      enrolledIds: enrolledHackathonIds,
+      sessionHackathonId: sessionUser?.hackathonId,
+      sessionHackathonIds: sessionUser?.hackathonIds,
+      submissions: mySubmissions,
+    });
+    if (joinedViaInvite && requestedHackathonId && !ids.includes(requestedHackathonId)) {
+      return [...ids, requestedHackathonId];
+    }
+    return ids;
+  }, [
+    enrolledHackathonIds,
+    joinedViaInvite,
+    mySubmissions,
+    requestedHackathonId,
+    sessionUser,
+  ]);
 
   const myHackathonSummaries = useMemo(
     () => buildParticipantHackathonSummaries(mySubmissions, enrolledHackathonIds, eventCatalog),
@@ -309,11 +356,36 @@ export default function HackathonBoardsPage() {
     ],
   );
 
+  const highlightedSubmissionId = useMemo(() => {
+    if (joinedProjectId && submissions.some((entry) => entry.id === joinedProjectId)) {
+      return joinedProjectId;
+    }
+    if (joinedTeamName) {
+      return (
+        submissions.find((entry) => entry.team_name?.trim() === joinedTeamName)?.id ??
+        (sessionUser?.id
+          ? submissions.find((entry) => isSubmissionCollaborator(entry, sessionUser.id))?.id ?? null
+          : null)
+      );
+    }
+    if (joinedViaInvite && sessionUser?.id) {
+      return submissions.find((entry) => isSubmissionCollaborator(entry, sessionUser.id))?.id ?? null;
+    }
+    return null;
+  }, [joinedProjectId, joinedTeamName, joinedViaInvite, sessionUser?.id, submissions]);
+
+  useEffect(() => {
+    if (!highlightedSubmissionId || isLoading) return;
+    const node = document.getElementById(`board-project-${highlightedSubmissionId}`);
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightedSubmissionId, isLoading]);
+
   const ownSubmissionOnBoard = useMemo(
     () =>
       submissions.find(
         (submission) =>
-          submission.user_id === sessionUser?.id &&
+          sessionUser?.id &&
+          isSubmissionCollaborator(submission, sessionUser.id) &&
           getSubmissionHackathonId(submission) === selectedHackathonId,
       ) ?? null,
     [selectedHackathonId, sessionUser?.id, submissions],
@@ -329,6 +401,7 @@ export default function HackathonBoardsPage() {
         submission.title,
         submission.team_name,
         submission.member_names,
+        formatTeamMemberNames(submission),
         submission.short_description,
       ]
         .filter(Boolean)
@@ -356,7 +429,9 @@ export default function HackathonBoardsPage() {
   );
   const canBrowseAllBoards = sessionUser.role === "admin" || sessionUser.role === "host";
   const canViewSelected =
-    canBrowseAllBoards || accessibleHackathonIds.includes(selectedHackathonId);
+    canBrowseAllBoards ||
+    accessibleHackathonIds.includes(selectedHackathonId) ||
+    joinedViaInvite;
 
   if (!requestedHackathonId) {
     if (preferredBoardId) {
@@ -417,10 +492,12 @@ export default function HackathonBoardsPage() {
             <p className="mt-1 text-sm text-muted-foreground">Projects on this board</p>
             {ownSubmissionOnBoard ? (
               <p className="mt-3 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-xs text-primary">
-                Your project is on this board
-                {ownSubmissionOnBoard.title?.trim()
-                  ? `: ${ownSubmissionOnBoard.title.trim()}`
-                  : ""}
+                {joinedViaInvite ? "You just joined this team" : "Your project is on this board"}
+                {ownSubmissionOnBoard.team_name?.trim()
+                  ? `: ${ownSubmissionOnBoard.team_name.trim()}`
+                  : ownSubmissionOnBoard.title?.trim()
+                    ? `: ${ownSubmissionOnBoard.title.trim()}`
+                    : ""}
               </p>
             ) : null}
           </section>
@@ -565,6 +642,13 @@ export default function HackathonBoardsPage() {
         </aside>
 
         <main className="min-w-0 space-y-4">
+          {joinedViaInvite ? (
+            <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
+              {joinedTeamName
+                ? `You joined ${joinedTeamName}. This is the event board for that invite.`
+                : "You joined this team. This is the event board for that invite."}
+            </div>
+          ) : null}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-display text-xs font-semibold uppercase tracking-[0.18em] text-primary">
@@ -619,6 +703,7 @@ export default function HackathonBoardsPage() {
                   key={submission.id}
                   submission={submission}
                   hackathon={selectedHackathon}
+                  highlighted={submission.id === highlightedSubmissionId}
                 />
               ))}
             </div>
