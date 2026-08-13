@@ -49,6 +49,7 @@ import { type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole"
 import { AiHackathonLauncher } from "@/components/dashboard/AiHackathonLauncher";
 import { ManualHackathonLauncher } from "@/components/dashboard/ManualHackathonLauncher";
 import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
+import { AdminTeamsPanel } from "@/components/dashboard/AdminTeamsPanel";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { AdminTop3RankingSummary } from "@/lib/judgeTop3Rankings";
 import type { HostApprovalStatus, JudgeApprovalStatus, PortalRole, UserProfile } from "@/types/portal";
@@ -70,6 +71,19 @@ export type AdminSubmissionRow = {
   participantId: string;
   participantEmail: string;
   teamName: string | null;
+  teamLeaderName: string | null;
+  teamLeaderEmail: string | null;
+  memberCount: number;
+  members: Array<{
+    user_id: string;
+    name: string;
+    email: string;
+    isOwner: boolean;
+    isLeader: boolean;
+    avatarUrl?: string | null;
+    headline?: string | null;
+  }>;
+  extraMemberNames: string[];
   title: string | null;
   shortDescription: string | null;
   projectUrl: string | null;
@@ -1026,7 +1040,7 @@ export function AdminDashboard({
                 <p className="dash-eyebrow">People</p>
                 <h2 className="dash-title">{selectedHackathon.name}</h2>
                 <p className="dash-subtitle">
-                  Participants, judges, hosts, invites, and access for this event.
+                  Participants, teams, judges, hosts, invites, and access for this event.
                 </p>
               </div>
             </div>
@@ -1037,6 +1051,12 @@ export function AdminDashboard({
         </section>
 
         <HostAnalyticsPanel analytics={hostAnalytics} isLoading={isLoadingUsers} />
+
+        <AdminTeamsPanel
+          selectedHackathon={selectedHackathon}
+          submissions={submissions}
+          isLoading={isLoadingSubmissions}
+        />
 
         <HostApprovalPanel
           hosts={hostAccounts}
@@ -1282,7 +1302,7 @@ export function AdminDashboard({
     {
       to: withHackathonQuery("/dashboard/admin/people", eventQuery),
       title: "People",
-      description: "Participants, judges, hosts, and invites.",
+      description: "Participants, teams, judges, hosts, and invites.",
       icon: Users,
     },
     {

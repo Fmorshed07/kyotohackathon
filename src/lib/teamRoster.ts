@@ -112,3 +112,86 @@ export function buildTeamRoster(input: {
 
 export const rosterDisplayNames = (roster: TeamRosterEntry[]) =>
   uniquePreserveOrder(roster.map((entry) => entry.name));
+
+export type AdminTeamMemberView = {
+  user_id: string;
+  name: string;
+  email: string;
+  isOwner: boolean;
+  isLeader: boolean;
+  avatarUrl?: string | null;
+  headline?: string | null;
+};
+
+export type AdminTeamDetails = {
+  teamName: string;
+  leaderName: string;
+  leaderEmail: string;
+  members: AdminTeamMemberView[];
+  extraMemberNames: string[];
+  memberCount: number;
+};
+
+export function buildAdminTeamDetails(input: {
+  submission: Pick<
+    Submission,
+    | "user_id"
+    | "team_name"
+    | "owner_name"
+    | "owner_email"
+    | "team_leader_id"
+    | "team_members"
+    | "member_names"
+    | "member_name_list"
+  >;
+  ownerEmail?: string;
+  ownerName?: string;
+  ownerProfile?: UserProfile | null;
+  memberProfiles?: Record<string, UserProfile | null | undefined>;
+}): AdminTeamDetails {
+  const ownerEmail =
+    input.submission.owner_email?.trim() || input.ownerEmail?.trim() || "";
+  const ownerName =
+    input.ownerProfile?.fullName?.trim() ||
+    input.submission.owner_name?.trim() ||
+    input.ownerName?.trim() ||
+    ownerEmail.split("@")[0] ||
+    "Team creator";
+  const roster = buildTeamRoster({
+    owner: {
+      user_id: input.submission.user_id,
+      name: ownerName,
+      email: ownerEmail,
+      profile: input.ownerProfile,
+    },
+    linkedMembers: input.submission.team_members ?? [],
+    teamLeaderId: getTeamLeaderId(input.submission),
+    profiles: input.memberProfiles,
+  });
+  const extraMemberNames = collectTeamDisplayNames(input.submission).filter((name) => {
+    const key = name.trim().toLowerCase();
+    if (!key) return false;
+    return !roster.some((entry) => {
+      const rosterKey = entry.name.trim().toLowerCase();
+      return rosterKey === key || rosterKey.startsWith(`${key} `) || key.startsWith(`${rosterKey} `);
+    });
+  });
+  const leader = roster.find((entry) => entry.isLeader) ?? roster[0];
+
+  return {
+    teamName: input.submission.team_name?.trim() || "Unnamed team",
+    leaderName: leader?.name ?? ownerName,
+    leaderEmail: leader?.email ?? ownerEmail,
+    members: roster.map((entry) => ({
+      user_id: entry.user_id,
+      name: entry.name,
+      email: entry.email,
+      isOwner: entry.isOwner,
+      isLeader: entry.isLeader,
+      avatarUrl: entry.profile?.avatarUrl ?? null,
+      headline: entry.profile?.headline?.trim() || entry.profile?.publicRole?.trim() || null,
+    })),
+    extraMemberNames,
+    memberCount: Math.max(roster.length + extraMemberNames.length, countTeamBuilders(input.submission)),
+  };
+}

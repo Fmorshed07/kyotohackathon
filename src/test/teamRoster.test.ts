@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAdminTeamDetails,
   buildTeamRoster,
   collectTeamDisplayNames,
   countTeamBuilders,
@@ -64,5 +65,21 @@ describe("team roster", () => {
     const alex = roster.find((entry) => entry.user_id === "teammate-1");
     expect(alex?.name).toBe("Alex Rivera");
     expect(alex?.profile?.headline).toBe("Full-stack builder");
+  });
+
+  it("builds admin-facing team details with leader, roster, and extra names", () => {
+    const details = buildAdminTeamDetails({
+      submission,
+      ownerEmail: "fatima@example.com",
+      ownerName: "Fatima",
+      memberProfiles: {
+        "teammate-1": { fullName: "Alex Rivera", headline: "Full-stack builder" },
+      },
+    });
+    expect(details.teamName).toBe("BridgeRevolution");
+    expect(details.leaderName).toBe("Alex Rivera");
+    expect(details.members.map((member) => member.user_id)).toEqual(["owner-1", "teammate-1"]);
+    expect(details.extraMemberNames).toEqual([]);
+    expect(details.memberCount).toBe(2);
   });
 });

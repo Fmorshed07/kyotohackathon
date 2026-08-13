@@ -153,7 +153,8 @@ export function AdminSubmissionsPanel({
             <Table>
               <TableHeader>
                 <TableRow className="border-white/10 bg-muted/15 hover:bg-muted/15">
-                  <TableHead className="dash-table-head w-[200px]">Participant</TableHead>
+                  <TableHead className="dash-table-head w-[180px]">Participant</TableHead>
+                  <TableHead className="dash-table-head w-[240px]">Team</TableHead>
                   <TableHead className="dash-table-head w-[220px]">Project</TableHead>
                   <TableHead className="dash-table-head">Links</TableHead>
                   <TableHead className="dash-table-head w-[90px] text-right">Avg</TableHead>
@@ -168,6 +169,26 @@ export function AdminSubmissionsPanel({
                     className="border-white/5 transition-colors hover:bg-primary/5"
                   >
                     <TableCell className="align-top text-sm">{submission.participantEmail}</TableCell>
+                    <TableCell className="align-top">
+                      <p className="text-sm font-medium">
+                        {submission.teamName?.trim() || "Unnamed team"}
+                      </p>
+                      <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                        {submission.memberCount}{" "}
+                        {submission.memberCount === 1 ? "member" : "members"}
+                        {submission.teamLeaderName
+                          ? ` · lead ${submission.teamLeaderName}`
+                          : ""}
+                      </p>
+                      {submission.members.length > 0 ? (
+                        <p className="mt-1 line-clamp-2 text-[0.7rem] text-muted-foreground">
+                          {submission.members.map((member) => member.name).join(" · ")}
+                          {submission.extraMemberNames.length > 0
+                            ? ` · ${submission.extraMemberNames.join(" · ")}`
+                            : ""}
+                        </p>
+                      ) : null}
+                    </TableCell>
                     <TableCell className="align-top">
                       <p className="text-sm font-medium">{submission.title || "Untitled Project"}</p>
                       <p className="mt-1 line-clamp-3 text-[0.7rem] text-muted-foreground">

@@ -203,6 +203,11 @@ const buildAdminPeopleNav: AdminNavBuilder = (hackathonId) => [
     icon: Users,
   },
   {
+    href: withHackathonQuery("/dashboard/admin/people#event-teams", hackathonId),
+    label: "Teams",
+    icon: Users,
+  },
+  {
     href: withHackathonQuery("/dashboard/admin/people#manage-judges", hackathonId),
     label: "Judges",
     icon: Scale,
@@ -404,6 +409,7 @@ function AdminHashScroll() {
       const createHashes = new Set(["ai-event-builder", "manual-event-builder"]);
       const peopleHashes = new Set([
         "manage-participants",
+        "event-teams",
         "manage-judges",
         "manage-hosts",
         "manage-judge-approvals",

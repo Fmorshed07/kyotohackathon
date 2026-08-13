@@ -28,6 +28,7 @@ import {
 } from "@/lib/judgeTop3Rankings";
 import { buildAdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { queueParticipantEmail } from "@/lib/participantEmail";
+import { buildAdminTeamDetails } from "@/lib/teamRoster";
 import type {
   HostApprovalStatus,
   JudgeApprovalStatus,
@@ -312,11 +313,26 @@ export function HostEventJudgingWorkspace({
             .map((mark) => mark.score)
             .filter((value): value is number => typeof value === "number");
 
+          const team = buildAdminTeamDetails({
+            submission,
+            ownerEmail: participantEmail,
+            ownerName: participantById[participantId]?.profile?.fullName ?? undefined,
+            ownerProfile: participantById[participantId]?.profile ?? null,
+            memberProfiles: Object.fromEntries(
+              users.map((user) => [user.id, user.profile ?? null])
+            ),
+          });
+
           return {
             id: submission.id,
             participantId,
             participantEmail,
-            teamName: submission.team_name ?? null,
+            teamName: team.teamName === "Unnamed team" ? submission.team_name ?? null : team.teamName,
+            teamLeaderName: team.leaderName,
+            teamLeaderEmail: team.leaderEmail,
+            memberCount: team.memberCount,
+            members: team.members,
+            extraMemberNames: team.extraMemberNames,
             title: submission.title,
             shortDescription: submission.short_description,
             projectUrl: submission.project_url,
@@ -335,7 +351,7 @@ export function HostEventJudgingWorkspace({
           const right = b.averageScore ?? -1;
           return right - left;
         }),
-    [submissions, hackathonUsers, userEmailLookup, judgingCriteria],
+    [submissions, hackathonUsers, userEmailLookup, judgingCriteria, users],
   );
 
   const activeJudgeIds = new Set(
