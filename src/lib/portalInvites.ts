@@ -128,22 +128,13 @@ export async function listTeamMembershipsForSubmission(
   });
 }
 
-function appendMemberName(existing: string | null | undefined, name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return existing?.trim() ?? "";
-  const lines = (existing ?? "")
-    .split(/\r?\n|,/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.some((line) => line.toLowerCase() === trimmed.toLowerCase())) {
-    return lines.join("\n");
-  }
-  return [...lines, trimmed].join("\n");
-}
-
 /**
  * Join a team via invite: writes a membership row, bumps invite use count,
- * enrolls the participant, and best-effort syncs submission member fields (owner can always edit).
+ * enrolls the participant, and best-effort syncs submission member fields.
+ *
+ * Teammates cannot read the owner's private submission, so this path must not
+ * getDoc(submissions/...). Rules allow membership create + invite use_count
+ * increment + a narrow submission update (arrayUnion + invite token).
  */
 export async function acceptTeamInvite(
   db: Firestore,
@@ -164,12 +155,6 @@ export async function acceptTeamInvite(
   }
   if (invite.owner_id === joiner.userId) {
     throw new Error("You already own this team.");
-  }
-
-  const submissionRef = doc(db, "submissions", invite.submission_id);
-  const submissionSnap = await getDoc(submissionRef);
-  if (!submissionSnap.exists()) {
-    throw new Error("The team submission no longer exists.");
   }
 
   const existingMemberships = await listTeamMembershipsForSubmission(db, invite.submission_id);
@@ -204,23 +189,23 @@ export async function acceptTeamInvite(
     use_count: increment(1),
   });
 
-  const submission = submissionSnap.data() as Record<string, unknown>;
-  const existingMembers = Array.isArray(submission.team_members)
-    ? (submission.team_members as TeamMemberRecord[])
-    : [];
-  const nextMemberNames = appendMemberName(
-    typeof submission.member_names === "string" ? submission.member_names : "",
-    member.name
-  );
-
+  const submissionRef = doc(db, "submissions", invite.submission_id);
   try {
     await updateDoc(submissionRef, {
-      team_members: [...existingMembers, member],
-      member_names: nextMemberNames,
+      team_members: arrayUnion(member),
+      member_user_ids: arrayUnion(joiner.userId),
       join_invite_token: token,
     });
   } catch {
-    // Membership row is enough; owner still sees linked members via team_memberships.
+    try {
+      // Older deployed rules only allow team_members + join_invite_token.
+      await updateDoc(submissionRef, {
+        team_members: arrayUnion(member),
+        join_invite_token: token,
+      });
+    } catch {
+      // Membership row is enough; owner still sees linked members via team_memberships.
+    }
   }
 
   const nextHackathonIds = Array.from(

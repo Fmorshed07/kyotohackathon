@@ -250,6 +250,13 @@ export default function ParticipantDashboardPage() {
     return value && isHackathonId(value) ? value : null;
   }, [searchParams]);
 
+  const joinedTeamName = searchParams.get("joinedTeam")?.trim() || null;
+
+  useEffect(() => {
+    if (!joinedTeamName) return;
+    setSubmissionMessage(`You joined ${joinedTeamName}.`);
+  }, [joinedTeamName]);
+
   const accessibleHackathonIds = useMemo(
     () =>
       collectAccessibleHackathonIds({

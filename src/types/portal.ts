@@ -47,6 +47,8 @@ export type Submission = {
   member_names?: string | null;
   /** Linked portal accounts that joined via invite link. */
   team_members?: TeamMemberRecord[] | null;
+  /** Auth uids allowed to read this submission after joining via invite. */
+  member_user_ids?: string[] | null;
   short_description: string | null;
   project_url: string | null;
   submission_pdf_url: string | null;

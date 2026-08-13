@@ -309,7 +309,12 @@ service cloud.firestore {
       allow read: if isAdmin()
         || isApprovedStaff()
         || isApprovedHost()
-        || (isSignedIn() && resource.data.user_id == request.auth.uid);
+        || (isSignedIn() && resource.data.user_id == request.auth.uid)
+        || (
+          isSignedIn()
+          && resource.data.member_user_ids is list
+          && request.auth.uid in resource.data.member_user_ids
+        );
       allow create: if isSignedIn() && (
         request.auth.uid == request.resource.data.user_id
         || isAdmin()
@@ -330,8 +335,9 @@ service cloud.firestore {
         )
         || (
           // Teammate accepting an invite: only membership fields + invite proof token.
+          // Must not require a prior read — joiners are not the submission owner.
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["member_names", "team_members", "join_invite_token"])
+            .hasOnly(["member_names", "team_members", "member_user_ids", "join_invite_token"])
           && request.resource.data.keys().hasAll(["join_invite_token"])
           && request.resource.data.join_invite_token is string
           && exists(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token))

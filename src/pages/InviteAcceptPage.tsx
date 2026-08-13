@@ -113,7 +113,12 @@ export default function InviteAcceptPage() {
         replace: true,
       });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to join this team.");
+      const message = error instanceof Error ? error.message : "Unable to join this team.";
+      setActionError(
+        /insufficient permissions|permission-denied/i.test(message)
+          ? "Could not join this team. Sign in with a participant account and try the invite link again."
+          : message
+      );
     } finally {
       setIsActing(false);
     }
