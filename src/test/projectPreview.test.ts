@@ -23,7 +23,7 @@ describe("project share preview metadata", () => {
     const metadata = buildProjectPreviewMetadata(
       project,
       "https://impactkyoto.cognisorai.com/projects/project-1",
-      "https://impactkyoto.cognisorai.com/h1.png",
+      "https://impactkyoto.cognisorai.com/app.png",
     );
 
     expect(metadata.title).toBe("KyoCare | Global Impact Hackathons");
@@ -42,7 +42,7 @@ describe("project share preview metadata", () => {
       "https://impactkyoto.cognisorai.com",
     );
 
-    expect(project?.image).toBe("https://impactkyoto.cognisorai.com/h1.png");
+    expect(project?.image).toBe("https://impactkyoto.cognisorai.com/app.png");
   });
 
   it("does not expose a project that was removed from the public gallery", () => {
@@ -64,7 +64,7 @@ describe("project share preview metadata", () => {
         image: "https://cdn.example.com/project.jpg",
       },
       "https://impactkyoto.cognisorai.com/projects/project-1",
-      "https://impactkyoto.cognisorai.com/h1.png",
+      "https://impactkyoto.cognisorai.com/app.png",
     );
     const html = renderProjectPreviewHtml(
       '<html><head><title>Old title</title><meta property="og:title" content="Old title" /></head><body><div id="root"></div><script type="module" src="/assets/app.js"></script></body></html>',

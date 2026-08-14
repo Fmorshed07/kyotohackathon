@@ -50,7 +50,7 @@ function safeHttpUrl(value: unknown) {
 }
 
 function projectImageFallback(origin: string) {
-  return `${origin.replace(/\/$/, "")}/h1.png`;
+  return `${origin.replace(/\/$/, "")}/app.png`;
 }
 
 function firestoreValue(value: FirestoreValue | undefined): unknown {
