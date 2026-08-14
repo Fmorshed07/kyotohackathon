@@ -32,6 +32,7 @@ import ProjectGalleryPage from "./pages/ProjectGalleryPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
 import NotFound from "./pages/NotFound";
+import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -134,6 +135,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <RouteErrorBoundary>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/hackathons" element={<HackathonsPage />} />
@@ -169,6 +171,7 @@ const App = () => (
           <Route path="/invite/:kind/:token" element={<InviteAcceptPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </RouteErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
