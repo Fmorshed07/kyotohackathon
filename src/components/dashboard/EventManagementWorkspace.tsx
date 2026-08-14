@@ -23,13 +23,18 @@ import {
   type HostedHackathon,
   type HostedHackathonUpdate,
 } from "@/lib/aiHackathons";
-import type { HackathonStatus } from "@/lib/hackathons";
+import {
+  getHackathonSubmissionMode,
+  type HackathonStatus,
+  type SubmissionMode,
+} from "@/lib/hackathons";
 import { formatDateTime, type HostEvent } from "@/lib/hostEvents";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SubmissionGateControls } from "@/components/dashboard/SubmissionGateControls";
 
 type TabKey = "public" | "host";
 type FilterKey = "all" | "live" | "published" | "unpublished" | "past" | "host";
@@ -46,6 +51,7 @@ export type EventManagementWorkspaceProps = {
   onPublish: (eventId: string) => Promise<void> | void;
   onUnpublish: (eventId: string) => Promise<void> | void;
   onSetStatus: (eventId: string, status: HackathonStatus) => Promise<void> | void;
+  onSetSubmissionMode: (eventId: string, mode: SubmissionMode) => Promise<void> | void;
   onSaveEvent: (eventId: string, patch: HostedHackathonUpdate) => Promise<void> | void;
   onDeleteEvent: (eventId: string) => Promise<void> | void;
   onPublishHostEvent: (hostEventId: string) => Promise<void> | void;
@@ -121,6 +127,7 @@ export function EventManagementWorkspace({
   onPublish,
   onUnpublish,
   onSetStatus,
+  onSetSubmissionMode,
   onSaveEvent,
   onDeleteEvent,
   onPublishHostEvent,
@@ -376,6 +383,21 @@ export function EventManagementWorkspace({
                           >
                             {visibility}
                           </Badge>
+                          {getHackathonSubmissionMode(event) !== "open" ? (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "font-display text-[10px] uppercase tracking-wide",
+                                getHackathonSubmissionMode(event) === "paused"
+                                  ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                                  : "border-white/20 bg-white/[0.04] text-muted-foreground",
+                              )}
+                            >
+                              {getHackathonSubmissionMode(event) === "paused"
+                                ? "Submissions paused"
+                                : "Submissions closed"}
+                            </Badge>
+                          ) : null}
                           {isPortalEdition ? (
                             <Badge
                               variant="outline"
@@ -558,6 +580,14 @@ export function EventManagementWorkspace({
                             <Archive className="h-3.5 w-3.5" />
                             Mark past
                           </Button>
+                        </div>
+
+                        <div className="mt-3 border-t border-white/10 pt-3">
+                          <SubmissionGateControls
+                            mode={getHackathonSubmissionMode(event)}
+                            disabled={busy || isBusy}
+                            onChange={(mode) => void onSetSubmissionMode(event.id, mode)}
+                          />
                         </div>
                       </div>
                     </div>

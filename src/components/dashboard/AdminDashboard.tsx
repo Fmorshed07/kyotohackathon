@@ -68,6 +68,7 @@ export type AdminUser = {
 
 export type AdminSubmissionRow = {
   id: string;
+  hackathonId: HackathonId;
   participantId: string;
   participantEmail: string;
   teamName: string | null;
@@ -129,6 +130,8 @@ type AdminDashboardProps = {
   judgeAccounts: AdminUser[];
   isLoadingUsers: boolean;
   submissions: AdminSubmissionRow[];
+  /** All events' submissions for the judging submissions list. Falls back to `submissions`. */
+  allSubmissions?: AdminSubmissionRow[];
   isLoadingSubmissions: boolean;
   analytics: AdminAnalytics;
   message: string | null;
@@ -884,6 +887,7 @@ export function AdminDashboard({
   judgeAccounts,
   isLoadingUsers,
   submissions,
+  allSubmissions,
   isLoadingSubmissions,
   analytics,
   message,
@@ -1004,12 +1008,14 @@ export function AdminDashboard({
         </section>
         <AdminJudgingSection
           selectedHackathon={selectedHackathon}
+          hackathons={hackathons}
           judgingCriteria={judgingCriteria}
           isLoadingCriteria={isLoadingCriteria}
           isSavingCriteria={isSavingCriteria}
           onSaveCriteria={onSaveCriteria}
           participants={participants}
           submissions={submissions}
+          allSubmissions={allSubmissions ?? submissions}
           isLoadingSubmissions={isLoadingSubmissions}
           isLoadingUsers={isLoadingUsers}
           analytics={analytics}

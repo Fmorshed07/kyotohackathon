@@ -6,7 +6,7 @@ import { EventManagementWorkspace } from "@/components/dashboard/EventManagement
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { useAdminHackathonCatalog } from "@/hooks/useAdminHackathonCatalog";
-import { HACKATHON_STORAGE_KEYS, PORTAL_HACKATHONS, type HackathonStatus } from "@/lib/hackathons";
+import { HACKATHON_STORAGE_KEYS, PORTAL_HACKATHONS, type HackathonStatus, type SubmissionMode } from "@/lib/hackathons";
 import {
   deleteHostedHackathon,
   mergePortalCatalogIntoEvents,
@@ -14,6 +14,7 @@ import {
   publishHostEventPublicly,
   setHackathonPublished,
   setHackathonStatus,
+  setHackathonSubmissionMode,
   unpublishHostEventPublicly,
   updateHostedHackathon,
   type HostedHackathon,
@@ -138,6 +139,22 @@ export default function EventManagementPage() {
     );
   };
 
+  const handleSetSubmissionMode = (eventId: string, submissionMode: SubmissionMode) => {
+    const event = listingEvents.find((item) => item.id === eventId);
+    const label =
+      submissionMode === "open"
+        ? "is accepting submissions"
+        : submissionMode === "paused"
+          ? "has paused submissions"
+          : "has closed submissions";
+    return runMutation(
+      eventId,
+      () => setHackathonSubmissionMode(db, eventId, submissionMode),
+      `${event?.name ?? "Event"} ${label}.`,
+      { submissionMode },
+    );
+  };
+
   const handleSaveEvent = (eventId: string, patch: HostedHackathonUpdate) => {
     const event = listingEvents.find((item) => item.id === eventId);
     return runMutation(
@@ -248,6 +265,7 @@ export default function EventManagementPage() {
           onPublish={handlePublish}
           onUnpublish={handleUnpublish}
           onSetStatus={handleSetStatus}
+          onSetSubmissionMode={handleSetSubmissionMode}
           onSaveEvent={handleSaveEvent}
           onDeleteEvent={handleDeleteEvent}
           onPublishHostEvent={handlePublishHostEvent}

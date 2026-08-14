@@ -25,12 +25,18 @@ import {
   pickPreferredHackathonId,
   PORTAL_HACKATHONS,
   resolvePortalHackathon,
+  areSubmissionsWritable,
+  getHackathonSubmissionMode,
+  getSubmissionLockCopy,
+  upsertPortalHackathon,
   type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
 import {
   fetchJoinablePortalHackathons,
   fetchPortalHackathonCatalog,
+  hostedToPortalHackathon,
+  subscribeHackathon,
 } from "@/lib/aiHackathons";
 import {
   listAccessibleSubmissions,
@@ -318,6 +324,23 @@ export default function ParticipantDashboardPage() {
   }, [db]);
 
   useEffect(() => {
+    const unsubscribe = subscribeHackathon(
+      db,
+      selectedHackathonId,
+      (event) => {
+        if (!event) return;
+        setEventCatalog((current) =>
+          upsertPortalHackathon(current, hostedToPortalHackathon(event)),
+        );
+      },
+      () => {
+        // Participants cannot read unpublished listings.
+      },
+    );
+    return unsubscribe;
+  }, [db, selectedHackathonId]);
+
+  useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
     if (isLoadingWorkspace) return;
     if (accessibleHackathonIds.length === 0) return;
@@ -543,6 +566,12 @@ export default function ParticipantDashboardPage() {
     queueEmail?: boolean;
   }) => {
     if (!sessionUser) return null;
+    if (!areSubmissionsWritable(selectedHackathon)) {
+      throw new Error(
+        getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathon)) ??
+          "Submissions are locked for this hackathon.",
+      );
+    }
 
     const hasScopedSubmission =
       participantSubmission &&
@@ -769,7 +798,7 @@ export default function ParticipantDashboardPage() {
   // Cloud autosave so drafts survive sudden closes even across devices.
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
-    if (isLoadingWorkspace || selectedHackathon.status === "past") return;
+    if (isLoadingWorkspace || !areSubmissionsWritable(selectedHackathon)) return;
     if (!isProjectDraftDirty || !projectDraftHasContent(projectDraftValue)) return;
     if (isSubmittingProject || isAutosavingRef.current) return;
 
@@ -802,7 +831,7 @@ export default function ParticipantDashboardPage() {
   }, [
     sessionUser,
     isLoadingWorkspace,
-    selectedHackathon.status,
+    selectedHackathon,
     isProjectDraftDirty,
     projectDraftValue,
     isSubmittingProject,
@@ -833,7 +862,7 @@ export default function ParticipantDashboardPage() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const isReadOnly = selectedHackathon.status === "past";
+  const isReadOnly = !areSubmissionsWritable(selectedHackathon);
 
   return (
     <DashboardLayout

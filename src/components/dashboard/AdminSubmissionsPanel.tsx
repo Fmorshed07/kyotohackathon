@@ -1,4 +1,6 @@
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -15,13 +17,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ClipboardList, PlusCircle, Trash2 } from "lucide-react";
+import { CalendarDays, ClipboardList, MapPin, PlusCircle, Trash2 } from "lucide-react";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import type { AdminSubmissionRow, AdminUser, NewSubmissionInput } from "@/components/dashboard/AdminDashboard";
-import type { PortalHackathon } from "@/lib/hackathons";
+import {
+  groupByHackathon,
+  PORTAL_HACKATHONS,
+  type HackathonId,
+  type PortalHackathon,
+} from "@/lib/hackathons";
 
 type AdminSubmissionsPanelProps = {
   selectedHackathon: PortalHackathon;
+  hackathons?: PortalHackathon[];
   participants: AdminUser[];
   submissions: AdminSubmissionRow[];
   isLoading: boolean;
@@ -33,8 +41,135 @@ type AdminSubmissionsPanelProps = {
   onDeleteSubmission: (submissionId: string) => Promise<void>;
 };
 
+function SubmissionTable({
+  submissions,
+  deletingSubmissionId,
+  onDeleteSubmission,
+}: {
+  submissions: AdminSubmissionRow[];
+  deletingSubmissionId: string | null;
+  onDeleteSubmission: (submissionId: string) => Promise<void>;
+}) {
+  return (
+    <div className="dash-table-scroll rounded-xl border border-white/10">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-white/10 bg-muted/15 hover:bg-muted/15">
+            <TableHead className="dash-table-head w-[180px]">Participant</TableHead>
+            <TableHead className="dash-table-head w-[240px]">Team</TableHead>
+            <TableHead className="dash-table-head w-[220px]">Project</TableHead>
+            <TableHead className="dash-table-head">Links</TableHead>
+            <TableHead className="dash-table-head w-[90px] text-right">Avg</TableHead>
+            <TableHead className="dash-table-head w-[100px] text-right">Judges</TableHead>
+            <TableHead className="dash-table-head w-[110px] text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {submissions.map((submission) => (
+            <TableRow
+              key={submission.id}
+              className="border-white/5 transition-colors hover:bg-primary/5"
+            >
+              <TableCell className="align-top text-sm">{submission.participantEmail}</TableCell>
+              <TableCell className="align-top">
+                <p className="text-sm font-medium">
+                  {submission.teamName?.trim() || "Unnamed team"}
+                </p>
+                <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                  {submission.memberCount}{" "}
+                  {submission.memberCount === 1 ? "member" : "members"}
+                  {submission.teamLeaderName
+                    ? ` · lead ${submission.teamLeaderName}`
+                    : ""}
+                </p>
+                {submission.members.length > 0 ? (
+                  <p className="mt-1 line-clamp-2 text-[0.7rem] text-muted-foreground">
+                    {submission.members.map((member) => member.name).join(" · ")}
+                    {submission.extraMemberNames.length > 0
+                      ? ` · ${submission.extraMemberNames.join(" · ")}`
+                      : ""}
+                  </p>
+                ) : null}
+              </TableCell>
+              <TableCell className="align-top">
+                <p className="text-sm font-medium">{submission.title || "Untitled Project"}</p>
+                <p className="mt-1 line-clamp-3 text-[0.7rem] text-muted-foreground">
+                  {submission.shortDescription || "No description provided."}
+                </p>
+              </TableCell>
+              <TableCell className="align-top">
+                <div className="space-y-1 text-[0.7rem]">
+                  {submission.projectUrl ? (
+                    <a
+                      href={submission.projectUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-primary underline underline-offset-4 hover:no-underline"
+                    >
+                      Project URL
+                    </a>
+                  ) : null}
+                  {submission.submissionPdfUrl ? (
+                    <a
+                      href={submission.submissionPdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-primary underline underline-offset-4 hover:no-underline"
+                    >
+                      PDF
+                    </a>
+                  ) : null}
+                  {submission.demoVideoUrl ? (
+                    <a
+                      href={submission.demoVideoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-primary underline underline-offset-4 hover:no-underline"
+                    >
+                      Demo video
+                    </a>
+                  ) : null}
+                </div>
+              </TableCell>
+              <TableCell className="align-top text-right">
+                <p className="font-mono text-sm font-bold tabular-nums text-primary">
+                  {submission.averageScore != null ? submission.averageScore.toFixed(1) : "—"}
+                </p>
+              </TableCell>
+              <TableCell className="align-top text-right">
+                <p className="font-mono text-sm tabular-nums text-foreground">
+                  {submission.scoredByCount}/{submission.judgeMarks.length}
+                </p>
+                <p className="text-[0.65rem] text-muted-foreground">scored</p>
+              </TableCell>
+              <TableCell className="align-top text-right">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
+                  disabled={deletingSubmissionId === submission.id}
+                  onClick={async () => {
+                    if (!window.confirm("Remove this submission? This cannot be undone.")) {
+                      return;
+                    }
+                    await onDeleteSubmission(submission.id);
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  {deletingSubmissionId === submission.id ? "Removing..." : "Remove"}
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 export function AdminSubmissionsPanel({
   selectedHackathon,
+  hackathons = PORTAL_HACKATHONS,
   participants,
   submissions,
   isLoading,
@@ -45,6 +180,26 @@ export function AdminSubmissionsPanel({
   onCreateSubmission,
   onDeleteSubmission,
 }: AdminSubmissionsPanelProps) {
+  const [eventFilter, setEventFilter] = useState<HackathonId | "all">("all");
+
+  const eventGroups = useMemo(
+    () =>
+      groupByHackathon(submissions, hackathons, {
+        selectedId: selectedHackathon.id,
+      }),
+    [hackathons, selectedHackathon.id, submissions],
+  );
+
+  const visibleGroups = useMemo(
+    () =>
+      eventFilter === "all"
+        ? eventGroups
+        : eventGroups.filter((group) => group.hackathon.id === eventFilter),
+    [eventFilter, eventGroups],
+  );
+
+  const showEventFilter = eventGroups.length > 1 || hackathons.length > 1;
+
   return (
     <section className={`${sectionClass} overflow-hidden p-0`} id="submission-marks">
       <div className="flex items-start gap-3 border-b border-white/10 px-6 py-5">
@@ -55,7 +210,7 @@ export function AdminSubmissionsPanel({
           <p className="dash-eyebrow">Submissions</p>
           <h2 className="dash-title">Participant projects</h2>
           <p className="dash-subtitle">
-            Manage submissions for {selectedHackathon.name}. Judge marks are shown in a separate section.
+            All submissions grouped by event. New projects are added to {selectedHackathon.name}.
           </p>
         </div>
       </div>
@@ -64,7 +219,7 @@ export function AdminSubmissionsPanel({
         <div className="mb-5 rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4">
           <p className="dash-eyebrow inline-flex items-center gap-1.5">
             <PlusCircle className="h-3.5 w-3.5" aria-hidden />
-            Add submission
+            Add submission · {selectedHackathon.shortName}
           </p>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <Select
@@ -142,125 +297,85 @@ export function AdminSubmissionsPanel({
           </div>
         </div>
 
+        {showEventFilter ? (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {submissions.length} project{submissions.length === 1 ? "" : "s"} across{" "}
+              {eventGroups.length} event{eventGroups.length === 1 ? "" : "s"}
+            </p>
+            <Select
+              value={eventFilter}
+              onValueChange={(value) => setEventFilter(value as HackathonId | "all")}
+            >
+              <SelectTrigger className="h-10 w-full max-w-xs">
+                <SelectValue placeholder="Filter by event" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All events</SelectItem>
+                {eventGroups.map((group) => (
+                  <SelectItem key={group.hackathon.id} value={group.hackathon.id}>
+                    {group.hackathon.name} ({group.items.length})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading submissions…</p>
         ) : submissions.length === 0 ? (
           <p className="dash-empty">
             No participant submissions yet for {selectedHackathon.name}.
           </p>
+        ) : visibleGroups.length === 0 ? (
+          <p className="dash-empty">No submissions for this event filter.</p>
         ) : (
-          <div className="dash-table-scroll rounded-xl border border-white/10">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/10 bg-muted/15 hover:bg-muted/15">
-                  <TableHead className="dash-table-head w-[180px]">Participant</TableHead>
-                  <TableHead className="dash-table-head w-[240px]">Team</TableHead>
-                  <TableHead className="dash-table-head w-[220px]">Project</TableHead>
-                  <TableHead className="dash-table-head">Links</TableHead>
-                  <TableHead className="dash-table-head w-[90px] text-right">Avg</TableHead>
-                  <TableHead className="dash-table-head w-[100px] text-right">Judges</TableHead>
-                  <TableHead className="dash-table-head w-[110px] text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {submissions.map((submission) => (
-                  <TableRow
-                    key={submission.id}
-                    className="border-white/5 transition-colors hover:bg-primary/5"
-                  >
-                    <TableCell className="align-top text-sm">{submission.participantEmail}</TableCell>
-                    <TableCell className="align-top">
-                      <p className="text-sm font-medium">
-                        {submission.teamName?.trim() || "Unnamed team"}
-                      </p>
-                      <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                        {submission.memberCount}{" "}
-                        {submission.memberCount === 1 ? "member" : "members"}
-                        {submission.teamLeaderName
-                          ? ` · lead ${submission.teamLeaderName}`
-                          : ""}
-                      </p>
-                      {submission.members.length > 0 ? (
-                        <p className="mt-1 line-clamp-2 text-[0.7rem] text-muted-foreground">
-                          {submission.members.map((member) => member.name).join(" · ")}
-                          {submission.extraMemberNames.length > 0
-                            ? ` · ${submission.extraMemberNames.join(" · ")}`
-                            : ""}
-                        </p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <p className="text-sm font-medium">{submission.title || "Untitled Project"}</p>
-                      <p className="mt-1 line-clamp-3 text-[0.7rem] text-muted-foreground">
-                        {submission.shortDescription || "No description provided."}
-                      </p>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <div className="space-y-1 text-[0.7rem]">
-                        {submission.projectUrl ? (
-                          <a
-                            href={submission.projectUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block text-primary underline underline-offset-4 hover:no-underline"
-                          >
-                            Project URL
-                          </a>
-                        ) : null}
-                        {submission.submissionPdfUrl ? (
-                          <a
-                            href={submission.submissionPdfUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block text-primary underline underline-offset-4 hover:no-underline"
-                          >
-                            PDF
-                          </a>
-                        ) : null}
-                        {submission.demoVideoUrl ? (
-                          <a
-                            href={submission.demoVideoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block text-primary underline underline-offset-4 hover:no-underline"
-                          >
-                            Demo video
-                          </a>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top text-right">
-                      <p className="font-mono text-sm font-bold tabular-nums text-primary">
-                        {submission.averageScore != null ? submission.averageScore.toFixed(1) : "—"}
-                      </p>
-                    </TableCell>
-                    <TableCell className="align-top text-right">
-                      <p className="font-mono text-sm tabular-nums text-foreground">
-                        {submission.scoredByCount}/{submission.judgeMarks.length}
-                      </p>
-                      <p className="text-[0.65rem] text-muted-foreground">scored</p>
-                    </TableCell>
-                    <TableCell className="align-top text-right">
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
-                        disabled={deletingSubmissionId === submission.id}
-                        onClick={async () => {
-                          if (!window.confirm("Remove this submission? This cannot be undone.")) {
-                            return;
-                          }
-                          await onDeleteSubmission(submission.id);
-                        }}
+          <div className="space-y-6">
+            {visibleGroups.map((group) => (
+              <section
+                key={group.hackathon.id}
+                className="space-y-3"
+                aria-labelledby={`submissions-${group.hackathon.id}`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3
+                        id={`submissions-${group.hackathon.id}`}
+                        className="text-base font-semibold text-foreground"
                       >
-                        <Trash2 className="h-3 w-3" />
-                        {deletingSubmissionId === submission.id ? "Removing..." : "Remove"}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        {group.hackathon.name}
+                      </h3>
+                      <Badge variant="outline" className="text-[0.6rem] uppercase tracking-[0.12em]">
+                        {group.hackathon.status}
+                      </Badge>
+                      {group.hackathon.id === selectedHackathon.id ? (
+                        <Badge className="text-[0.6rem] uppercase tracking-[0.12em]">Current</Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.7rem] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <CalendarDays className="h-3 w-3" aria-hidden />
+                        {group.hackathon.eventDate}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3 w-3" aria-hidden />
+                        {group.hackathon.location}
+                      </span>
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="uppercase tracking-[0.12em]">
+                    {group.items.length} project{group.items.length === 1 ? "" : "s"}
+                  </Badge>
+                </div>
+                <SubmissionTable
+                  submissions={group.items}
+                  deletingSubmissionId={deletingSubmissionId}
+                  onDeleteSubmission={onDeleteSubmission}
+                />
+              </section>
+            ))}
           </div>
         )}
       </div>

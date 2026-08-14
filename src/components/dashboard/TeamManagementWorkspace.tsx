@@ -264,7 +264,7 @@ export function TeamManagementWorkspace({
               </p>
             ) : isReadOnly ? (
               <p className="text-sm text-muted-foreground">
-                Past events are view-only. You can still browse the roster and teammate board.
+                Submissions are locked. You can still browse the roster and teammate board.
               </p>
             ) : null}
           </div>

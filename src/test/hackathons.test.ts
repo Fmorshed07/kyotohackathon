@@ -3,6 +3,7 @@ import {
   buildAdminHackathonCatalog,
   collectAccessibleHackathonIds,
   filterCurrentHackathons,
+  groupByHackathon,
   getAdminEventWorkspacePath,
   getEventBoardPath,
   getHackathonPublicUrl,
@@ -154,6 +155,40 @@ describe("pickPreferredHackathonId", () => {
         submissionHackathonIds: [SITE_HACKATHON_ID],
       })
     ).toBe(SITE_HACKATHON_ID);
+  });
+});
+
+describe("groupByHackathon", () => {
+  it("groups items by event and puts the selected event first", () => {
+    const grouped = groupByHackathon(
+      [
+        { hackathonId: "impact-tokyo", id: "t1" },
+        { hackathonId: hostedIdeathonId, id: "h1" },
+        { hackathonId: "impact-tokyo", id: "t2" },
+        { hackathonId: SITE_HACKATHON_ID, id: "k1" },
+      ],
+      [
+        ...PORTAL_HACKATHONS,
+        {
+          id: hostedIdeathonId,
+          name: "AI Ideathon 2026",
+          shortName: "AI Ideathon",
+          eventDate: "Aug 12–14, 2026",
+          location: "Online",
+          theme: "Live theme",
+          status: "active",
+        },
+      ],
+      { selectedId: SITE_HACKATHON_ID },
+    );
+
+    expect(grouped.map((entry) => entry.hackathon.id)).toEqual([
+      SITE_HACKATHON_ID,
+      hostedIdeathonId,
+      "impact-tokyo",
+    ]);
+    expect(grouped[0]?.items.map((item) => item.id)).toEqual(["k1"]);
+    expect(grouped[2]?.items.map((item) => item.id)).toEqual(["t1", "t2"]);
   });
 });
 

@@ -17,6 +17,7 @@ import { getFirestoreDb } from "@/lib/firebaseClient";
 import {
   fetchSubmissionsForHackathon,
   filterUsersForHackathon,
+  getSubmissionHackathonId,
   getUserAllowedHackathonIds,
   getUserHackathonId,
   type PortalHackathon,
@@ -325,6 +326,7 @@ export function HostEventJudgingWorkspace({
 
           return {
             id: submission.id,
+            hackathonId: getSubmissionHackathonId(submission),
             participantId,
             participantEmail,
             teamName: team.teamName === "Unnamed team" ? submission.team_name ?? null : team.teamName,
@@ -592,6 +594,7 @@ export function HostEventJudgingWorkspace({
       />
       <AdminJudgingSection
         selectedHackathon={hackathon}
+        hackathons={[hackathon]}
         judgingCriteria={judgingCriteria}
         isLoadingCriteria={isLoadingCriteria}
         isSavingCriteria={isSavingCriteria}

@@ -25,6 +25,9 @@ import {
   type HackathonId,
   type HackathonStatus,
   type PortalHackathon,
+  type SubmissionMode,
+  getHackathonSubmissionMode,
+  isSubmissionMode,
 } from "@/lib/hackathons";
 import { buildHostEventSummary, formatPublicEventDate, type HostEvent } from "@/lib/hostEvents";
 import {
@@ -102,6 +105,8 @@ export type HostedHackathon = PortalHackathon & {
   fontPreset?: string;
   layoutStyle?: string;
   tagline?: string;
+  /** Organiser gate for project writes. Independent of live / upcoming / past. */
+  submissionMode?: SubmissionMode;
 };
 
 function eventSlug(value: string) {
@@ -290,6 +295,7 @@ export async function publishHostEventPublicly(
   let createdAt = now;
   // Keep active/past lifecycle when re-publishing or updating an existing public listing.
   let lifecycleStatus: HackathonStatus = options?.status ?? "upcoming";
+  let submissionMode: SubmissionMode | undefined;
   if (existingId) {
     const existing = await getDoc(doc(db, "hackathons", existingId));
     if (existing.exists()) {
@@ -302,6 +308,9 @@ export async function publishHostEventPublicly(
         if (previous.status === "active" || previous.status === "past" || previous.status === "upcoming") {
           lifecycleStatus = previous.status;
         }
+      }
+      if (isSubmissionMode(previous.submissionMode)) {
+        submissionMode = previous.submissionMode;
       }
     }
   }
@@ -367,6 +376,7 @@ export async function publishHostEventPublicly(
     fontPreset: getEventFontPreset(hostEvent.fontPreset),
     layoutStyle: getEventLayoutStyle(hostEvent.layoutStyle),
     tagline: hostEvent.tagline.trim(),
+    ...(submissionMode ? { submissionMode } : {}),
   };
 
   await setDoc(doc(db, "hackathons", id), event, { merge: Boolean(existingId) });
@@ -447,6 +457,10 @@ function asHostedHackathon(
     fontPreset: getEventFontPreset(event.fontPreset),
     layoutStyle: getEventLayoutStyle(event.layoutStyle),
     tagline: typeof event.tagline === "string" ? event.tagline.trim() : "",
+    submissionMode: getHackathonSubmissionMode({
+      status: event.status === "active" || event.status === "past" ? event.status : "upcoming",
+      submissionMode: isSubmissionMode(event.submissionMode) ? event.submissionMode : undefined,
+    }),
   };
 }
 
@@ -756,6 +770,7 @@ export function hostedToPortalHackathon(event: HostedHackathon): PortalHackathon
     location: event.location,
     theme: event.theme,
     status: event.status,
+    submissionMode: event.submissionMode,
   };
 }
 
@@ -909,6 +924,41 @@ export async function setHackathonStatus(
   if (status === "active") {
     await syncLinkedHostEventVisibility(db, id, true);
   }
+}
+
+export async function setHackathonSubmissionMode(
+  db: Firestore,
+  id: string,
+  submissionMode: SubmissionMode,
+): Promise<void> {
+  await ensurePortalCatalogHackathon(db, id);
+  await setDoc(doc(db, "hackathons", id), { submissionMode }, { merge: true });
+}
+
+/** Live updates for a single listing (participant lock banners, host/admin gates). */
+export function subscribeHackathon(
+  db: Firestore,
+  id: string,
+  onChange: (event: HostedHackathon | null) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, "hackathons", id),
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        onChange(null);
+        return;
+      }
+      onChange(
+        asHostedHackathon(snapshot.id, snapshot.data() as Record<string, unknown>, {
+          requirePublished: false,
+        }),
+      );
+    },
+    (error) => {
+      onError?.(error);
+    },
+  );
 }
 
 export async function deleteHostedHackathon(db: Firestore, id: string): Promise<void> {

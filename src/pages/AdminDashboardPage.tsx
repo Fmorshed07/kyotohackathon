@@ -17,8 +17,10 @@ import {
   type AdminUser,
 } from "@/components/dashboard/AdminDashboard";
 import {
-  fetchSubmissionsForHackathon,
+  fetchAllSubmissions,
+  filterSubmissionsByHackathon,
   filterUsersForHackathon,
+  getSubmissionHackathonId,
   getUserAllowedHackathonIds,
   getUserHackathonId,
   HACKATHON_STORAGE_KEYS,
@@ -151,7 +153,7 @@ export default function AdminDashboardPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [userEmailLookup, setUserEmailLookup] = useState<Record<string, string>>({});
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
@@ -264,8 +266,8 @@ export default function AdminDashboardPage() {
     const loadSubmissions = async () => {
       setIsLoadingSubmissions(true);
       try {
-        const hackathonSubmissions = await fetchSubmissionsForHackathon(db, selectedHackathonId);
-        setSubmissions(hackathonSubmissions);
+        const loaded = await fetchAllSubmissions(db);
+        setAllSubmissions(loaded);
       } catch (error: unknown) {
         const text =
           typeof error === "object" && error && "message" in error
@@ -276,6 +278,14 @@ export default function AdminDashboardPage() {
         setIsLoadingSubmissions(false);
       }
     };
+
+    void loadUsers();
+    void loadPendingAdminGrants();
+    void loadSubmissions();
+  }, [sessionUser, db]);
+
+  useEffect(() => {
+    if (!sessionUser || sessionUser.role !== "admin") return;
 
     const loadJudgeRankings = async () => {
       setIsLoadingTop3Rankings(true);
@@ -293,11 +303,13 @@ export default function AdminDashboardPage() {
       }
     };
 
-    void loadUsers();
-    void loadPendingAdminGrants();
-    void loadSubmissions();
     void loadJudgeRankings();
   }, [sessionUser, db, selectedHackathonId]);
+
+  const submissions = useMemo(
+    () => filterSubmissionsByHackathon(allSubmissions, selectedHackathonId),
+    [allSubmissions, selectedHackathonId],
+  );
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -354,6 +366,15 @@ export default function AdminDashboardPage() {
     [users, selectedHackathonId, submissions]
   );
 
+  const userById = useMemo(
+    () =>
+      users.reduce<Record<string, AdminUser>>((acc, user) => {
+        acc[user.id] = user;
+        return acc;
+      }, {}),
+    [users],
+  );
+
   const participantById = hackathonUsers
     .filter((user) => user.role === "participant")
     .reduce<Record<string, AdminUser>>((acc, user) => {
@@ -361,21 +382,14 @@ export default function AdminDashboardPage() {
       return acc;
     }, {});
 
-  const judgeById = hackathonUsers
-    .filter((user) => isStaffRole(user.role))
-    .reduce<Record<string, AdminUser>>((acc, user) => {
-      acc[user.id] = user;
-      return acc;
-    }, {});
-
-  const adminSubmissionRows: AdminSubmissionRow[] = useMemo(
+  const allAdminSubmissionRows: AdminSubmissionRow[] = useMemo(
     () =>
-      submissions
+      allSubmissions
         .map((submission) => {
       const participantId = submission.user_id || submission.id;
       const participantEmail =
         getUserEmail(participantId) ??
-        participantById[participantId]?.email ??
+        userById[participantId]?.email ??
         "Unknown participant";
       const judgeIds = new Set<string>([
         ...Object.keys(submission.judge_scores ?? {}),
@@ -393,7 +407,7 @@ export default function AdminDashboardPage() {
 
         return {
           judgeId,
-          judgeEmail: getUserEmail(judgeId) ?? judgeById[judgeId]?.email ?? "Unknown judge",
+          judgeEmail: getUserEmail(judgeId) ?? userById[judgeId]?.email ?? "Unknown judge",
           score: resolvedScore,
           notes: submission.judge_notes_by_judge?.[judgeId] ?? null,
           criteriaScores:
@@ -410,7 +424,7 @@ export default function AdminDashboardPage() {
                   judgeId: submission.judge_id,
                   judgeEmail:
                     getUserEmail(submission.judge_id) ??
-                    judgeById[submission.judge_id]?.email ??
+                    userById[submission.judge_id]?.email ??
                     "Unknown judge",
                   score: submission.judge_score ?? null,
                   notes: submission.judge_notes ?? null,
@@ -425,8 +439,8 @@ export default function AdminDashboardPage() {
       const team = buildAdminTeamDetails({
         submission,
         ownerEmail: participantEmail,
-        ownerName: participantById[participantId]?.profile?.fullName ?? undefined,
-        ownerProfile: participantById[participantId]?.profile ?? null,
+        ownerName: userById[participantId]?.profile?.fullName ?? undefined,
+        ownerProfile: userById[participantId]?.profile ?? null,
         memberProfiles: Object.fromEntries(
           users.map((user) => [user.id, user.profile ?? null])
         ),
@@ -434,6 +448,7 @@ export default function AdminDashboardPage() {
 
       return {
         id: submission.id,
+        hackathonId: getSubmissionHackathonId(submission),
         participantId,
         participantEmail,
         teamName: team.teamName === "Unnamed team" ? submission.team_name ?? null : team.teamName,
@@ -460,7 +475,12 @@ export default function AdminDashboardPage() {
           const right = b.averageScore ?? -1;
           return right - left;
         }),
-    [submissions, hackathonUsers, userEmailLookup, judgingCriteria, users]
+    [allSubmissions, userById, userEmailLookup, judgingCriteria, users]
+  );
+
+  const adminSubmissionRows = useMemo(
+    () => allAdminSubmissionRows.filter((row) => row.hackathonId === selectedHackathonId),
+    [allAdminSubmissionRows, selectedHackathonId],
   );
 
   const activeJudgeIds = new Set(
@@ -770,7 +790,7 @@ export default function AdminDashboardPage() {
       };
 
       const ref = await addDoc(collection(db, "submissions"), submissionPayload);
-      setSubmissions((current) => [...current, { id: ref.id, ...submissionPayload }]);
+      setAllSubmissions((current) => [...current, { id: ref.id, ...submissionPayload }]);
       setMessage("Submission added.");
 
       const participantEmail =
@@ -982,7 +1002,7 @@ export default function AdminDashboardPage() {
     try {
       await deleteDoc(doc(db, "submissions", submissionId));
       await deleteDoc(doc(db, "public_projects", submissionId)).catch(() => undefined);
-      setSubmissions((current) => current.filter((submission) => submission.id !== submissionId));
+      setAllSubmissions((current) => current.filter((submission) => submission.id !== submissionId));
       setMessage("Submission removed.");
     } catch (error: unknown) {
       const text =
@@ -1102,7 +1122,7 @@ export default function AdminDashboardPage() {
         }
       }
 
-      setSubmissions((current) =>
+      setAllSubmissions((current) =>
         current.map((submission) => {
           const team = formed.find((entry) => entry.members.some((member) => member.id === submission.user_id));
           return team ? { ...submission, team_name: team.name } : submission;
@@ -1335,6 +1355,7 @@ export default function AdminDashboardPage() {
         judgeAccounts={judgeAccounts}
         isLoadingUsers={isLoadingUsers}
         submissions={adminSubmissionRows}
+        allSubmissions={allAdminSubmissionRows}
         isLoadingSubmissions={isLoadingSubmissions}
         analytics={analytics}
         message={message}

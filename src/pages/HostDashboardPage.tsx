@@ -32,11 +32,12 @@ import {
   publishHostEventPublicly,
   setHackathonPublished,
   setHackathonStatus,
+  setHackathonSubmissionMode,
   type HostedHackathon,
 } from "@/lib/aiHackathons";
 import { formDraftStorageKey } from "@/lib/formDrafts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { type HackathonStatus, type PortalHackathon } from "@/lib/hackathons";
+import { type HackathonStatus, type PortalHackathon, type SubmissionMode, getHackathonSubmissionMode } from "@/lib/hackathons";
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import { createJudgeInvite } from "@/lib/portalInvites";
 import {
@@ -62,6 +63,7 @@ import {
   HostEventJudgingWorkspace,
   HostJudgingUnavailableNotice,
 } from "@/components/dashboard/HostEventJudgingWorkspace";
+import { SubmissionGateControls } from "@/components/dashboard/SubmissionGateControls";
 
 const emptyEventForm = emptyHostEventBriefForm;
 
@@ -607,6 +609,30 @@ export default function HostDashboardPage() {
     }
   };
 
+  const setSubmissionMode = async (mode: SubmissionMode) => {
+    if (!selectedEvent?.public_hackathon_id) {
+      setMessage("Publish the event first, then open, pause, or close submissions.");
+      return;
+    }
+    setIsBusy(true);
+    setMessage(null);
+    try {
+      await setHackathonSubmissionMode(db, selectedEvent.public_hackathon_id, mode);
+      setPublicListing((current) => (current ? { ...current, submissionMode: mode } : current));
+      setMessage(
+        mode === "open"
+          ? "Submissions are open. Teams can create and edit projects."
+          : mode === "paused"
+            ? "Submissions paused. Teams can view but not save until you reopen."
+            : "Submissions closed. Reopen if you extend the deadline.",
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update submissions.");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   const togglePublicVisibility = async (published: boolean) => {
     if (!selectedEvent?.public_hackathon_id) {
       if (published) {
@@ -950,6 +976,24 @@ export default function HostDashboardPage() {
                 Public: {getHackathonVisibilityLabel(publicListing)}
               </Badge>
             ) : null}
+            {publicListing ? (
+              <Badge
+                variant="outline"
+                className={
+                  getHackathonSubmissionMode(publicListing) === "open"
+                    ? "border-emerald-400/40 text-emerald-300"
+                    : getHackathonSubmissionMode(publicListing) === "paused"
+                      ? "border-amber-400/40 text-amber-200"
+                      : ""
+                }
+              >
+                {getHackathonSubmissionMode(publicListing) === "open"
+                  ? "Submissions open"
+                  : getHackathonSubmissionMode(publicListing) === "paused"
+                    ? "Submissions paused"
+                    : "Submissions closed"}
+              </Badge>
+            ) : null}
           </div>
 
           {selectedEvent ? (
@@ -1027,6 +1071,30 @@ export default function HostDashboardPage() {
                     Mark past
                   </Button>
                 </div>
+              </div>
+
+              <div className="border-t border-white/10 pt-3">
+                {selectedEvent.public_hackathon_id ? (
+                  <SubmissionGateControls
+                    mode={
+                      publicListing
+                        ? getHackathonSubmissionMode(publicListing)
+                        : "open"
+                    }
+                    disabled={isBusy}
+                    onChange={(mode) => void setSubmissionMode(mode)}
+                  />
+                ) : (
+                  <div>
+                    <p className="font-display text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Project submissions
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Publish once to pause, close, or reopen project submissions without changing live /
+                      past status.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           ) : null}

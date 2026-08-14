@@ -24,12 +24,14 @@ const JUDGING_JUMP_LINKS = [
 
 type AdminJudgingSectionProps = {
   selectedHackathon: PortalHackathon;
+  hackathons?: PortalHackathon[];
   judgingCriteria: JudgingCriterion[];
   isLoadingCriteria: boolean;
   isSavingCriteria: boolean;
   onSaveCriteria: (criteria: JudgingCriterion[]) => Promise<void>;
   participants: AdminUser[];
   submissions: AdminSubmissionRow[];
+  allSubmissions?: AdminSubmissionRow[];
   isLoadingSubmissions: boolean;
   isLoadingUsers: boolean;
   analytics: AdminJudgingStatistics;
@@ -49,12 +51,14 @@ type AdminJudgingSectionProps = {
 
 export function AdminJudgingSection({
   selectedHackathon,
+  hackathons,
   judgingCriteria,
   isLoadingCriteria,
   isSavingCriteria,
   onSaveCriteria,
   participants,
   submissions,
+  allSubmissions,
   isLoadingSubmissions,
   isLoadingUsers,
   analytics,
@@ -80,8 +84,8 @@ export function AdminJudgingSection({
               <p className="dash-eyebrow">Judging</p>
               <h2 className="dash-title">Scoring & mark check</h2>
               <p className="dash-subtitle">
-                Criteria, live analytics, per-judge mark verification, leaderboards, and project
-                submissions for {selectedHackathon.name}.
+                Criteria, live analytics, mark check, and leaderboards for {selectedHackathon.name}.
+                The submissions list is grouped by event.
               </p>
             </div>
           </div>
@@ -190,8 +194,9 @@ export function AdminJudgingSection({
 
       <AdminSubmissionsPanel
         selectedHackathon={selectedHackathon}
+        hackathons={hackathons}
         participants={participants}
-        submissions={submissions}
+        submissions={allSubmissions ?? submissions}
         isLoading={isLoadingSubmissions}
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}

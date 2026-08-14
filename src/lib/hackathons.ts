@@ -15,6 +15,12 @@ export type HackathonId = string;
 
 export type HackathonStatus = "active" | "upcoming" | "past";
 
+/**
+ * Independent of listing lifecycle (live / upcoming / past).
+ * Pause is a soft freeze organisers can reverse; close is the deadline state.
+ */
+export type SubmissionMode = "open" | "paused" | "closed";
+
 export const STATUS_ORDER: Record<HackathonStatus, number> = {
   active: 0,
   upcoming: 1,
@@ -29,6 +35,8 @@ export type PortalHackathon = {
   location: string;
   theme: string;
   status: HackathonStatus;
+  /** Organiser gate for project writes. Missing → open, unless the event is past. */
+  submissionMode?: SubmissionMode;
 };
 
 /**
@@ -75,6 +83,48 @@ export const PORTAL_HACKATHONS: PortalHackathon[] = [
 
 export const isHackathonId = (value: string): value is HackathonId =>
   /^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(value.trim());
+
+export const isSubmissionMode = (value: unknown): value is SubmissionMode =>
+  value === "open" || value === "paused" || value === "closed";
+
+/** Resolve the organiser gate. Explicit mode wins; past events default to closed. */
+export const getHackathonSubmissionMode = (
+  hackathon: Pick<PortalHackathon, "status" | "submissionMode">,
+): SubmissionMode => {
+  if (isSubmissionMode(hackathon.submissionMode)) return hackathon.submissionMode;
+  return hackathon.status === "past" ? "closed" : "open";
+};
+
+export const areSubmissionsWritable = (
+  hackathon: Pick<PortalHackathon, "status" | "submissionMode">,
+): boolean => getHackathonSubmissionMode(hackathon) === "open";
+
+export const getSubmissionModeLabel = (mode: SubmissionMode): string => {
+  if (mode === "paused") return "Submissions paused";
+  if (mode === "closed") return "Submissions closed";
+  return "Submissions open";
+};
+
+export const getSubmissionLockCopy = (mode: SubmissionMode): string | null => {
+  if (mode === "paused") {
+    return "Organisers paused submissions. You can still view your project, but saves are locked until they reopen.";
+  }
+  if (mode === "closed") {
+    return "Submissions are closed for this hackathon. You can still view your project and the event board.";
+  }
+  return null;
+};
+
+export const upsertPortalHackathon = (
+  catalog: PortalHackathon[],
+  event: PortalHackathon,
+): PortalHackathon[] => {
+  const index = catalog.findIndex((item) => item.id === event.id);
+  if (index === -1) return [...catalog, event];
+  const next = [...catalog];
+  next[index] = { ...next[index], ...event };
+  return next;
+};
 
 /** Fallback label when an id is not in the static catalog or a live event list. */
 export const portalHackathonStub = (
@@ -169,10 +219,46 @@ export const filterSubmissionsByHackathon = <T extends Pick<Submission, "hackath
 ): T[] =>
   submissions.filter((submission) => submissionBelongsToHackathon(submission, hackathonId));
 
+/** Group records that already carry a resolved `hackathonId` (legacy docs included). */
+export function groupByHackathon<T extends { hackathonId: HackathonId }>(
+  items: T[],
+  catalog: PortalHackathon[] = PORTAL_HACKATHONS,
+  options?: { selectedId?: HackathonId | null },
+): Array<{ hackathon: PortalHackathon; items: T[] }> {
+  const buckets = new Map<HackathonId, T[]>();
+  for (const item of items) {
+    const list = buckets.get(item.hackathonId);
+    if (list) list.push(item);
+    else buckets.set(item.hackathonId, [item]);
+  }
+
+  const selectedId = options?.selectedId ?? null;
+
+  return Array.from(buckets.entries())
+    .map(([id, grouped]) => ({
+      hackathon: resolvePortalHackathon(id, catalog),
+      items: grouped,
+    }))
+    .sort((left, right) => {
+      if (selectedId) {
+        if (left.hackathon.id === selectedId) return -1;
+        if (right.hackathon.id === selectedId) return 1;
+      }
+      const status = STATUS_ORDER[left.hackathon.status] - STATUS_ORDER[right.hackathon.status];
+      if (status !== 0) return status;
+      return left.hackathon.name.localeCompare(right.hackathon.name);
+    });
+}
+
 const mapSubmissionDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Submission => ({
   id: docSnap.id,
   ...(docSnap.data() as Omit<Submission, "id">),
 });
+
+export async function fetchAllSubmissions(db: Firestore): Promise<Submission[]> {
+  const snapshot = await getDocs(collection(db, "submissions"));
+  return snapshot.docs.map(mapSubmissionDoc);
+}
 
 export async function fetchSubmissionsForHackathon(
   db: Firestore,

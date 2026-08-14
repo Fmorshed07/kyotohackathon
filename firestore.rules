@@ -380,6 +380,31 @@ service cloud.firestore {
           && request.resource.data.user_id == resource.data.user_id;
       }
 
+      function hackathonPath(hackathonId) {
+        return /databases/$(database)/documents/hackathons/$(hackathonId);
+      }
+
+      // Missing docs and missing/unknown mode stay open so legacy events keep working.
+      // Pause and close only block participants — admins, hosts, and judges can still write.
+      function hackathonAllowsParticipantProjectWrites(hackathonId) {
+        return !(hackathonId is string && hackathonId.size() > 0)
+          || !exists(hackathonPath(hackathonId))
+          || (
+            get(hackathonPath(hackathonId)).data.submissionMode != "paused"
+            && get(hackathonPath(hackathonId)).data.submissionMode != "closed"
+          );
+      }
+
+      function createHackathonId() {
+        return request.resource.data.hackathon_id is string
+          ? request.resource.data.hackathon_id
+          : "";
+      }
+
+      function existingHackathonId() {
+        return resource.data.hackathon_id is string ? resource.data.hackathon_id : "";
+      }
+
       // Private by default. Public gallery/boards use public_projects only after explicit opt-in.
       allow read: if isAdmin()
         || isApprovedStaff()
@@ -387,17 +412,19 @@ service cloud.firestore {
         || isSubmissionOwner()
         || isSubmissionTeammate();
       allow create: if isSignedIn() && (
-        request.auth.uid == request.resource.data.user_id
-        || isAdmin()
+        isAdmin()
         || (
           isApprovedHost()
           && request.resource.data.keys().hasAll(["user_id", "hackathon_id"])
           && ownsHackathon(request.resource.data.hackathon_id)
         )
+        || (
+          request.auth.uid == request.resource.data.user_id
+          && hackathonAllowsParticipantProjectWrites(createHackathonId())
+        )
       );
       allow update: if isSignedIn() && (
-        isSubmissionOwner()
-        || isApprovedStaff()
+        isApprovedStaff()
         || isAdmin()
         || (
           isApprovedHost()
@@ -406,10 +433,15 @@ service cloud.firestore {
         )
         || isInviteJoinUpdate()
         || (
+          isSubmissionOwner()
+          && hackathonAllowsParticipantProjectWrites(existingHackathonId())
+        )
+        || (
           isSubmissionTeammate()
           && submissionCoreUnchanged()
           && teammateEditableKeys()
           && validTeamLeader()
+          && hackathonAllowsParticipantProjectWrites(existingHackathonId())
         )
       );
       allow delete: if isAdmin()

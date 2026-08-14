@@ -7,7 +7,7 @@ import { TeamManagementWorkspace } from "@/components/dashboard/TeamManagementWo
 import { Button } from "@/components/ui/button";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
-import { fetchPortalHackathonCatalog } from "@/lib/aiHackathons";
+import { fetchPortalHackathonCatalog, hostedToPortalHackathon, subscribeHackathon } from "@/lib/aiHackathons";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import {
@@ -22,6 +22,10 @@ import {
   pickPreferredHackathonId,
   PORTAL_HACKATHONS,
   resolvePortalHackathon,
+  areSubmissionsWritable,
+  getHackathonSubmissionMode,
+  getSubmissionLockCopy,
+  upsertPortalHackathon,
   type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
@@ -164,7 +168,7 @@ export default function ParticipantTeamPage() {
 
   const savedTeamName = activeSubmission?.team_name ?? "";
   const isTeamNameDirty = teamName.trim() !== savedTeamName.trim();
-  const isReadOnly = selectedHackathon.status === "past";
+  const isReadOnly = !areSubmissionsWritable(selectedHackathon);
   const isTeamNameDirtyRef = useRef(isTeamNameDirty);
   const isAutosavingTeamRef = useRef(false);
   const teamNameAutosaveTimerRef = useRef<number | null>(null);
@@ -194,6 +198,23 @@ export default function ParticipantTeamPage() {
       cancelled = true;
     };
   }, [db]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeHackathon(
+      db,
+      selectedHackathonId,
+      (event) => {
+        if (!event) return;
+        setEventCatalog((current) =>
+          upsertPortalHackathon(current, hostedToPortalHackathon(event)),
+        );
+      },
+      () => {
+        // Participants cannot read unpublished listings.
+      },
+    );
+    return unsubscribe;
+  }, [db, selectedHackathonId]);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
@@ -329,6 +350,12 @@ export default function ParticipantTeamPage() {
 
   const persistTeamName = async (nextName = teamName) => {
     if (!sessionUser) return null;
+    if (!areSubmissionsWritable(selectedHackathon)) {
+      throw new Error(
+        getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathon)) ??
+          "Submissions are locked for this hackathon.",
+      );
+    }
     const trimmed = nextName.trim();
     if (!trimmed) return null;
 

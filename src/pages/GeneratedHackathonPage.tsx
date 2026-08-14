@@ -24,6 +24,7 @@ import {
   getEventLayoutStyle,
   type EventLayoutStyle,
 } from "@/lib/eventBranding";
+import { getHackathonSubmissionMode } from "@/lib/hackathons";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { cn } from "@/lib/utils";
 
@@ -92,6 +93,20 @@ function EventHeroMeta({
           >
             {event.format}
           </Badge>
+          {getHackathonSubmissionMode(event) !== "open" ? (
+            <Badge
+              variant="outline"
+              className={cn(
+                isStage
+                  ? "border-amber-300/40 bg-black/40 text-amber-100 backdrop-blur"
+                  : "border-amber-400/30 text-amber-200",
+              )}
+            >
+              {getHackathonSubmissionMode(event) === "paused"
+                ? "Submissions paused"
+                : "Submissions closed"}
+            </Badge>
+          ) : null}
           {isHosted ? (
             <Badge
               variant="outline"

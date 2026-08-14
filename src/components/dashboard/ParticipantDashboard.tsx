@@ -36,6 +36,8 @@ import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import { buildTeamRoster } from "@/lib/teamRoster";
 import {
   getEventBoardPath,
+  getHackathonSubmissionMode,
+  getSubmissionLockCopy,
   type HackathonId,
   type ParticipantHackathonSummary,
   type PortalHackathon,
@@ -194,6 +196,8 @@ export function ParticipantDashboard({
   memberProfiles = {},
 }: ParticipantDashboardProps) {
   const [submissionSearchQuery, setSubmissionSearchQuery] = useState("");
+  const submissionMode = getHackathonSubmissionMode(selectedHackathon);
+  const lockCopy = isReadOnly ? getSubmissionLockCopy(submissionMode) : null;
   const normalizedPdfUrl = ensureAbsoluteUrl(participantForm.submissionPdfUrl);
   const pdfPreviewUrl = toPdfPreviewUrl(participantForm.submissionPdfUrl);
   const profileCompleteness = getPeopleProfileCompleteness(participantForm);
@@ -388,9 +392,7 @@ export function ParticipantDashboard({
               <p className="dash-eyebrow">{selectedHackathon.shortName} overview</p>
               <h2 className="dash-title">Submission overview</h2>
               <p className="dash-subtitle">
-                {isReadOnly
-                  ? "This past event is view-only. Open the board to browse teams."
-                  : "Keep your project details up to date before judging starts."}
+                {lockCopy ?? "Keep your project details up to date before judging starts."}
               </p>
             </div>
           </div>
@@ -549,6 +551,7 @@ export function ParticipantDashboard({
                   setParticipantForm((prev) => ({ ...prev, title: e.target.value }))
                 }
                 placeholder="Your project name"
+                disabled={isReadOnly}
               />
             </div>
             <div className="space-y-2">
@@ -561,6 +564,7 @@ export function ParticipantDashboard({
                   setParticipantForm((prev) => ({ ...prev, teamName: e.target.value }))
                 }
                 placeholder="Your name, or a team name"
+                disabled={isReadOnly}
               />
               <p className="text-xs text-muted-foreground">
                 Solo builders can name themselves too. This shows on the board and gallery.
@@ -576,6 +580,7 @@ export function ParticipantDashboard({
                   setParticipantForm((prev) => ({ ...prev, projectUrl: e.target.value }))
                 }
                 placeholder="https://github.com/..."
+                disabled={isReadOnly}
               />
             </div>
           </div>
@@ -590,6 +595,7 @@ export function ParticipantDashboard({
               }
               placeholder="Describe your project in a few sentences."
               rows={4}
+              disabled={isReadOnly}
             />
           </div>
         </div>
@@ -750,6 +756,7 @@ export function ParticipantDashboard({
                 setParticipantForm((prev) => ({ ...prev, submissionPdfUrl: e.target.value }))
               }
               placeholder="Link to your PDF (Drive, Notion, etc.)"
+              disabled={isReadOnly}
             />
             {participantForm.submissionPdfUrl && (
               <div className="mt-3 rounded-xl border border-white/10 bg-muted/25 p-3">
@@ -786,6 +793,7 @@ export function ParticipantDashboard({
                 setParticipantForm((prev) => ({ ...prev, demoVideoUrl: e.target.value }))
               }
               placeholder="https://youtu.be/..."
+              disabled={isReadOnly}
             />
             {participantForm.demoVideoUrl && (
               <div className="mt-3 rounded-xl border border-white/10 bg-muted/25 p-3">
@@ -811,6 +819,7 @@ export function ParticipantDashboard({
             checked={participantForm.allowPublicPreview}
             onChange={(event) => setParticipantForm((prev) => ({ ...prev, allowPublicPreview: event.target.checked }))}
             className="mt-0.5 h-4 w-4 accent-primary"
+            disabled={isReadOnly}
           />
           <span>
             <span className="block text-sm font-semibold text-foreground">Show this project on hackathon boards and the public Projects & demos gallery</span>
@@ -832,9 +841,7 @@ export function ParticipantDashboard({
                 Save submission
               </h2>
               <p className="dash-subtitle">
-                {isReadOnly
-                  ? "Past hackathon submissions are locked. You can still browse the event board."
-                  : "You can update until organisers lock changes. Ensure all links are accessible."}
+                {lockCopy ?? "You can update until organisers pause or close submissions. Ensure all links are accessible."}
               </p>
             </div>
           </div>
