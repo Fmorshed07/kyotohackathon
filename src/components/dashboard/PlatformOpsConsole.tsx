@@ -239,13 +239,21 @@ function LivePlatformOpsConsole({ live }: { live: PlatformOpsLive }) {
     live.submissions[0] ??
     null;
 
-  const rankings = useMemo(
+  const judgeRankings = useMemo(
     () =>
-      [...live.submissions].sort((left, right) => {
-        const leftScore = left.averageScore ?? ops.projectScores[left.id] ?? -1;
-        const rightScore = right.averageScore ?? ops.projectScores[right.id] ?? -1;
-        return rightScore - leftScore;
-      }),
+      [...live.submissions]
+        .filter((submission) => submission.averageScore != null)
+        .sort((left, right) => (right.averageScore ?? -1) - (left.averageScore ?? -1)),
+    [live.submissions],
+  );
+  const agentRankings = useMemo(
+    () =>
+      [...live.submissions]
+        .filter((submission) => ops.projectScores[submission.id] != null)
+        .sort(
+          (left, right) =>
+            (ops.projectScores[right.id] ?? -1) - (ops.projectScores[left.id] ?? -1),
+        ),
     [live.submissions, ops.projectScores],
   );
 
@@ -264,7 +272,12 @@ function LivePlatformOpsConsole({ live }: { live: PlatformOpsLive }) {
         title: submission.title?.trim() || "Untitled project",
         meta: `${submission.teamName || "Solo"}${
           submission.averageScore != null || ops.projectScores[submission.id] != null
-            ? ` · ${submission.averageScore ?? ops.projectScores[submission.id]} pts`
+            ? ` · ${[
+                submission.averageScore != null ? `Judge ${submission.averageScore}` : null,
+                ops.projectScores[submission.id] != null ? `Agent ${ops.projectScores[submission.id]}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}`
             : ""
         }`,
       })),
@@ -559,30 +572,61 @@ function LivePlatformOpsConsole({ live }: { live: PlatformOpsLive }) {
         {
           icon: BarChart3,
           title: "Live rankings & reports",
-          description: "Judge averages and saved copilot marks, ranked.",
-          body:
-            rankings.length === 0 ? (
-              <p className="rounded-md border border-dashed border-white/10 px-3 py-4 text-center font-body text-xs text-muted-foreground">
-                Score a project to populate rankings.
-              </p>
-            ) : (
-              <ol className="space-y-1.5">
-                {rankings.slice(0, 6).map((submission, index) => {
-                  const score = submission.averageScore ?? ops.projectScores[submission.id] ?? null;
-                  return (
-                    <li
-                      key={submission.id}
-                      className="flex items-center justify-between gap-2 rounded-md bg-white/[0.03] px-2 py-1.5"
-                    >
-                      <span className="truncate font-display text-xs text-foreground">
-                        {index + 1}. {submission.title?.trim() || "Untitled"}
-                      </span>
-                      <span className="font-mono text-[11px] text-primary">{score === null ? "—" : score}</span>
-                    </li>
-                  );
-                })}
-              </ol>
-            ),
+          description: "Judge averages and project-agent marks on separate lists.",
+          body: (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Judge marks
+                </p>
+                {judgeRankings.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-white/10 px-3 py-4 text-center font-body text-xs text-muted-foreground">
+                    No judge marks yet.
+                  </p>
+                ) : (
+                  <ol className="space-y-1.5">
+                    {judgeRankings.slice(0, 6).map((submission, index) => (
+                      <li
+                        key={submission.id}
+                        className="flex items-center justify-between gap-2 rounded-md bg-white/[0.03] px-2 py-1.5"
+                      >
+                        <span className="truncate font-display text-xs text-foreground">
+                          {index + 1}. {submission.title?.trim() || "Untitled"}
+                        </span>
+                        <span className="font-mono text-[11px] text-primary">{submission.averageScore}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+              <div>
+                <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Project agent
+                </p>
+                {agentRankings.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-white/10 px-3 py-4 text-center font-body text-xs text-muted-foreground">
+                    No agent scores yet.
+                  </p>
+                ) : (
+                  <ol className="space-y-1.5">
+                    {agentRankings.slice(0, 6).map((submission, index) => (
+                      <li
+                        key={submission.id}
+                        className="flex items-center justify-between gap-2 rounded-md bg-white/[0.03] px-2 py-1.5"
+                      >
+                        <span className="truncate font-display text-xs text-foreground">
+                          {index + 1}. {submission.title?.trim() || "Untitled"}
+                        </span>
+                        <span className="font-mono text-[11px] text-primary">
+                          {ops.projectScores[submission.id]}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </div>
+          ),
         },
         {
           icon: Network,

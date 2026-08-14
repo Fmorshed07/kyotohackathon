@@ -24,6 +24,8 @@ import SiteHeader from "@/components/SiteHeader";
 import { ProjectPublicLinks } from "@/components/projects/ProjectPublicLinks";
 import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
 import { ProjectStarRating } from "@/components/projects/ProjectStarRating";
+import { ProjectStarEmailDialog } from "@/components/projects/ProjectStarEmailDialog";
+import { HackathonSubscribeForm } from "@/components/hackathons/HackathonSubscribeForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -200,7 +202,7 @@ export default function ProjectGalleryPage() {
   const { projectId: projectIdParam } = useParams();
   const navigate = useNavigate();
   const db = getFirestoreDb();
-  const { statsById, myRatingById, pendingId, communityFill, rate } = useProjectCommunityStars();
+  const { statsById, myRatingById, pendingId, emailPrompt, communityFill, rate, submitStarEmail, cancelStarEmail } = useProjectCommunityStars();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [hostedEvents, setHostedEvents] = useState<HostedHackathon[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -315,12 +317,21 @@ export default function ProjectGalleryPage() {
               <p className="dash-eyebrow">Public hackathon showcase</p>
               <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Projects & demos</h1>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-                Explore projects participants chose to share. Star the ones you like, send a link to friends, and open the live demo, repo, or document.
+                Explore projects participants chose to share. Star a project with your email — no account needed. Subscribe for more hackathons, send a link to friends, and open the live demo, repo, or document.
               </p>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/15 px-4 py-3 backdrop-blur">
               <Sparkles className="h-5 w-5 text-primary" />
               <div><p className="font-display text-xl font-semibold text-foreground">{submissions.length}</p><p className="text-xs text-muted-foreground">public projects</p></div>
+            </div>
+          </div>
+          <div className="relative mt-5 rounded-xl border border-primary/25 bg-primary/10 px-4 py-4">
+            <p className="font-display text-sm font-semibold text-foreground">Subscribe for more hackathons</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Leave your email for upcoming events. No account required.
+            </p>
+            <div className="mt-3">
+              <HackathonSubscribeForm source="projects-gallery" compact />
             </div>
           </div>
         </section>
@@ -366,7 +377,7 @@ export default function ProjectGalleryPage() {
                     event={getEvent(submission, eventById)}
                     starFill={communityFill(submission.id)}
                     myRating={myRatingById[submission.id] ?? 0}
-                    ratingDisabled={pendingId === submission.id}
+                    ratingDisabled={pendingId === submission.id || (myRatingById[submission.id] ?? 0) > 0}
                     onPreview={openPreview}
                     onRate={(stars) => void rate(submission.id, stars)}
                   />
@@ -393,7 +404,7 @@ export default function ProjectGalleryPage() {
                 <ProjectStarRating
                   fill={communityFill(previewSubmission.id)}
                   myRating={myRatingById[previewSubmission.id] ?? 0}
-                  disabled={pendingId === previewSubmission.id}
+                  disabled={pendingId === previewSubmission.id || (myRatingById[previewSubmission.id] ?? 0) > 0}
                   onRate={(stars) => void rate(previewSubmission.id, stars)}
                 />
                 <ProjectShareMenu projectId={previewSubmission.id} title={previewTitle} teamName={previewTeam} />
@@ -435,6 +446,12 @@ export default function ProjectGalleryPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      <ProjectStarEmailDialog
+        open={Boolean(emailPrompt)}
+        pending={pendingId === emailPrompt?.projectId}
+        onCancel={cancelStarEmail}
+        onSubmit={(email) => void submitStarEmail(email)}
+      />
     </div>
   );
 }

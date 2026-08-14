@@ -7,6 +7,8 @@ import type {
 import { getApplicantDisplayName } from "@/lib/platformOps";
 import type { UserProfile } from "@/types/portal";
 
+export { parseAiScreeningEvaluations } from "./projectScreeningParse";
+
 export type ProjectConceptSource = "submission" | "pitch";
 
 export type ProjectConceptInput = {
@@ -45,8 +47,9 @@ export type ProjectScreeningResult = {
   analysisMode: ProjectAnalysisMode;
 };
 
-const SHORTLIST_THRESHOLD = 75;
-const PASS_THRESHOLD = 50;
+export const SHORTLIST_THRESHOLD = 75;
+export const PASS_THRESHOLD = 50;
+export const SHORTLIST_THEME_FIT = 55;
 
 const STOPWORDS = new Set([
   "a",
@@ -179,7 +182,27 @@ export const activeThemeFamilies = (theme: string): string[] => {
   return THEME_FAMILIES.filter((family) => familyHitsBlob(family, themeBlob)).map((family) => family.id);
 };
 
-const hasText = (value: string | null | undefined) => Boolean(value?.trim());
+const asText = (value: unknown): string => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["url", "href", "link", "src", "text", "title", "name"]) {
+      if (typeof record[key] === "string" && record[key].trim()) return record[key];
+    }
+  }
+  return "";
+};
+
+const asStringList = (value: unknown, limit: number) =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean).slice(0, limit)
+    : [];
+
+const pickList = (value: unknown, limit: number, fallback: string[]) => {
+  const list = asStringList(value, limit);
+  return list.length ? list : fallback;
+};
 
 const clampScore = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Math.round(value)));
 
@@ -198,9 +221,9 @@ export const evaluateProjectConcept = (
   theme: string,
 ): ProjectScreeningResult => {
   theme = theme ?? "";
-  const title = concept.title?.trim() ?? "";
-  const description = concept.description?.trim() ?? "";
-  const support = [concept.interests, concept.bio].filter(hasText).join(" ");
+  const title = asText(concept.title).trim();
+  const description = asText(concept.description).trim();
+  const support = [asText(concept.interests), asText(concept.bio)].filter((value) => value.trim()).join(" ");
   const primaryBlob = `${title} ${description}`.trim().toLowerCase();
   const fullBlob = `${primaryBlob} ${support}`.trim().toLowerCase();
   const themeTokens = tokenizeThemeText(theme);
@@ -245,9 +268,9 @@ export const evaluateProjectConcept = (
   const whoHits = hitCount(fullBlob, WHO_RE);
   const mechanismHits = hitCount(fullBlob, MECHANISM_RE);
   const feasibilityHits = hitCount(fullBlob, FEASIBILITY_RE);
-  const urlPoints = hasText(concept.projectUrl) ? 6 : 0;
-  const pdfPoints = hasText(concept.submissionPdfUrl) ? 4 : 0;
-  const demoPoints = hasText(concept.demoVideoUrl) ? 6 : 0;
+  const urlPoints = asText(concept.projectUrl).trim() ? 6 : 0;
+  const pdfPoints = asText(concept.submissionPdfUrl).trim() ? 4 : 0;
+  const demoPoints = asText(concept.demoVideoUrl).trim() ? 6 : 0;
   const artifactPoints = urlPoints + pdfPoints + demoPoints;
   const genericPitch = GENERIC_PITCH_RE.test(primaryBlob) && descLen < 120;
   const placeBonus = PLACE_RE.test(fullBlob) && families.includes("japan") ? 12 : 0;
@@ -374,7 +397,7 @@ export const evaluateProjectConcept = (
 };
 
 export const recommendationFromScores = (score: number, themeFit: number): ApplicantOpsStatus =>
-  score >= SHORTLIST_THRESHOLD && themeFit >= 55
+  score >= SHORTLIST_THRESHOLD && themeFit >= SHORTLIST_THEME_FIT
     ? "shortlisted"
     : score < PASS_THRESHOLD
       ? "passed"
@@ -421,18 +444,6 @@ const buildHeuristicNarrative = (input: {
   return { strengths: strengths.slice(0, 4), gaps: gaps.slice(0, 4), summary };
 };
 
-const clampAiScore = (value: unknown) =>
-  typeof value === "number" && Number.isFinite(value) ? clampScore(value) : null;
-
-const cleanStringList = (value: unknown, limit: number) =>
-  Array.isArray(value)
-    ? value
-        .filter((item): item is string => typeof item === "string")
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .slice(0, limit)
-    : [];
-
 export const blendScreeningResults = (
   heuristic: ProjectScreeningResult,
   ai?: Partial<ProjectScreeningResult> | null,
@@ -474,57 +485,14 @@ export const blendScreeningResults = (
     impact,
     recommendation: recommendationFromScores(score, themeFit),
     confidence: ai.confidence ?? heuristic.confidence,
-    summary: ai.summary?.trim() || heuristic.summary,
-    strengths: ai.strengths?.length ? ai.strengths.slice(0, 4) : heuristic.strengths,
-    gaps: ai.gaps?.length ? ai.gaps.slice(0, 4) : heuristic.gaps,
-    matchedKeywords: ai.matchedKeywords?.length ? ai.matchedKeywords.slice(0, 8) : heuristic.matchedKeywords,
-    missingKeywords: ai.missingKeywords?.length ? ai.missingKeywords.slice(0, 4) : heuristic.missingKeywords,
+    summary: typeof ai.summary === "string" && ai.summary.trim() ? ai.summary.trim() : heuristic.summary,
+    strengths: pickList(ai.strengths, 4, heuristic.strengths),
+    gaps: pickList(ai.gaps, 4, heuristic.gaps),
+    matchedKeywords: pickList(ai.matchedKeywords, 8, heuristic.matchedKeywords),
+    missingKeywords: pickList(ai.missingKeywords, 4, heuristic.missingKeywords),
     signals: heuristic.signals,
     analysisMode: "blended",
   };
-};
-
-export const parseAiScreeningEvaluations = (
-  payload: unknown,
-): Record<string, Partial<ProjectScreeningResult>> => {
-  const source = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
-  const rows = Array.isArray(source.evaluations) ? source.evaluations : [];
-  const mapped: Record<string, Partial<ProjectScreeningResult>> = {};
-  for (const row of rows) {
-    if (!row || typeof row !== "object") continue;
-    const record = row as Record<string, unknown>;
-    const id = typeof record.id === "string" ? record.id.trim() : "";
-    if (!id) continue;
-    const recommendation =
-      record.recommendation === "shortlisted" ||
-      record.recommendation === "passed" ||
-      record.recommendation === "pending"
-        ? record.recommendation
-        : undefined;
-    const confidence =
-      record.confidence === "high" || record.confidence === "medium" || record.confidence === "low"
-        ? record.confidence
-        : undefined;
-    mapped[id] = {
-      themeFit: clampAiScore(record.themeFit) ?? undefined,
-      conceptQuality: clampAiScore(record.conceptQuality) ?? undefined,
-      problemClarity: clampAiScore(record.problemClarity) ?? undefined,
-      solutionDepth: clampAiScore(record.solutionDepth) ?? undefined,
-      feasibility: clampAiScore(record.feasibility) ?? undefined,
-      originality: clampAiScore(record.originality) ?? undefined,
-      impact: clampAiScore(record.impact) ?? undefined,
-      score: clampAiScore(record.score) ?? undefined,
-      recommendation,
-      confidence,
-      summary: typeof record.summary === "string" ? record.summary.trim() : undefined,
-      strengths: cleanStringList(record.strengths, 4),
-      gaps: cleanStringList(record.gaps, 4),
-      matchedKeywords: cleanStringList(record.matchedKeywords, 8),
-      missingKeywords: cleanStringList(record.missingKeywords, 4),
-      analysisMode: "ai",
-    };
-  }
-  return mapped;
 };
 
 export const applyPersistedProjectScreen = (
@@ -549,7 +517,7 @@ export const applyPersistedProjectScreen = (
     record.analysisMode === "ai" ||
     record.analysisMode === "blended" ||
     typeof record.themeFit === "number" ||
-    Boolean(record.summary?.trim());
+    (typeof record.summary === "string" && Boolean(record.summary.trim()));
   if (!hasAi) {
     return {
       ...heuristic,
@@ -581,6 +549,39 @@ export const compareProjectScreenScores = (
   (right.conceptQuality ?? 0) - (left.conceptQuality ?? 0) ||
   (left.title ?? "").localeCompare(right.title ?? "");
 
+export const explainProjectMark = (input: {
+  summary?: string | null;
+  strengths?: string[] | null;
+  gaps?: string[] | null;
+  themeFit: number;
+  conceptQuality: number;
+  score: number;
+}): string => {
+  const shape =
+    input.themeFit < 50 && input.conceptQuality >= 70
+      ? "Concept is strong, but weak theme fit is holding the total down."
+      : input.themeFit >= 70 && input.conceptQuality < 50
+        ? "On-theme, but the write-up is too thin to rank higher."
+        : input.score >= 75
+          ? "Strong theme match with a usable concept."
+          : input.score < 50
+            ? "Off-theme or too thin for this event."
+            : "Mid-pack: some overlap with the theme, not enough to shortlist yet.";
+
+  const parts = [asText(input.summary).trim(), shape, asText(input.gaps?.[0]).trim()].filter(
+    (part): part is string => Boolean(part),
+  );
+  const unique: string[] = [];
+  for (const part of parts) {
+    const key = part.toLowerCase();
+    if (unique.some((existing) => existing.toLowerCase() === key || existing.toLowerCase().includes(key))) {
+      continue;
+    }
+    unique.push(part);
+  }
+  return unique.slice(0, 2).join(" ");
+};
+
 type QueueParticipant = {
   id: string;
   email: string;
@@ -601,7 +602,7 @@ type QueueSubmission = {
 
 const conceptFromProfile = (profile?: UserProfile | null) =>
   [profile?.headline, profile?.bio, profile?.interests, profile?.lookingFor]
-    .map((value) => value?.trim())
+    .map((value) => asText(value).trim())
     .filter(Boolean)
     .join("\n");
 
@@ -612,19 +613,26 @@ export const buildProjectConceptQueue = (
   const nameById = Object.fromEntries(
     participants.map((person) => [person.id, getApplicantDisplayName(person.profile, person.email)]),
   );
-  const fromSubmissions: ProjectConceptInput[] = submissions.map((submission) => ({
-    id: submission.id,
-    source: "submission",
-    participantId: submission.participantId,
-    participantEmail: submission.participantEmail,
-    participantName: nameById[submission.participantId] ?? submission.participantEmail.split("@")[0] ?? "Builder",
-    teamName: submission.teamName,
-    title: submission.title?.trim() || "Untitled project",
-    concept: submission.shortDescription?.trim() || "",
-    projectUrl: submission.projectUrl,
-    submissionPdfUrl: submission.submissionPdfUrl,
-    demoVideoUrl: submission.demoVideoUrl,
-  }));
+  const fromSubmissions: ProjectConceptInput[] = submissions.map((submission) => {
+    const email = asText(submission.participantEmail);
+    const projectUrl = asText(submission.projectUrl).trim();
+    const submissionPdfUrl = asText(submission.submissionPdfUrl).trim();
+    const demoVideoUrl = asText(submission.demoVideoUrl).trim();
+    const teamName = asText(submission.teamName).trim();
+    return {
+      id: String(submission.id ?? ""),
+      source: "submission" as const,
+      participantId: String(submission.participantId ?? ""),
+      participantEmail: email,
+      participantName: nameById[submission.participantId] ?? email.split("@")[0] ?? "Builder",
+      teamName: teamName || null,
+      title: asText(submission.title).trim() || "Untitled project",
+      concept: asText(submission.shortDescription).trim(),
+      projectUrl: projectUrl || null,
+      submissionPdfUrl: submissionPdfUrl || null,
+      demoVideoUrl: demoVideoUrl || null,
+    };
+  });
 
   const submittedParticipantIds = new Set(submissions.map((submission) => submission.participantId));
   const fromPitches: ProjectConceptInput[] = participants
@@ -638,9 +646,9 @@ export const buildProjectConceptQueue = (
         participantEmail: person.email,
         participantName: getApplicantDisplayName(person.profile, person.email),
         teamName: null,
-        title: person.profile?.headline?.trim() || "Concept pitch",
+        title: asText(person.profile?.headline).trim() || "Concept pitch",
         concept,
-        projectUrl: person.profile?.portfolioUrl ?? null,
+        projectUrl: asText(person.profile?.portfolioUrl).trim() || null,
         submissionPdfUrl: null,
         demoVideoUrl: null,
       };

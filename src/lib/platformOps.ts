@@ -58,9 +58,9 @@ const TEAM_NAMES = ["Nova", "Delta", "Horizon", "Kumo", "Sora", "Hana", "Ivy", "
 const hasText = (value: string | null | undefined) => Boolean(value?.trim());
 
 export const getApplicantDisplayName = (profile?: UserProfile | null, email?: string) => {
-  const name = profile?.fullName?.trim();
+  const name = typeof profile?.fullName === "string" ? profile.fullName.trim() : "";
   if (name) return name;
-  const fromEmail = email?.split("@")[0]?.replace(/[._-]+/g, " ").trim();
+  const fromEmail = typeof email === "string" ? email.split("@")[0]?.replace(/[._-]+/g, " ").trim() : "";
   if (fromEmail) {
     return fromEmail.replace(/\b\w/g, (char) => char.toUpperCase());
   }

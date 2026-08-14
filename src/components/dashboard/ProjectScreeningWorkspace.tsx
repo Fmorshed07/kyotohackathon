@@ -49,6 +49,12 @@ const statusLabel: Record<ApplicantOpsStatus, string> = {
   passed: "Passed",
 };
 
+const asList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+const asDisplay = (value: unknown, fallback = "—") =>
+  typeof value === "string" && value.trim() ? value : fallback;
+
 const FitBar = ({ value, label }: { value: number; label: string }) => (
   <div>
     <div className="flex items-baseline justify-between gap-2">
@@ -286,23 +292,23 @@ export function ProjectScreeningWorkspace({
                 <p className="font-body text-sm leading-relaxed text-muted-foreground">
                   {active.evaluation.summary}
                 </p>
-                {(active.evaluation.strengths.length > 0 || active.evaluation.gaps.length > 0) && (
+                {(asList(active.evaluation.strengths).length > 0 || asList(active.evaluation.gaps).length > 0) && (
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {active.evaluation.strengths.length > 0 && (
+                    {asList(active.evaluation.strengths).length > 0 && (
                       <div className="rounded-lg bg-emerald-500/10 px-3 py-3">
                         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-300">Strengths</p>
                         <ul className="mt-2 space-y-1 font-body text-sm text-foreground">
-                          {active.evaluation.strengths.map((item) => (
+                          {asList(active.evaluation.strengths).map((item) => (
                             <li key={item}>{item}</li>
                           ))}
                         </ul>
                       </div>
                     )}
-                    {active.evaluation.gaps.length > 0 && (
+                    {asList(active.evaluation.gaps).length > 0 && (
                       <div className="rounded-lg bg-white/[0.04] px-3 py-3">
                         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Gaps</p>
                         <ul className="mt-2 space-y-1 font-body text-sm text-muted-foreground">
-                          {active.evaluation.gaps.map((item) => (
+                          {asList(active.evaluation.gaps).map((item) => (
                             <li key={item}>{item}</li>
                           ))}
                         </ul>
@@ -316,10 +322,10 @@ export function ProjectScreeningWorkspace({
                     <p className="font-display text-sm font-semibold text-foreground">Concept</p>
                     <dl className="mt-3 space-y-2 font-body text-sm">
                       {[
-                        ["Builder", active.participantName],
-                        ["Email", active.participantEmail],
-                        ["Team", active.teamName || "—"],
-                        ["Link", active.projectUrl || "—"],
+                        ["Builder", asDisplay(active.participantName, "Builder")],
+                        ["Email", asDisplay(active.participantEmail)],
+                        ["Team", asDisplay(active.teamName)],
+                        ["Link", asDisplay(active.projectUrl)],
                       ].map(([label, value]) => (
                         <div key={label} className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
                           <dt className="text-muted-foreground">{label}</dt>
@@ -327,17 +333,17 @@ export function ProjectScreeningWorkspace({
                         </div>
                       ))}
                     </dl>
-                    <p className="mt-4 rounded-lg bg-black/30 p-3 font-body text-sm leading-relaxed text-muted-foreground">
-                      {active.concept.trim() || "No concept write-up yet."}
+                    <p className="mt-4 max-h-64 overflow-y-auto rounded-lg bg-black/30 p-3 font-body text-sm leading-relaxed text-muted-foreground">
+                      {asDisplay(active.concept, "No concept write-up yet.")}
                     </p>
-                    {active.evaluation.matchedKeywords.length > 0 && (
+                    {asList(active.evaluation.matchedKeywords).length > 0 && (
                       <p className="mt-3 font-body text-xs text-muted-foreground">
-                        Matched: {active.evaluation.matchedKeywords.join(" · ")}
+                        Matched: {asList(active.evaluation.matchedKeywords).join(" · ")}
                       </p>
                     )}
-                    {active.evaluation.missingKeywords.length > 0 && (
+                    {asList(active.evaluation.missingKeywords).length > 0 && (
                       <p className="mt-1 font-body text-xs text-muted-foreground">
-                        Weak on: {active.evaluation.missingKeywords.join(" · ")}
+                        Weak on: {asList(active.evaluation.missingKeywords).join(" · ")}
                       </p>
                     )}
                   </div>
@@ -345,7 +351,7 @@ export function ProjectScreeningWorkspace({
                   <div>
                     <p className="font-display text-sm font-semibold text-foreground">Agent signals</p>
                     <ul className="mt-3 space-y-2">
-                      {active.evaluation.signals.map((signal) => (
+                      {(Array.isArray(active.evaluation.signals) ? active.evaluation.signals : []).map((signal) => (
                         <li
                           key={signal.id}
                           className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2"
@@ -417,9 +423,13 @@ export function ProjectScreeningWorkspace({
             score: item.score,
             themeFit: item.evaluation.themeFit,
             conceptQuality: item.evaluation.conceptQuality,
+            summary: item.evaluation.summary,
+            strengths: item.evaluation.strengths,
+            gaps: item.evaluation.gaps,
           }))}
           activeId={activeId}
           onSelect={setActiveId}
+          csvLabel={hackathon.name}
         />
       )}
     </div>

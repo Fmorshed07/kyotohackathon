@@ -549,7 +549,7 @@ service cloud.firestore {
         || (isApprovedHost() && resource.data.created_by == request.auth.uid);
     }
 
-    // A minimal public copy is created only by a participant who opts their project into the gallery.
+    // A minimal public copy is created when a team, host, or admin opts the project into the gallery.
     // This deliberately avoids publishing private submissions, judging notes, or score data.
     match /public_projects/{projectId} {
       function isPublicProjectInviteJoin() {
@@ -612,76 +612,107 @@ service cloud.firestore {
     }
 
     // Community star ratings for public projects. Public pages show stars only — never judge scores.
+    // Visitors may star once per browser voter id — no account required.
     match /project_stars/{starId} {
-      function ownedStarWrite() {
-        return isSignedIn()
-          && request.resource.data.user_id == request.auth.uid
-          && request.resource.data.project_id is string
-          && request.resource.data.stars is int
-          && request.resource.data.stars >= 1
-          && request.resource.data.stars <= 5
-          && starId == request.resource.data.project_id + '_' + request.auth.uid;
+      function isWholeStar(value) {
+        return value is number
+          && value >= 1
+          && value <= 5
+          && value == int(value);
+      }
+
+      function validVoterId(id) {
+        return id is string
+          && id.size() >= 16
+          && id.size() <= 64
+          && id.matches('^[A-Za-z0-9_-]+$');
+      }
+
+      function publicStarCreate() {
+        return request.resource.data.project_id is string
+          && request.resource.data.project_id.size() > 0
+          && validVoterId(request.resource.data.user_id)
+          && isWholeStar(request.resource.data.stars)
+          && starId == request.resource.data.project_id + '_' + request.resource.data.user_id
+          && request.resource.data.email is string
+          && request.resource.data.email.size() >= 6
+          && request.resource.data.email.size() <= 254
+          && request.resource.data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+          && request.resource.data.keys().hasOnly([
+            "project_id", "user_id", "stars", "email", "created_at", "updated_at"
+          ]);
       }
 
       allow get: if true;
       allow list: if isSignedIn() && resource.data.user_id == request.auth.uid;
-      allow create: if ownedStarWrite();
-      allow update: if ownedStarWrite()
-        && request.resource.data.project_id == resource.data.project_id
-        && request.resource.data.user_id == resource.data.user_id;
-      allow delete: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if publicStarCreate();
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     match /project_star_stats/{projectId} {
-      function ownRatingPath() {
-        return /databases/$(database)/documents/project_stars/$(projectId + '_' + request.auth.uid);
+      function validVoterId(id) {
+        return id is string
+          && id.size() >= 16
+          && id.size() <= 64
+          && id.matches('^[A-Za-z0-9_-]+$');
+      }
+
+      function voterRatingPath() {
+        return /databases/$(database)/documents/project_stars/$(
+          projectId + '_' + request.resource.data.last_voter_id
+        );
       }
 
       function statsKeysOk() {
-        return request.resource.data.keys().hasOnly(["star_sum", "star_count", "updated_at"])
+        return request.resource.data.keys().hasOnly(["star_sum", "star_count", "updated_at", "last_voter_id"])
           && request.resource.data.star_sum is number
           && request.resource.data.star_count is number
           && request.resource.data.star_sum >= 0
           && request.resource.data.star_count >= 0
-          && request.resource.data.star_sum <= request.resource.data.star_count * 5;
+          && request.resource.data.star_sum <= request.resource.data.star_count * 5
+          && validVoterId(request.resource.data.last_voter_id);
       }
 
-      function newRatingDelta() {
-        return !exists(ownRatingPath())
-          && existsAfter(ownRatingPath())
+      function newPublicRatingDelta() {
+        return !exists(voterRatingPath())
+          && existsAfter(voterRatingPath())
+          && getAfter(voterRatingPath()).data.user_id == request.resource.data.last_voter_id
           && request.resource.data.star_count == resource.data.star_count + 1
-          && request.resource.data.star_sum == resource.data.star_sum + getAfter(ownRatingPath()).data.stars;
-      }
-
-      function changedRatingDelta() {
-        return exists(ownRatingPath())
-          && existsAfter(ownRatingPath())
-          && request.resource.data.star_count == resource.data.star_count
           && request.resource.data.star_sum
-            == resource.data.star_sum
-              + getAfter(ownRatingPath()).data.stars
-              - get(ownRatingPath()).data.stars;
-      }
-
-      function clearedRatingDelta() {
-        return exists(ownRatingPath())
-          && !existsAfter(ownRatingPath())
-          && request.resource.data.star_count == resource.data.star_count - 1
-          && request.resource.data.star_sum == resource.data.star_sum - get(ownRatingPath()).data.stars;
+            == resource.data.star_sum + getAfter(voterRatingPath()).data.stars;
       }
 
       allow read: if true;
-      allow create: if isSignedIn()
-        && statsKeysOk()
-        && existsAfter(ownRatingPath())
+      allow create: if statsKeysOk()
+        && existsAfter(voterRatingPath())
+        && getAfter(voterRatingPath()).data.user_id == request.resource.data.last_voter_id
         && request.resource.data.star_count == 1
-        && request.resource.data.star_sum == getAfter(ownRatingPath()).data.stars;
-      allow update: if isSignedIn()
-        && statsKeysOk()
+        && request.resource.data.star_sum == getAfter(voterRatingPath()).data.stars;
+      allow update: if statsKeysOk()
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["star_sum", "star_count", "updated_at"])
-        && (newRatingDelta() || changedRatingDelta() || clearedRatingDelta());
+            .hasOnly(["star_sum", "star_count", "updated_at", "last_voter_id"])
+        && newPublicRatingDelta();
       allow delete: if isAdmin();
+    }
+
+    // Email-only waitlist for upcoming hackathons. No account required.
+    match /hackathon_subscribers/{subscriberId} {
+      function validSubscribeEmail(value) {
+        return value is string
+          && value.size() >= 6
+          && value.size() <= 254
+          && value == subscriberId
+          && value.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$');
+      }
+
+      allow create: if validSubscribeEmail(request.resource.data.email)
+        && request.resource.data.keys().hasOnly(["email", "created_at", "source"])
+        && request.resource.data.source is string
+        && request.resource.data.source.size() > 0
+        && request.resource.data.source.size() <= 80
+        && request.resource.data.created_at is string;
+      allow read, update, delete: if isAdmin();
     }
 
     match /hackathon_criteria/{hackathonId} {

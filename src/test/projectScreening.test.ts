@@ -5,6 +5,7 @@ import {
   buildProjectConceptQueue,
   compareProjectScreenScores,
   evaluateProjectConcept,
+  explainProjectMark,
   parseAiScreeningEvaluations,
   tokenizeThemeText,
 } from "@/lib/projectScreening";
@@ -168,5 +169,46 @@ describe("projectScreening", () => {
       { score: 91, themeFit: 88, title: "A" },
     ].sort(compareProjectScreenScores);
     expect(ranked[0].title).toBe("A");
+  });
+
+  it("explains a high-concept low-theme mark", () => {
+    const why = explainProjectMark({
+      themeFit: 42,
+      conceptQuality: 96,
+      score: 61,
+      summary: "Partial fit for “Agentic AI for Japan's Future”.",
+      gaps: ["Weak on agentic and japan"],
+    });
+    expect(why.toLowerCase()).toContain("theme fit");
+    expect(why.toLowerCase()).toContain("partial fit");
+  });
+
+  it("does not crash on Giftour-like malformed submission fields", () => {
+    const queue = buildProjectConceptQueue(
+      [
+        {
+          id: "giftour",
+          participantId: "u1",
+          participantEmail: "giftour@example.com",
+          teamName: { name: "Giftour" } as unknown as string,
+          title: "Giftour",
+          shortDescription: { text: "A gift routing agent for Kyoto visitors." } as unknown as string,
+          projectUrl: { url: "https://giftour.example.com" } as unknown as string,
+          submissionPdfUrl: null,
+          demoVideoUrl: null,
+        },
+      ],
+      [{ id: "u1", email: "giftour@example.com", profile: { fullName: "Giftour Team" } }],
+    );
+    expect(queue).toHaveLength(1);
+    expect(queue[0].title).toBe("Giftour");
+    expect(queue[0].concept).toContain("gift routing");
+    expect(queue[0].projectUrl).toBe("https://giftour.example.com");
+    expect(() => evaluateProjectConcept({ title: queue[0].title, description: queue[0].concept, projectUrl: queue[0].projectUrl }, KYOTO_THEME)).not.toThrow();
+    expect(explainProjectMark({ themeFit: 40, conceptQuality: 80, score: 55, summary: { text: "bad" } as unknown as string, gaps: "not-an-array" as unknown as string[] })).toBeTruthy();
+    const heuristic = evaluateProjectConcept({ title: "Giftour", description: "A gift routing agent." }, KYOTO_THEME);
+    expect(() =>
+      blendScreeningResults(heuristic, { summary: 12 as unknown as string, strengths: "strong" as unknown as string[] }),
+    ).not.toThrow();
   });
 });

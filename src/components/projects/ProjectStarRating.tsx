@@ -40,6 +40,7 @@ export function ProjectStarRating({
             role="radio"
             aria-checked={myRating === value}
             aria-label={`${value} star${value === 1 ? "" : "s"}`}
+            title={disabled && myRating > 0 ? "You already starred this project" : undefined}
             disabled={disabled}
             onMouseEnter={() => setHover(value)}
             onFocus={() => setHover(value)}

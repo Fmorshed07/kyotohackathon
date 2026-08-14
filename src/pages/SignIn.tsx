@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
-import { getDashboardPathForUser, isStaffRole, participantNeedsOnboarding } from "@/lib/portalRoutes";
+import { getDashboardPathForUser, isStaffRole, participantNeedsOnboarding, safeInternalPath } from "@/lib/portalRoutes";
 import { consumePendingAdminGrant, hasPendingAdminGrant } from "@/lib/adminGrants";
 import {
   clearPendingInvite,
@@ -277,6 +277,11 @@ export default function SignIn() {
       const user = auth.currentUser;
       if (!user) return;
 
+      const nextPath = safeInternalPath(new URLSearchParams(location.search).get("next"));
+      const finish = (fallback: string) => {
+        navigate(nextPath ?? fallback, { replace: true });
+      };
+
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
       const existingData = userSnap.data() ?? {};
@@ -286,7 +291,7 @@ export default function SignIn() {
       );
 
       if (existingRole === "admin") {
-        navigate("/dashboard/admin", { replace: true });
+        finish("/dashboard/admin");
         return;
       }
 
@@ -392,16 +397,15 @@ export default function SignIn() {
             },
           });
 
-          navigate(
+          finish(
             needsOnboarding
               ? onboardingPath(pendingHackathonOnSignIn)
               : "/dashboard/participant",
-            { replace: true }
           );
           return;
         }
 
-        navigate(
+        finish(
           pathForSession({
             role: existingRole,
             judgeApprovalStatus: resolvedJudgeApprovalStatus,
@@ -417,7 +421,6 @@ export default function SignIn() {
                   : null,
             },
           }),
-          { replace: true }
         );
         return;
       }
@@ -471,7 +474,7 @@ export default function SignIn() {
             ? "pending"
             : existingJudgeApprovalStatus;
 
-        navigate(
+        finish(
           pathForSession({
             role: existingRole,
             judgeApprovalStatus: resolvedExistingApproval,
@@ -487,7 +490,6 @@ export default function SignIn() {
                   : null,
             },
           }),
-          { replace: true }
         );
         return;
       }
@@ -577,7 +579,7 @@ export default function SignIn() {
         const pendingHackathon =
           readPendingHackathon() ||
           (searchHackathon && isHackathonId(searchHackathon) ? searchHackathon : null);
-        navigate(onboardingPath(pendingHackathon), { replace: true });
+        finish(onboardingPath(pendingHackathon));
         return;
       }
 
@@ -620,15 +622,15 @@ export default function SignIn() {
         };
 
         if (participantNeedsOnboarding(sessionForPath)) {
-          navigate(onboardingPath(pendingHackathon), { replace: true });
+          finish(onboardingPath(pendingHackathon));
           return;
         }
 
-        navigate(pathForSession(sessionForPath), { replace: true });
+        finish(pathForSession(sessionForPath));
         return;
       }
 
-      navigate(
+      finish(
         pathForSession({
           role: targetRole,
           judgeApprovalStatus: targetJudgeApprovalStatus ?? existingJudgeApprovalStatus,
@@ -644,7 +646,6 @@ export default function SignIn() {
                 : null,
           },
         }),
-        { replace: true }
       );
     } catch (error: unknown) {
       const message =

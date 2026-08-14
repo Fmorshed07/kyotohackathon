@@ -1,26 +1,31 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
-import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { getFirestoreDb } from "@/lib/firebaseClient";
+import { isValidSubscribeEmail, subscribeToHackathons } from "@/lib/hackathonSubscribe";
 import {
   communityStarFill,
   EMPTY_STAR_STATS,
-  fetchMyProjectStarRatings,
   fetchProjectStarStats,
+  readLocalStarRatings,
+  readSavedStarEmail,
   saveProjectStarRating,
   starRatingDelta,
+  voterIdFromEmail,
+  writeLocalStarRating,
+  writeSavedStarEmail,
   type StarStats,
 } from "@/lib/projectStars";
 
+type StarEmailPrompt = { projectId: string; stars: number };
+
 export function useProjectCommunityStars() {
-  const navigate = useNavigate();
-  const { sessionUser, loading: authLoading } = usePortalAuth();
   const [statsById, setStatsById] = useState<Record<string, StarStats>>({});
   const [myRatingById, setMyRatingById] = useState<Record<string, number>>({});
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [emailPrompt, setEmailPrompt] = useState<StarEmailPrompt | null>(null);
 
   useEffect(() => {
+    setMyRatingById(readSavedStarEmail() ? readLocalStarRatings() : {});
     let isCurrent = true;
     const db = getFirestoreDb();
     void fetchProjectStarStats(db)
@@ -35,45 +40,23 @@ export function useProjectCommunityStars() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!sessionUser?.id) {
-      setMyRatingById({});
-      return;
-    }
-    let isCurrent = true;
-    const db = getFirestoreDb();
-    void fetchMyProjectStarRatings(db, sessionUser.id)
-      .then((ratings) => {
-        if (isCurrent) setMyRatingById(ratings);
-      })
-      .catch(() => {
-        if (isCurrent) setMyRatingById({});
-      });
-    return () => {
-      isCurrent = false;
-    };
-  }, [sessionUser?.id]);
-
-  const rate = async (projectId: string, stars: number) => {
-    if (authLoading) return;
-    if (!sessionUser?.id) {
-      toast("Sign in to star this project");
-      navigate("/signin");
+  const commitStar = async (projectId: string, stars: number, email: string) => {
+    if ((myRatingById[projectId] ?? 0) > 0) {
+      toast("You already starred this project");
       return;
     }
 
-    const previous = myRatingById[projectId] ?? 0;
-    const next = previous === stars ? 0 : stars;
+    const voter = await voterIdFromEmail(email);
+    const previous = 0;
+    const next = stars;
     const delta = starRatingDelta(previous, next);
     const currentStats = statsById[projectId] ?? EMPTY_STAR_STATS;
+    const db = getFirestoreDb();
 
     setPendingId(projectId);
-    setMyRatingById((current) => {
-      const nextRatings = { ...current };
-      if (next > 0) nextRatings[projectId] = next;
-      else delete nextRatings[projectId];
-      return nextRatings;
-    });
+    setMyRatingById((current) => ({ ...current, [projectId]: next }));
+    writeLocalStarRating(projectId, next);
+    writeSavedStarEmail(email);
     setStatsById((current) => ({
       ...current,
       [projectId]: {
@@ -83,16 +66,17 @@ export function useProjectCommunityStars() {
     }));
 
     try {
-      await saveProjectStarRating(getFirestoreDb(), {
+      await subscribeToHackathons(db, email, "project-star");
+      await saveProjectStarRating(db, {
         projectId,
-        userId: sessionUser.id,
-        stars: next > 0 ? next : null,
+        userId: voter,
+        stars: next,
+        email,
       });
     } catch (error) {
       setMyRatingById((current) => {
         const nextRatings = { ...current };
-        if (previous > 0) nextRatings[projectId] = previous;
-        else delete nextRatings[projectId];
+        delete nextRatings[projectId];
         return nextRatings;
       });
       setStatsById((current) => ({ ...current, [projectId]: currentStats }));
@@ -102,12 +86,39 @@ export function useProjectCommunityStars() {
     }
   };
 
+  const rate = async (projectId: string, stars: number) => {
+    if ((myRatingById[projectId] ?? 0) > 0) {
+      toast("You already starred this project");
+      return;
+    }
+    const savedEmail = readSavedStarEmail();
+    if (savedEmail) {
+      await commitStar(projectId, stars, savedEmail);
+      return;
+    }
+    setEmailPrompt({ projectId, stars });
+  };
+
+  const submitStarEmail = async (email: string) => {
+    if (!emailPrompt) return;
+    if (!isValidSubscribeEmail(email)) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+    const pending = emailPrompt;
+    setEmailPrompt(null);
+    await commitStar(pending.projectId, pending.stars, email);
+  };
+
   return {
     statsById,
     myRatingById,
     pendingId,
-    canRate: Boolean(sessionUser?.id),
+    emailPrompt,
+    canRate: true,
     communityFill: (projectId: string) => communityStarFill(statsById[projectId] ?? EMPTY_STAR_STATS),
     rate,
+    submitStarEmail,
+    cancelStarEmail: () => setEmailPrompt(null),
   };
 }

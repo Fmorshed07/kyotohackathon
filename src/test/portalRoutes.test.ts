@@ -3,6 +3,7 @@ import {
   canAccessStaffDashboard,
   getDashboardPathForUser,
   isStaffRole,
+  safeInternalPath,
 } from "@/lib/portalRoutes";
 
 describe("judge onboarding access", () => {
@@ -19,6 +20,15 @@ describe("judge onboarding access", () => {
     expect(getDashboardPathForUser("judge", undefined)).toBe("/dashboard");
     expect(getDashboardPathForUser("mentor", "pending")).toBe("/dashboard");
     expect(getDashboardPathForUser("judge", "approved")).toBe("/dashboard/judge");
+  });
+
+  it("accepts same-origin next paths after create-profile", () => {
+    expect(safeInternalPath("/projects/abc")).toBe("/projects/abc");
+    expect(safeInternalPath("/projects?sort=stars")).toBe("/projects?sort=stars");
+    expect(safeInternalPath("//evil.example")).toBeNull();
+    expect(safeInternalPath("https://evil.example")).toBeNull();
+    expect(safeInternalPath("\\windows")).toBeNull();
+    expect(safeInternalPath("")).toBeNull();
   });
 
   it("recognizes mentor and judge as staff roles", () => {

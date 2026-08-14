@@ -204,6 +204,11 @@ const buildAdminPeopleNav: AdminNavBuilder = (hackathonId) => [
     icon: Users,
   },
   {
+    href: withHackathonQuery("/dashboard/admin/people#newsletter", hackathonId),
+    label: "Newsletter",
+    icon: Mail,
+  },
+  {
     href: withHackathonQuery("/dashboard/admin/people#manage-participants", hackathonId),
     label: "Participants",
     icon: Users,
@@ -247,6 +252,21 @@ const buildAdminScoringNav: AdminNavBuilder = (hackathonId) => [
     icon: ListChecks,
   },
   {
+    href: withHackathonQuery("/dashboard/admin/judging#submission-marks", hackathonId),
+    label: "Submissions",
+    icon: ClipboardList,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judging#judge-marks", hackathonId),
+    label: "Mark check",
+    icon: ClipboardCheck,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judging#judge-marks-chart", hackathonId),
+    label: "Judge chart",
+    icon: BarChart3,
+  },
+  {
     href: withHackathonQuery("/dashboard/admin/judging#analytics", hackathonId),
     label: "Analytics",
     icon: BarChart3,
@@ -255,11 +275,6 @@ const buildAdminScoringNav: AdminNavBuilder = (hackathonId) => [
     href: withHackathonQuery("/dashboard/admin/judging#project-marks", hackathonId),
     label: "Theme marks",
     icon: ScanSearch,
-  },
-  {
-    href: withHackathonQuery("/dashboard/admin/judging#judge-marks", hackathonId),
-    label: "Mark check",
-    icon: ClipboardCheck,
   },
   {
     href: withHackathonQuery("/dashboard/admin/judging#top-3-marks", hackathonId),
@@ -271,11 +286,57 @@ const buildAdminScoringNav: AdminNavBuilder = (hackathonId) => [
     label: "Top 3 ballots",
     icon: Trophy,
   },
+];
+
+const hostDashboardNav: NavItem[] = [
+  { href: "/dashboard/host#overview", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard/host#event-details", label: "Event details", icon: CalendarRange },
+  { href: "/dashboard/host#event-teams", label: "Teams", icon: Users },
+  { href: "/dashboard/host#tickets", label: "Tickets & QR", icon: Ticket },
+  { href: "/dashboard/host#check-in", label: "Check-in", icon: ClipboardCheck },
+];
+
+const hostPeopleNav: NavItem[] = [
+  { href: "/dashboard/host#judges", label: "Judges", icon: Scale },
   {
-    href: withHackathonQuery("/dashboard/admin/judging#submission-marks", hackathonId),
-    label: "Submissions",
-    icon: ClipboardList,
+    href: "/dashboard/host#manage-judge-approvals",
+    label: "Judge approvals",
+    icon: ShieldCheck,
   },
+];
+
+const hostScoringNav: NavItem[] = [
+  { href: "/dashboard/host#judging", label: "Judging", icon: Gavel },
+  { href: "/dashboard/host#marking-criteria", label: "Criteria", icon: ListChecks },
+  { href: "/dashboard/host#submission-marks", label: "Submissions", icon: ClipboardList },
+  { href: "/dashboard/host#judge-marks", label: "Mark check", icon: ClipboardCheck },
+  { href: "/dashboard/host#judge-marks-chart", label: "Judge chart", icon: BarChart3 },
+  { href: "/dashboard/host#analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/dashboard/host#project-marks", label: "Theme marks", icon: ScanSearch },
+  { href: "/dashboard/host#top-3-marks", label: "Top 3 by score", icon: Medal },
+  { href: "/dashboard/host#top-3-ranking", label: "Top 3 ballots", icon: Trophy },
+];
+
+const hostToolsNav: NavItem[] = [
+  { href: "/dashboard/host/screening", label: "Screening agent", icon: Radar },
+  { href: "/dashboard/host/project-screening", label: "Project agent", icon: ScanSearch },
+  { href: "/dashboard/host/operations", label: "Operations", icon: Activity },
+];
+
+const judgeDashboardNav: NavItem[] = [
+  { href: "#overview", label: "Overview", icon: LayoutDashboard },
+  { href: "#teams", label: "Teams", icon: Users },
+];
+
+const judgeScoringNav: NavItem[] = [
+  { href: "#submissions", label: "Submissions", icon: ClipboardList },
+  { href: "#judge-marks-chart", label: "My marks", icon: BarChart3 },
+  { href: "#project-marks", label: "Theme marks", icon: ScanSearch },
+  { href: "#top-3-ranking", label: "Top 3 Ranking", icon: Trophy },
+];
+
+const judgeToolsNav: NavItem[] = [
+  { href: "/dashboard/judge/project-screening", label: "Project agent", icon: ScanSearch },
 ];
 
 function scrollToHashId(id: string) {
@@ -435,7 +496,9 @@ function AdminHashScroll() {
         "judging",
         "marking-criteria",
         "analytics",
+        "project-marks",
         "judge-marks",
+        "judge-marks-chart",
         "top-3-marks",
         "top-3-ranking",
         "submission-marks",
@@ -687,22 +750,24 @@ function DashboardLayoutContent({
                 defaultOpen={false}
               />
             </>
+          ) : role === "host" ? (
+            <NavSection label="Dashboard">
+              <NavMenuItems items={hostDashboardNav} onNavigate={closeMobileNav} />
+            </NavSection>
+          ) : isStaffDashboard ? (
+            <NavSection label="Dashboard">
+              <NavMenuItems items={judgeDashboardNav} onNavigate={closeMobileNav} />
+            </NavSection>
           ) : (
             <NavSection label="Dashboard">
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={role === "participant" ? isParticipantHome : undefined}
+                  isActive={isParticipantHome}
                   className={menuButtonClass}
                 >
                   <DashboardNavLink
-                    href={
-                      role === "host"
-                        ? "/dashboard/host#overview"
-                        : role === "participant"
-                          ? "/dashboard/participant#overview"
-                          : "#overview"
-                    }
+                    href="/dashboard/participant#overview"
                     onNavigate={closeMobileNav}
                   >
                     <LayoutDashboard className={navIconClass} />
@@ -710,207 +775,96 @@ function DashboardLayoutContent({
                   </DashboardNavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {role === "participant" && (
-                <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink
-                        href="/dashboard/participant#my-hackathons"
-                        onNavigate={closeMobileNav}
-                      >
-                        <CalendarRange className={navIconClass} />
-                        <span>My Hackathons</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isParticipantTeamPage}
-                      className={menuButtonClass}
-                    >
-                      <DashboardNavLink
-                        href="/dashboard/participant/team"
-                        onNavigate={closeMobileNav}
-                      >
-                        <Users className={navIconClass} />
-                        <span>My Team</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isParticipantProfilePage}
-                      className={menuButtonClass}
-                    >
-                      <DashboardNavLink
-                        href="/dashboard/participant/profile"
-                        onNavigate={closeMobileNav}
-                      >
-                        <UserRound className={navIconClass} />
-                        <span>My Profile</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink
-                        href="/dashboard/participant#my-project"
-                        onNavigate={closeMobileNav}
-                      >
-                        <FileText className={navIconClass} />
-                        <span>My Project</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="/projects" onNavigate={closeMobileNav}>
-                        <LayoutGrid className={navIconClass} />
-                        <span>Projects & demos</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </>
-              )}
-              {isStaffDashboard && (
-                <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#teams" onNavigate={closeMobileNav}>
-                        <Users className={navIconClass} />
-                        <span>Teams</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink
-                        href="/dashboard/judge/project-screening"
-                        onNavigate={closeMobileNav}
-                      >
-                        <ScanSearch className={navIconClass} />
-                        <span>Project agent</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="/dashboard/judge#project-marks" onNavigate={closeMobileNav}>
-                        <BarChart3 className={navIconClass} />
-                        <span>Theme marks</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#top-3-ranking" onNavigate={closeMobileNav}>
-                        <Trophy className={navIconClass} />
-                        <span>Top 3 Ranking</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="#submissions" onNavigate={closeMobileNav}>
-                        <ClipboardList className={navIconClass} />
-                        <span>Submissions</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </>
-              )}
-              {role === "host" && (
-                <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink
-                        href="/dashboard/host/screening"
-                        onNavigate={closeMobileNav}
-                      >
-                        <Radar className={navIconClass} />
-                        <span>Screening agent</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink
-                        href="/dashboard/host/project-screening"
-                        onNavigate={closeMobileNav}
-                      >
-                        <ScanSearch className={navIconClass} />
-                        <span>Project agent</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink
-                        href="/dashboard/host/operations"
-                        onNavigate={closeMobileNav}
-                      >
-                        <Activity className={navIconClass} />
-                        <span>Operations</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink
-                        href="/dashboard/host#event-details"
-                        onNavigate={closeMobileNav}
-                      >
-                        <CalendarRange className={navIconClass} />
-                        <span>Event details</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="/dashboard/host#tickets" onNavigate={closeMobileNav}>
-                        <Ticket className={navIconClass} />
-                        <span>Tickets & QR</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={menuButtonClass}>
-                      <DashboardNavLink href="/dashboard/host#check-in" onNavigate={closeMobileNav}>
-                        <ClipboardCheck className={navIconClass} />
-                        <span>Check-in</span>
-                      </DashboardNavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </>
-              )}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className={menuButtonClass}>
+                  <DashboardNavLink
+                    href="/dashboard/participant#my-hackathons"
+                    onNavigate={closeMobileNav}
+                  >
+                    <CalendarRange className={navIconClass} />
+                    <span>My Hackathons</span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isParticipantTeamPage}
+                  className={menuButtonClass}
+                >
+                  <DashboardNavLink
+                    href="/dashboard/participant/team"
+                    onNavigate={closeMobileNav}
+                  >
+                    <Users className={navIconClass} />
+                    <span>My Team</span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isParticipantProfilePage}
+                  className={menuButtonClass}
+                >
+                  <DashboardNavLink
+                    href="/dashboard/participant/profile"
+                    onNavigate={closeMobileNav}
+                  >
+                    <UserRound className={navIconClass} />
+                    <span>My Profile</span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className={menuButtonClass}>
+                  <DashboardNavLink
+                    href="/dashboard/participant#my-project"
+                    onNavigate={closeMobileNav}
+                  >
+                    <FileText className={navIconClass} />
+                    <span>My Project</span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className={menuButtonClass}>
+                  <DashboardNavLink href="/projects" onNavigate={closeMobileNav}>
+                    <LayoutGrid className={navIconClass} />
+                    <span>Projects & demos</span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </NavSection>
           )}
 
-          {role === "host" && (
-            <NavSection label="Scoring">
-              <NavMenuItems
-                items={[
-                  { href: "/dashboard/host#judges", label: "Judges", icon: Scale },
-                  {
-                    href: "/dashboard/host#manage-judge-approvals",
-                    label: "Judge approvals",
-                    icon: ShieldCheck,
-                  },
-                  { href: "/dashboard/host#judging", label: "Judging", icon: Gavel },
-                  { href: "/dashboard/host#judge-marks", label: "Mark check", icon: ClipboardCheck },
-                  { href: "/dashboard/host#submission-marks", label: "Submissions", icon: ClipboardList },
-                  { href: "/dashboard/host#marking-criteria", label: "Criteria", icon: ListChecks },
-                  { href: "/dashboard/host#analytics", label: "Analytics", icon: BarChart3 },
-                  { href: "/dashboard/host#project-marks", label: "Theme marks", icon: ScanSearch },
-                  { href: "/dashboard/host#top-3-marks", label: "Top 3 by score", icon: Medal },
-                  { href: "/dashboard/host#top-3-ranking", label: "Top 3 ballots", icon: Trophy },
-                ]}
+          {isStaffDashboard ? (
+            <>
+              <NavSection label="Scoring">
+                <NavMenuItems items={judgeScoringNav} onNavigate={closeMobileNav} />
+              </NavSection>
+              <NavSection label="Tools">
+                <NavMenuItems items={judgeToolsNav} onNavigate={closeMobileNav} />
+              </NavSection>
+            </>
+          ) : null}
+
+          {role === "host" ? (
+            <>
+              <NavSection label="People">
+                <NavMenuItems items={hostPeopleNav} onNavigate={closeMobileNav} />
+              </NavSection>
+              <CollapsibleNavSection
+                label="Scoring"
+                items={hostScoringNav}
                 onNavigate={closeMobileNav}
+                defaultOpen
               />
-            </NavSection>
-          )}
+              <NavSection label="Tools">
+                <NavMenuItems items={hostToolsNav} onNavigate={closeMobileNav} />
+              </NavSection>
+            </>
+          ) : null}
 
           <NavSection label="Boards">
             {role === "admin" && (
@@ -1210,4 +1164,4 @@ export function DashboardLayout(props: DashboardLayoutProps) {
   );
 }
 
-export { sectionClass } from "@/components/dashboard/dashboardStyles";
+export { dashJumpLinkClass, sectionClass } from "@/components/dashboard/dashboardStyles";

@@ -1,27 +1,28 @@
-import { BarChart3, ClipboardCheck, ClipboardList, ListChecks, Medal, ScanSearch, Trophy } from "lucide-react";
+import { BarChart3, ClipboardCheck, ClipboardList, Gavel, ListChecks, Medal, ScanSearch, Trophy } from "lucide-react";
 import { MarkingCriteriaSection } from "@/components/dashboard/MarkingCriteriaSection";
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { AdminJudgeMarksPanel } from "@/components/dashboard/AdminJudgeMarksPanel";
 import { AdminTop3MarksPanel } from "@/components/dashboard/AdminTop3MarksPanel";
 import { AdminTop3RankingPanel } from "@/components/dashboard/AdminTop3RankingPanel";
 import { AdminSubmissionsPanel } from "@/components/dashboard/AdminSubmissionsPanel";
+import { JudgeMarksChartPanel } from "@/components/dashboard/JudgeMarksChartPanel";
 import { ProjectThemeMarksPanel } from "@/components/dashboard/ProjectThemeMarksPanel";
-import { sectionClass } from "@/components/dashboard/DashboardLayout";
+import { dashJumpLinkClass, sectionClass } from "@/components/dashboard/DashboardLayout";
 import type { AdminSubmissionRow, AdminUser, NewSubmissionInput } from "@/components/dashboard/AdminDashboard";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
 import type { AdminTop3RankingSummary } from "@/lib/judgeTop3Rankings";
 import type { PortalHackathon } from "@/lib/hackathons";
-import { cn } from "@/lib/utils";
 
 const JUDGING_JUMP_LINKS = [
-  { href: "#marking-criteria", label: "Criteria", icon: ListChecks },
-  { href: "#analytics", label: "Analytics", icon: BarChart3 },
-  { href: "#project-marks", label: "Theme marks", icon: ScanSearch },
-  { href: "#judge-marks", label: "Mark check", icon: ClipboardCheck },
-  { href: "#top-3-marks", label: "Top 3 by score", icon: Medal },
-  { href: "#top-3-ranking", label: "Top 3 ballots", icon: Trophy },
-  { href: "#submission-marks", label: "Submissions", icon: ClipboardList },
+  { href: "#marking-criteria", label: "1. Criteria", icon: ListChecks },
+  { href: "#submission-marks", label: "2. Submissions", icon: ClipboardList },
+  { href: "#judge-marks", label: "3. Mark check", icon: ClipboardCheck },
+  { href: "#judge-marks-chart", label: "4. Judge chart", icon: Gavel },
+  { href: "#analytics", label: "5. Analytics", icon: BarChart3 },
+  { href: "#project-marks", label: "6. Agent marks", icon: ScanSearch },
+  { href: "#top-3-marks", label: "7. Top 3 by score", icon: Medal },
+  { href: "#top-3-ranking", label: "8. Top 3 ballots", icon: Trophy },
 ] as const;
 
 type AdminJudgingSectionProps = {
@@ -39,10 +40,12 @@ type AdminJudgingSectionProps = {
   analytics: AdminJudgingStatistics;
   isCreatingSubmission: boolean;
   deletingSubmissionId: string | null;
+  publishingSubmissionId: string | null;
   newSubmission: NewSubmissionInput;
   onNewSubmissionChange: (value: NewSubmissionInput) => void;
   onCreateSubmission: (payload: NewSubmissionInput) => Promise<void>;
   onDeleteSubmission: (submissionId: string) => Promise<void>;
+  onSetSubmissionPublic: (submissionId: string, makePublic: boolean) => Promise<void>;
   top3RankingSummary: AdminTop3RankingSummary;
   isLoadingTop3Rankings: boolean;
   top3SubmissionLookup: Map<
@@ -66,10 +69,12 @@ export function AdminJudgingSection({
   analytics,
   isCreatingSubmission,
   deletingSubmissionId,
+  publishingSubmissionId,
   newSubmission,
   onNewSubmissionChange,
   onCreateSubmission,
   onDeleteSubmission,
+  onSetSubmissionPublic,
   top3RankingSummary,
   isLoadingTop3Rankings,
   top3SubmissionLookup,
@@ -86,8 +91,8 @@ export function AdminJudgingSection({
               <p className="dash-eyebrow">Judging</p>
               <h2 className="dash-title">Scoring & mark check</h2>
               <p className="dash-subtitle">
-                Criteria, live analytics, mark check, and leaderboards for {selectedHackathon.name}.
-                The submissions list is grouped by event.
+                Work in order for {selectedHackathon.name}: set criteria, review submissions, check
+                judge marks, then read analytics and lock top 3. Agent scores stay on a separate chart.
               </p>
             </div>
           </div>
@@ -101,11 +106,7 @@ export function AdminJudgingSection({
             <a
               key={href}
               href={href}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-muted/20 px-2.5 py-1.5",
-                "text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground",
-                "transition-colors hover:border-primary/35 hover:bg-primary/10 hover:text-primary"
-              )}
+              className={dashJumpLinkClass}
             >
               <Icon className="h-3.5 w-3.5" aria-hidden />
               {label}
@@ -122,7 +123,37 @@ export function AdminJudgingSection({
         onSave={onSaveCriteria}
       />
 
-      <section className={sectionClass} id="analytics">
+      <AdminSubmissionsPanel
+        selectedHackathon={selectedHackathon}
+        hackathons={hackathons}
+        participants={participants}
+        submissions={allSubmissions ?? submissions}
+        isLoading={isLoadingSubmissions}
+        isCreatingSubmission={isCreatingSubmission}
+        deletingSubmissionId={deletingSubmissionId}
+        publishingSubmissionId={publishingSubmissionId}
+        newSubmission={newSubmission}
+        onNewSubmissionChange={onNewSubmissionChange}
+        onCreateSubmission={onCreateSubmission}
+        onDeleteSubmission={onDeleteSubmission}
+        onSetSubmissionPublic={onSetSubmissionPublic}
+      />
+
+      <AdminJudgeMarksPanel
+        selectedHackathon={selectedHackathon}
+        submissions={submissions}
+        judgingCriteria={judgingCriteria}
+        isLoading={isLoadingSubmissions}
+      />
+
+      <JudgeMarksChartPanel
+        eventLabel={selectedHackathon.name}
+        judgingCriteria={judgingCriteria}
+        submissions={submissions}
+        isLoading={isLoadingSubmissions}
+      />
+
+      <section className={`${sectionClass} scroll-mt-24`} id="analytics">
         <div className="mb-5 flex items-start gap-3 border-b border-white/10 pb-4">
           <span className="dash-icon-chip" aria-hidden>
             <BarChart3 className="h-4 w-4" />
@@ -180,13 +211,6 @@ export function AdminJudgingSection({
         isLoading={isLoadingSubmissions}
       />
 
-      <AdminJudgeMarksPanel
-        selectedHackathon={selectedHackathon}
-        submissions={submissions}
-        judgingCriteria={judgingCriteria}
-        isLoading={isLoadingSubmissions}
-      />
-
       <AdminTop3MarksPanel
         selectedHackathon={selectedHackathon}
         submissions={submissions}
@@ -198,20 +222,6 @@ export function AdminJudgingSection({
         summary={top3RankingSummary}
         isLoading={isLoadingTop3Rankings || isLoadingSubmissions}
         submissionLookup={top3SubmissionLookup}
-      />
-
-      <AdminSubmissionsPanel
-        selectedHackathon={selectedHackathon}
-        hackathons={hackathons}
-        participants={participants}
-        submissions={allSubmissions ?? submissions}
-        isLoading={isLoadingSubmissions}
-        isCreatingSubmission={isCreatingSubmission}
-        deletingSubmissionId={deletingSubmissionId}
-        newSubmission={newSubmission}
-        onNewSubmissionChange={onNewSubmissionChange}
-        onCreateSubmission={onCreateSubmission}
-        onDeleteSubmission={onDeleteSubmission}
       />
     </div>
   );

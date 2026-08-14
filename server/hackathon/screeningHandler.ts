@@ -5,9 +5,12 @@ import {
   verifyFirebaseIdToken,
 } from "../email/auth";
 import { resolveHackathonAiModel } from "../../src/lib/hackathonAiModels.ts";
-import { parseAiScreeningEvaluations, type ProjectScreeningResult } from "../../src/lib/projectScreening.ts";
+import {
+  parseAiScreeningEvaluations,
+  type ParsedAiScreeningEvaluation,
+} from "../../src/lib/projectScreeningParse.ts";
 
-type AiEvaluation = Partial<ProjectScreeningResult> & { id: string };
+type AiEvaluation = ParsedAiScreeningEvaluation & { id: string };
 
 type HandlerResult =
   | { ok: true; evaluations: AiEvaluation[] }
@@ -223,7 +226,7 @@ ${catalog}
   const jsonText = getTextResponse(payload);
   if (!jsonText) return errorResult("OpenAI returned an empty screening. Please try again.", 502);
   try {
-    const mapped = parseAiScreeningEvaluations(parsed);
+    const mapped = parseAiScreeningEvaluations(JSON.parse(jsonText));
     const evaluations = Object.entries(mapped).map(([id, value]) => ({ id, ...value }));
     if (evaluations.length === 0) {
       return errorResult("OpenAI returned no concept scores. Please try again.", 502);

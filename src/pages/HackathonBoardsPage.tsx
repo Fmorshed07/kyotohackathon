@@ -16,6 +16,7 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { ProjectPublicLinks } from "@/components/projects/ProjectPublicLinks";
 import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
 import { ProjectStarRating } from "@/components/projects/ProjectStarRating";
+import { ProjectStarEmailDialog } from "@/components/projects/ProjectStarEmailDialog";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useProjectCommunityStars } from "@/hooks/useProjectCommunityStars";
 import { getFirestoreDb } from "@/lib/firebaseClient";
@@ -199,7 +200,7 @@ export default function HackathonBoardsPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { sessionUser, loading: authLoading } = usePortalAuth();
-  const { myRatingById, pendingId, communityFill, rate } = useProjectCommunityStars();
+  const { myRatingById, pendingId, emailPrompt, communityFill, rate, submitStarEmail, cancelStarEmail } = useProjectCommunityStars();
   const db = getFirestoreDb();
 
   const requestedHackathonId: HackathonId | null =
@@ -708,7 +709,7 @@ export default function HackathonBoardsPage() {
                   highlighted={submission.id === highlightedSubmissionId}
                   starFill={communityFill(submission.id)}
                   myRating={myRatingById[submission.id] ?? 0}
-                  ratingDisabled={pendingId === submission.id}
+                  ratingDisabled={pendingId === submission.id || (myRatingById[submission.id] ?? 0) > 0}
                   onRate={(stars) => void rate(submission.id, stars)}
                 />
               ))}
@@ -722,6 +723,12 @@ export default function HackathonBoardsPage() {
           ) : null}
         </main>
       </div>
+      <ProjectStarEmailDialog
+        open={Boolean(emailPrompt)}
+        pending={pendingId === emailPrompt?.projectId}
+        onCancel={cancelStarEmail}
+        onSubmit={(email) => void submitStarEmail(email)}
+      />
     </div>
   );
 }

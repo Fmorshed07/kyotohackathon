@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { addDoc, collection, deleteDoc, deleteField, doc, getDocs, setDoc } from "firebase/firestore";
 import {
   AdminJudgingSection,
 } from "@/components/dashboard/AdminJudgingSection";
+import { AdminTeamsPanel } from "@/components/dashboard/AdminTeamsPanel";
 import {
   JudgeApprovalPanel,
   type AdminSubmissionRow,
@@ -30,6 +31,7 @@ import {
 import { buildAdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { queueParticipantEmail } from "@/lib/participantEmail";
 import { buildAdminTeamDetails } from "@/lib/teamRoster";
+import { setSubmissionPublicPreview } from "@/lib/projectSocial";
 import type {
   HostApprovalStatus,
   JudgeApprovalStatus,
@@ -101,14 +103,22 @@ const normalizeHostApprovalStatus = (value: unknown): HostApprovalStatus | undef
 
 const isStaffRole = (role: PortalRole) => role === "judge" || role === "mentor";
 
+type HostEventJudgingSlots = {
+  teams: ReactNode;
+  approvals: ReactNode;
+  judging: ReactNode;
+};
+
 type HostEventJudgingWorkspaceProps = {
   hackathon: PortalHackathon;
   onMessage?: (message: string | null) => void;
+  children?: (slots: HostEventJudgingSlots) => ReactNode;
 };
 
 export function HostEventJudgingWorkspace({
   hackathon,
   onMessage,
+  children,
 }: HostEventJudgingWorkspaceProps) {
   const db = getFirestoreDb();
   const hackathonId = hackathon.id;
@@ -125,6 +135,7 @@ export function HostEventJudgingWorkspace({
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [isCreatingSubmission, setIsCreatingSubmission] = useState(false);
   const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
+  const [publishingSubmissionId, setPublishingSubmissionId] = useState<string | null>(null);
   const [isSavingCriteria, setIsSavingCriteria] = useState(false);
   const [newSubmission, setNewSubmission] = useState<NewSubmissionInput>(emptyNewSubmission);
   const [judgeRankings, setJudgeRankings] = useState<Awaited<
@@ -340,6 +351,7 @@ export function HostEventJudgingWorkspace({
             projectUrl: submission.project_url,
             submissionPdfUrl: submission.submission_pdf_url,
             demoVideoUrl: submission.demo_video_url,
+            isPublic: submission.public_preview_consent === true,
             judgeMarks: marks,
             averageScore:
               validScores.length > 0
@@ -567,6 +579,45 @@ export function HostEventJudgingWorkspace({
     }
   };
 
+  const handleSetSubmissionPublic = async (submissionId: string, makePublic: boolean) => {
+    const submission = submissions.find((item) => item.id === submissionId);
+    if (!submission) {
+      onMessage?.("Submission not found.");
+      return;
+    }
+
+    setPublishingSubmissionId(submissionId);
+    try {
+      const updatedAt = await setSubmissionPublicPreview(
+        db,
+        { ...submission, hackathon_id: submission.hackathon_id || hackathonId },
+        makePublic,
+      );
+      setSubmissions((current) =>
+        current.map((item) =>
+          item.id === submissionId
+            ? { ...item, public_preview_consent: makePublic, updated_at: updatedAt }
+            : item,
+        ),
+      );
+      onMessage?.(
+        makePublic
+          ? "Project is now on hackathon boards and the public gallery."
+          : "Project was hidden from boards and the public gallery.",
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : makePublic
+            ? "Failed to make project public."
+            : "Failed to unpublish project.";
+      onMessage?.(text);
+    } finally {
+      setPublishingSubmissionId(null);
+    }
+  };
+
   const handleSaveCriteria = async (criteria: JudgingCriterion[]) => {
     setIsSavingCriteria(true);
     try {
@@ -585,8 +636,17 @@ export function HostEventJudgingWorkspace({
     }
   };
 
-  return (
-    <>
+  const slots: HostEventJudgingSlots = {
+    teams: (
+      <AdminTeamsPanel
+        selectedHackathon={hackathon}
+        submissions={adminSubmissionRows}
+        isLoading={isLoadingSubmissions}
+        publishingSubmissionId={publishingSubmissionId}
+        onSetSubmissionPublic={handleSetSubmissionPublic}
+      />
+    ),
+    approvals: (
       <JudgeApprovalPanel
         judges={judgeAccounts}
         selectedHackathon={hackathon}
@@ -594,6 +654,8 @@ export function HostEventJudgingWorkspace({
         onApproveJudge={handleApproveJudge}
         onRejectJudge={handleRejectJudge}
       />
+    ),
+    judging: (
       <AdminJudgingSection
         selectedHackathon={hackathon}
         hackathons={[hackathon]}
@@ -608,14 +670,26 @@ export function HostEventJudgingWorkspace({
         analytics={analytics}
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}
+        publishingSubmissionId={publishingSubmissionId}
         newSubmission={newSubmission}
         onNewSubmissionChange={setNewSubmission}
         onCreateSubmission={handleCreateSubmission}
         onDeleteSubmission={handleDeleteSubmission}
+        onSetSubmissionPublic={handleSetSubmissionPublic}
         top3RankingSummary={top3RankingSummary}
         isLoadingTop3Rankings={isLoadingTop3Rankings}
         top3SubmissionLookup={top3SubmissionLookup}
       />
+    ),
+  };
+
+  if (children) return <>{children(slots)}</>;
+
+  return (
+    <>
+      {slots.teams}
+      {slots.approvals}
+      {slots.judging}
     </>
   );
 }

@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Gavel, ListChecks, Target, Trophy, Users } from "lucide-react";
-import { sectionClass } from "@/components/dashboard/DashboardLayout";
+import {
+  CheckCircle2,
+  ClipboardList,
+  Gavel,
+  ScanSearch,
+  Trophy,
+  Users,
+} from "lucide-react";
+import { dashJumpLinkClass, sectionClass } from "@/components/dashboard/DashboardLayout";
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { JudgeScoringWorkspace } from "@/components/dashboard/JudgeScoringWorkspace";
 import { JudgeTop3RankingSection } from "@/components/dashboard/JudgeTop3RankingSection";
+import { JudgeMarksChartPanel } from "@/components/dashboard/JudgeMarksChartPanel";
 import { ProjectThemeMarksPanel } from "@/components/dashboard/ProjectThemeMarksPanel";
 import {
   getSubmissionAccentStyle,
@@ -22,6 +30,13 @@ import type { PortalHackathon } from "@/lib/hackathons";
 import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
 import { collectTeamDisplayNames } from "@/lib/teamRoster";
 import { formatSubmissionDateTime } from "@/lib/datetime";
+
+const JUDGE_JUMP_LINKS = [
+  { href: "#teams", label: "1. Teams", icon: Users },
+  { href: "#submissions", label: "2. Score", icon: ClipboardList },
+  { href: "#project-marks", label: "3. Theme marks", icon: ScanSearch },
+  { href: "#top-3-ranking", label: "4. Top 3", icon: Trophy },
+] as const;
 
 type TeamSummary = {
   name: string;
@@ -174,41 +189,41 @@ export function JudgeDashboard({
                 <p className="dash-eyebrow">Judge command center</p>
                 <h2 className="dash-title">Overview</h2>
                 <p className="dash-subtitle max-w-2xl">
-                  Track your review queue, scoring progress, and final ranking for{" "}
-                  {selectedHackathon.name}.
+                  Work in order: review teams, score submissions, check theme marks, then lock your
+                  top 3 for {selectedHackathon.name}.
                 </p>
               </div>
             </div>
 
             {!isLoadingSubmissions && submissions.length > 0 ? (
               <div className="mt-5 grid gap-3 md:grid-cols-3">
-                <div className="dash-workflow-card">
+                <a href="#teams" className="dash-workflow-card block transition hover:border-primary/35">
                   <div className="flex items-center gap-2 text-primary">
-                    <ListChecks className="h-4 w-4" aria-hidden />
-                    <p className="text-xs font-semibold uppercase">Queue</p>
+                    <Users className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">1. Teams</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Review the roster before you open the scoring queue.
+                  </p>
+                </a>
+                <a href="#submissions" className="dash-workflow-card block transition hover:border-primary/35">
+                  <div className="flex items-center gap-2 text-emerald-300">
+                    <CheckCircle2 className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">2. Score</p>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
                     {summary.total - summary.scored} ideas still need a complete score.
                   </p>
-                </div>
-                <div className="dash-workflow-card">
-                  <div className="flex items-center gap-2 text-emerald-300">
-                    <CheckCircle2 className="h-4 w-4" aria-hidden />
-                    <p className="text-xs font-semibold uppercase">Progress</p>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {overallProgress.percent}% complete across assigned submissions.
-                  </p>
-                </div>
-                <div className="dash-workflow-card">
+                </a>
+                <a href="#top-3-ranking" className="dash-workflow-card block transition hover:border-primary/35">
                   <div className="flex items-center gap-2 text-amber-300">
-                    <Target className="h-4 w-4" aria-hidden />
-                    <p className="text-xs font-semibold uppercase">Decision</p>
+                    <Trophy className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">3. Rank</p>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Use saved scores to make a clean top 3 ballot.
+                    After scoring, lock a clean top 3 ballot.
                   </p>
-                </div>
+                </a>
               </div>
             ) : null}
           </div>
@@ -238,6 +253,17 @@ export function JudgeDashboard({
             </div>
           </div>
         </div>
+        <nav
+          aria-label="Judge workflow"
+          className="mt-5 flex flex-wrap gap-1.5 border-t border-white/10 pt-4"
+        >
+          {JUDGE_JUMP_LINKS.map(({ href, label, icon: Icon }) => (
+            <a key={href} href={href} className={dashJumpLinkClass}>
+              <Icon className="h-3.5 w-3.5" aria-hidden />
+              {label}
+            </a>
+          ))}
+        </nav>
         {judgeMessage && (
           <p className="dash-message mt-4">
             {judgeMessage}
@@ -319,7 +345,7 @@ export function JudgeDashboard({
         ) : null}
       </section>
 
-      <section className={`${sectionClass}`} id="teams" aria-label="Teams">
+      <section className={`${sectionClass} scroll-mt-24`} id="teams" aria-label="Teams">
         <div className="mb-5 flex items-start gap-3 border-b border-white/10 pb-4">
           <span className="dash-icon-chip" aria-hidden>
             <Users className="h-4 w-4" />
@@ -523,46 +549,9 @@ export function JudgeDashboard({
         )}
       </section>
 
-      <ProjectThemeMarksPanel
-        hackathon={selectedHackathon}
-        submissions={submissions}
-        isLoading={isLoadingSubmissions}
-      />
-
-      <section
-        className={`${sectionClass} overflow-hidden border-violet-500/20 bg-gradient-to-b from-violet-500/5 via-card/95 to-card/95 p-0`}
-        id="top-3-ranking"
-        aria-label="Top 3 idea ranking"
-      >
-        <div className="border-b border-white/10 px-4 py-5 sm:px-6 sm:py-6 md:px-8">
-          <div className="flex items-center gap-2 text-violet-300">
-            <Trophy className="h-4 w-4" aria-hidden />
-            <p className="text-xs font-semibold uppercase tracking-[0.14em]">Ballot</p>
-          </div>
-        </div>
-        <div className="p-4 sm:p-6 md:p-8">
-          {isLoadingSubmissions ? (
-            <p className="text-sm text-muted-foreground">Loading submissions…</p>
-          ) : submissions.length === 0 ? (
-            <p className="dash-empty">
-              No submissions yet. Top 3 ranking will be available once teams submit.
-            </p>
-          ) : (
-            <JudgeTop3RankingSection
-              submissions={submissions}
-              ranks={top3Ranks}
-              savedAt={top3SavedAt}
-              isSaving={isSavingTop3}
-              onRankChange={onTop3RankChange}
-              onSave={onSaveTop3Ranking}
-            />
-          )}
-        </div>
-      </section>
-
       {/* Submissions & scoring */}
       <section
-        className={`${sectionClass} overflow-hidden border-primary/20 bg-gradient-to-b from-primary/5 via-card/95 to-card/95 p-0`}
+        className={`${sectionClass} scroll-mt-24 overflow-hidden border-primary/20 bg-gradient-to-b from-primary/5 via-card/95 to-card/95 p-0`}
         id="submissions"
         aria-labelledby="scoring-heading"
       >
@@ -610,6 +599,52 @@ export function JudgeDashboard({
               onNotesChange={onNotesChange}
               onSave={onSave}
               savingSubmissionId={savingSubmissionId}
+            />
+          )}
+        </div>
+      </section>
+
+      <JudgeMarksChartPanel
+        eventLabel={selectedHackathon.name}
+        judgingCriteria={judgingCriteria}
+        judgeSubmissions={submissions}
+        isLoading={isLoadingSubmissions}
+        scoreHeading="Your mark"
+        subtitle="Your judge scores only. Project agent theme marks are on a separate chart below."
+      />
+
+      <ProjectThemeMarksPanel
+        hackathon={selectedHackathon}
+        submissions={submissions}
+        isLoading={isLoadingSubmissions}
+      />
+
+      <section
+        className={`${sectionClass} scroll-mt-24 overflow-hidden border-violet-500/20 bg-gradient-to-b from-violet-500/5 via-card/95 to-card/95 p-0`}
+        id="top-3-ranking"
+        aria-label="Top 3 idea ranking"
+      >
+        <div className="border-b border-white/10 px-4 py-5 sm:px-6 sm:py-6 md:px-8">
+          <div className="flex items-center gap-2 text-violet-300">
+            <Trophy className="h-4 w-4" aria-hidden />
+            <p className="text-xs font-semibold uppercase tracking-[0.14em]">Ballot</p>
+          </div>
+        </div>
+        <div className="p-4 sm:p-6 md:p-8">
+          {isLoadingSubmissions ? (
+            <p className="text-sm text-muted-foreground">Loading submissions…</p>
+          ) : submissions.length === 0 ? (
+            <p className="dash-empty">
+              No submissions yet. Top 3 ranking will be available once teams submit.
+            </p>
+          ) : (
+            <JudgeTop3RankingSection
+              submissions={submissions}
+              ranks={top3Ranks}
+              savedAt={top3SavedAt}
+              isSaving={isSavingTop3}
+              onRankChange={onTop3RankChange}
+              onSave={onSaveTop3Ranking}
             />
           )}
         </div>

@@ -50,7 +50,8 @@ import { type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole"
 import { AiHackathonLauncher } from "@/components/dashboard/AiHackathonLauncher";
 import { ManualHackathonLauncher } from "@/components/dashboard/ManualHackathonLauncher";
 import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
-import { AdminTeamsPanel } from "@/components/dashboard/AdminTeamsPanel";
+import { AdminNewsletterPanel } from "@/components/dashboard/AdminNewsletterPanel";
+import type { NewsletterSubscriber } from "@/lib/hackathonSubscribe";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { AdminTop3RankingSummary } from "@/lib/judgeTop3Rankings";
 import type { HostApprovalStatus, JudgeApprovalStatus, PortalRole, UserProfile } from "@/types/portal";
@@ -91,6 +92,7 @@ export type AdminSubmissionRow = {
   projectUrl: string | null;
   submissionPdfUrl: string | null;
   demoVideoUrl: string | null;
+  isPublic: boolean;
   judgeMarks: Array<{
     judgeId: string;
     judgeEmail: string;
@@ -159,8 +161,10 @@ type AdminDashboardProps = {
   onSendParticipantBroadcast: () => Promise<void>;
   isCreatingSubmission: boolean;
   deletingSubmissionId: string | null;
+  publishingSubmissionId: string | null;
   onCreateSubmission: (payload: NewSubmissionInput) => Promise<void>;
   onDeleteSubmission: (submissionId: string) => Promise<void>;
+  onSetSubmissionPublic: (submissionId: string, makePublic: boolean) => Promise<void>;
   top3RankingSummary: AdminTop3RankingSummary;
   isLoadingTop3Rankings: boolean;
   top3SubmissionLookup: Map<
@@ -184,6 +188,8 @@ type AdminDashboardProps = {
   judgeInviteMessage?: string | null;
   isCreatingJudgeInvite?: boolean;
   onCreateJudgeInvite?: () => Promise<void>;
+  newsletterSubscribers?: NewsletterSubscriber[];
+  isLoadingNewsletter?: boolean;
 };
 
 const roleBadgeVariant: Record<PortalRole, "default" | "secondary" | "outline"> = {
@@ -915,8 +921,10 @@ export function AdminDashboard({
   onSendParticipantBroadcast,
   isCreatingSubmission,
   deletingSubmissionId,
+  publishingSubmissionId,
   onCreateSubmission,
   onDeleteSubmission,
+  onSetSubmissionPublic,
   top3RankingSummary,
   isLoadingTop3Rankings,
   top3SubmissionLookup,
@@ -931,6 +939,8 @@ export function AdminDashboard({
   judgeInviteMessage = null,
   isCreatingJudgeInvite = false,
   onCreateJudgeInvite,
+  newsletterSubscribers = [],
+  isLoadingNewsletter = false,
 }: AdminDashboardProps) {
   const [newSubmission, setNewSubmission] = useState<NewSubmissionInput>({
     participantId: "",
@@ -1024,10 +1034,12 @@ export function AdminDashboard({
           analytics={analytics}
           isCreatingSubmission={isCreatingSubmission}
           deletingSubmissionId={deletingSubmissionId}
+          publishingSubmissionId={publishingSubmissionId}
           newSubmission={newSubmission}
           onNewSubmissionChange={setNewSubmission}
           onCreateSubmission={onCreateSubmission}
           onDeleteSubmission={onDeleteSubmission}
+          onSetSubmissionPublic={onSetSubmissionPublic}
           top3RankingSummary={top3RankingSummary}
           isLoadingTop3Rankings={isLoadingTop3Rankings}
           top3SubmissionLookup={top3SubmissionLookup}
@@ -1061,10 +1073,17 @@ export function AdminDashboard({
 
         <HostAnalyticsPanel analytics={hostAnalytics} isLoading={isLoadingUsers} />
 
+        <AdminNewsletterPanel
+          subscribers={newsletterSubscribers}
+          isLoading={isLoadingNewsletter}
+        />
+
         <AdminTeamsPanel
           selectedHackathon={selectedHackathon}
           submissions={submissions}
           isLoading={isLoadingSubmissions}
+          publishingSubmissionId={publishingSubmissionId}
+          onSetSubmissionPublic={onSetSubmissionPublic}
         />
 
         <HostApprovalPanel

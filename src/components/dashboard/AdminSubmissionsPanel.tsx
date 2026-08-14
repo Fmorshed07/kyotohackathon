@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CalendarDays, ClipboardList, MapPin, PlusCircle, Trash2 } from "lucide-react";
+import { CalendarDays, ClipboardList, Download, Globe, GlobeLock, MapPin, PlusCircle, Trash2 } from "lucide-react";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import type { AdminSubmissionRow, AdminUser, NewSubmissionInput } from "@/components/dashboard/AdminDashboard";
 import {
@@ -27,6 +27,12 @@ import {
   type PortalHackathon,
 } from "@/lib/hackathons";
 import { formatSubmissionDate, formatSubmissionTime } from "@/lib/datetime";
+import {
+  buildSubmissionsCsv,
+  downloadCsv,
+  submissionsCsvFilename,
+  type SubmissionCsvInput,
+} from "@/lib/submissionCsv";
 
 type AdminSubmissionsPanelProps = {
   selectedHackathon: PortalHackathon;
@@ -36,20 +42,66 @@ type AdminSubmissionsPanelProps = {
   isLoading: boolean;
   isCreatingSubmission: boolean;
   deletingSubmissionId: string | null;
+  publishingSubmissionId: string | null;
   newSubmission: NewSubmissionInput;
   onNewSubmissionChange: (value: NewSubmissionInput) => void;
   onCreateSubmission: (payload: NewSubmissionInput) => Promise<void>;
   onDeleteSubmission: (submissionId: string) => Promise<void>;
+  onSetSubmissionPublic: (submissionId: string, makePublic: boolean) => Promise<void>;
 };
+
+function toCsvInputs(
+  groups: Array<{ hackathon: PortalHackathon; items: AdminSubmissionRow[] }>,
+): SubmissionCsvInput[] {
+  return groups.flatMap((group) =>
+    group.items.map((item) => ({ ...item, eventName: group.hackathon.name })),
+  );
+}
+
+function downloadSubmissionsCsv(
+  label: string,
+  groups: Array<{ hackathon: PortalHackathon; items: AdminSubmissionRow[] }>,
+) {
+  downloadCsv(submissionsCsvFilename(label), buildSubmissionsCsv(toCsvInputs(groups)));
+}
+
+function DownloadCsvButton({
+  label,
+  groups,
+  className,
+}: {
+  label: string;
+  groups: Array<{ hackathon: PortalHackathon; items: AdminSubmissionRow[] }>;
+  className?: string;
+}) {
+  const count = groups.reduce((sum, group) => sum + group.items.length, 0);
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className={className ?? "h-9 px-3 text-[0.65rem] uppercase tracking-[0.2em]"}
+      disabled={count === 0}
+      onClick={() => downloadSubmissionsCsv(label, groups)}
+    >
+      <Download className="h-3.5 w-3.5" />
+      Download CSV
+    </Button>
+  );
+}
 
 function SubmissionTable({
   submissions,
   deletingSubmissionId,
+  publishingSubmissionId,
   onDeleteSubmission,
+  onSetSubmissionPublic,
 }: {
   submissions: AdminSubmissionRow[];
   deletingSubmissionId: string | null;
+  publishingSubmissionId: string | null;
   onDeleteSubmission: (submissionId: string) => Promise<void>;
+  onSetSubmissionPublic: (submissionId: string, makePublic: boolean) => Promise<void>;
 }) {
   return (
     <div className="dash-table-scroll rounded-xl border border-white/10">
@@ -63,11 +115,14 @@ function SubmissionTable({
             <TableHead className="dash-table-head">Links</TableHead>
             <TableHead className="dash-table-head w-[90px] text-right">Avg</TableHead>
             <TableHead className="dash-table-head w-[100px] text-right">Judges</TableHead>
-            <TableHead className="dash-table-head w-[110px] text-right">Action</TableHead>
+            <TableHead className="dash-table-head w-[150px] text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {submissions.map((submission) => (
+          {submissions.map((submission) => {
+            const isBusy =
+              deletingSubmissionId === submission.id || publishingSubmissionId === submission.id;
+            return (
             <TableRow
               key={submission.id}
               className="border-white/5 transition-colors hover:bg-primary/5"
@@ -98,6 +153,12 @@ function SubmissionTable({
                 <p className="mt-1 line-clamp-3 text-[0.7rem] text-muted-foreground">
                   {submission.shortDescription || "No description provided."}
                 </p>
+                <Badge
+                  variant={submission.isPublic ? "default" : "outline"}
+                  className="mt-2 text-[0.6rem] uppercase tracking-[0.12em]"
+                >
+                  {submission.isPublic ? "Public" : "Private"}
+                </Badge>
               </TableCell>
               <TableCell className="align-top">
                 {formatSubmissionDate(submission.createdAt) ? (
@@ -166,24 +227,56 @@ function SubmissionTable({
                 <p className="text-[0.65rem] text-muted-foreground">scored</p>
               </TableCell>
               <TableCell className="align-top text-right">
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
-                  disabled={deletingSubmissionId === submission.id}
-                  onClick={async () => {
-                    if (!window.confirm("Remove this submission? This cannot be undone.")) {
-                      return;
-                    }
-                    await onDeleteSubmission(submission.id);
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                  {deletingSubmissionId === submission.id ? "Removing..." : "Remove"}
-                </Button>
+                <div className="flex flex-col items-end gap-2">
+                  <Button
+                    size="sm"
+                    variant={submission.isPublic ? "outline" : "default"}
+                    className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
+                    disabled={isBusy}
+                    onClick={async () => {
+                      const makePublic = !submission.isPublic;
+                      const confirmed = window.confirm(
+                        makePublic
+                          ? "Show this project on hackathon boards and the public gallery?"
+                          : "Hide this project from boards and the public gallery?",
+                      );
+                      if (!confirmed) return;
+                      await onSetSubmissionPublic(submission.id, makePublic);
+                    }}
+                  >
+                    {submission.isPublic ? (
+                      <GlobeLock className="h-3 w-3" />
+                    ) : (
+                      <Globe className="h-3 w-3" />
+                    )}
+                    {publishingSubmissionId === submission.id
+                      ? submission.isPublic
+                        ? "Hiding..."
+                        : "Publishing..."
+                      : submission.isPublic
+                        ? "Unpublish"
+                        : "Make public"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
+                    disabled={isBusy}
+                    onClick={async () => {
+                      if (!window.confirm("Remove this submission? This cannot be undone.")) {
+                        return;
+                      }
+                      await onDeleteSubmission(submission.id);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {deletingSubmissionId === submission.id ? "Removing..." : "Remove"}
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -198,12 +291,20 @@ export function AdminSubmissionsPanel({
   isLoading,
   isCreatingSubmission,
   deletingSubmissionId,
+  publishingSubmissionId,
   newSubmission,
   onNewSubmissionChange,
   onCreateSubmission,
   onDeleteSubmission,
+  onSetSubmissionPublic,
 }: AdminSubmissionsPanelProps) {
   const [eventFilter, setEventFilter] = useState<HackathonId | "all">("all");
+
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7752/ingest/e37c9ea6-3a22-4110-a9e4-4334f1ef0ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'608977'},body:JSON.stringify({sessionId:'608977',runId:'post-fix',hypothesisId:'B',location:'AdminSubmissionsPanel.tsx:mount',message:'make-public props wired',data:{hasHandler:typeof onSetSubmissionPublic==='function',publishingSubmissionId,submissionCount:submissions.length,publicCount:submissions.filter((s)=>s.isPublic).length,missingIsPublic:submissions.filter((s)=>typeof s.isPublic!=='boolean').length},timestamp:Date.now()})}).catch(()=>{});
+  }, [onSetSubmissionPublic, publishingSubmissionId, submissions]);
+  // #endregion
 
   const eventGroups = useMemo(
     () =>
@@ -233,7 +334,7 @@ export function AdminSubmissionsPanel({
           <p className="dash-eyebrow">Submissions</p>
           <h2 className="dash-title">Participant projects</h2>
           <p className="dash-subtitle">
-            All submissions grouped by event. New projects are added to {selectedHackathon.name}.
+            All submissions grouped by event. Hosts and admins can make a project public for boards and the gallery.
           </p>
         </div>
       </div>
@@ -326,22 +427,32 @@ export function AdminSubmissionsPanel({
               {submissions.length} project{submissions.length === 1 ? "" : "s"} across{" "}
               {eventGroups.length} event{eventGroups.length === 1 ? "" : "s"}
             </p>
-            <Select
-              value={eventFilter}
-              onValueChange={(value) => setEventFilter(value as HackathonId | "all")}
-            >
-              <SelectTrigger className="h-10 w-full max-w-xs">
-                <SelectValue placeholder="Filter by event" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All events</SelectItem>
-                {eventGroups.map((group) => (
-                  <SelectItem key={group.hackathon.id} value={group.hackathon.id}>
-                    {group.hackathon.name} ({group.items.length})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={eventFilter}
+                onValueChange={(value) => setEventFilter(value as HackathonId | "all")}
+              >
+                <SelectTrigger className="h-10 w-full max-w-xs">
+                  <SelectValue placeholder="Filter by event" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All events</SelectItem>
+                  {eventGroups.map((group) => (
+                    <SelectItem key={group.hackathon.id} value={group.hackathon.id}>
+                      {group.hackathon.name} ({group.items.length})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <DownloadCsvButton
+                label={
+                  eventFilter === "all"
+                    ? "all-events"
+                    : visibleGroups[0]?.hackathon.name ?? "export"
+                }
+                groups={visibleGroups}
+              />
+            </div>
           </div>
         ) : null}
 
@@ -388,14 +499,23 @@ export function AdminSubmissionsPanel({
                       </span>
                     </p>
                   </div>
-                  <Badge variant="secondary" className="uppercase tracking-[0.12em]">
-                    {group.items.length} project{group.items.length === 1 ? "" : "s"}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DownloadCsvButton
+                      label={group.hackathon.name}
+                      groups={[group]}
+                      className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
+                    />
+                    <Badge variant="secondary" className="uppercase tracking-[0.12em]">
+                      {group.items.length} project{group.items.length === 1 ? "" : "s"}
+                    </Badge>
+                  </div>
                 </div>
                 <SubmissionTable
                   submissions={group.items}
                   deletingSubmissionId={deletingSubmissionId}
+                  publishingSubmissionId={publishingSubmissionId}
                   onDeleteSubmission={onDeleteSubmission}
+                  onSetSubmissionPublic={onSetSubmissionPublic}
                 />
               </section>
             ))}

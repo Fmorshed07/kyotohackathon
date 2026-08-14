@@ -67,7 +67,7 @@ export type Submission = {
   demo_video_url: string | null;
   cover_url?: string | null;
   gallery_urls?: string[] | null;
-  /** Explicit participant consent required before a submission appears on hackathon boards and the public gallery. */
+  /** True when the project appears on hackathon boards and the public gallery. Set by the team, or by a host/admin. */
   public_preview_consent?: boolean | null;
   created_at: string | null;
   updated_at?: string | null;

@@ -10,6 +10,8 @@ import {
   type Firestore,
 } from "firebase/firestore";
 
+import { isValidSubscribeEmail, normalizeSubscribeEmail } from "@/lib/hackathonSubscribe";
+
 export const STAR_MIN = 1;
 export const STAR_MAX = 5;
 export const PROJECT_STARS_COLLECTION = "project_stars";
@@ -22,8 +24,78 @@ export type StarStats = {
 
 export const EMPTY_STAR_STATS: StarStats = { sum: 0, count: 0 };
 
+const VOTER_STORAGE_KEY = "cognisor_star_voter";
+const RATINGS_STORAGE_KEY = "cognisor_star_ratings";
+const EMAIL_STORAGE_KEY = "cognisor_star_email";
+
 export function ratingDocId(projectId: string, userId: string) {
   return `${projectId}_${userId}`;
+}
+
+export function isValidPublicVoterId(value: string) {
+  return /^[A-Za-z0-9_-]{16,64}$/.test(value);
+}
+
+/** Stable per-browser id so guests can star once without creating an account. */
+export function getPublicVoterId() {
+  if (typeof window === "undefined") return "";
+  const existing = window.localStorage.getItem(VOTER_STORAGE_KEY)?.trim() ?? "";
+  if (isValidPublicVoterId(existing)) return existing;
+  const generated = (
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`
+  ).replace(/[^A-Za-z0-9]/g, "");
+  const next = `${generated}guestvoteridfallback`.slice(0, 32);
+  window.localStorage.setItem(VOTER_STORAGE_KEY, next);
+  return next;
+}
+
+export function readLocalStarRatings() {
+  if (typeof window === "undefined") return {} as Record<string, number>;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(RATINGS_STORAGE_KEY) ?? "{}") as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    const ratings: Record<string, number> = {};
+    for (const [projectId, value] of Object.entries(parsed as Record<string, unknown>)) {
+      const stars = Number(value);
+      if (!projectId || !Number.isFinite(stars) || stars < STAR_MIN) continue;
+      ratings[projectId] = clampStarRating(stars);
+    }
+    return ratings;
+  } catch {
+    return {};
+  }
+}
+
+export function writeLocalStarRating(projectId: string, stars: number) {
+  if (typeof window === "undefined" || !projectId) return;
+  const next = { ...readLocalStarRatings(), [projectId]: clampStarRating(stars) };
+  window.localStorage.setItem(RATINGS_STORAGE_KEY, JSON.stringify(next));
+}
+
+export function readSavedStarEmail() {
+  if (typeof window === "undefined") return "";
+  const email = normalizeSubscribeEmail(window.localStorage.getItem(EMAIL_STORAGE_KEY) ?? "");
+  return isValidSubscribeEmail(email) ? email : "";
+}
+
+export function writeSavedStarEmail(email: string) {
+  if (typeof window === "undefined") return;
+  const normalized = normalizeSubscribeEmail(email);
+  if (!isValidSubscribeEmail(normalized)) return;
+  window.localStorage.setItem(EMAIL_STORAGE_KEY, normalized);
+}
+
+/** One email can star a project once. Hex id stays within public voter-id rules. */
+export async function voterIdFromEmail(email: string) {
+  const normalized = normalizeSubscribeEmail(email);
+  const bytes = new TextEncoder().encode(normalized);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 32);
 }
 
 export function clampStarRating(value: number) {
@@ -91,19 +163,27 @@ export async function fetchMyProjectStarRatings(db: Firestore, userId: string) {
 
 export async function saveProjectStarRating(
   db: Firestore,
-  input: { projectId: string; userId: string; stars: number | null },
+  input: { projectId: string; userId: string; stars: number | null; email: string },
 ) {
   const projectId = input.projectId.trim();
   const userId = input.userId.trim();
-  if (!projectId || !userId) {
-    throw new Error("Sign in to star this project.");
+  const email = normalizeSubscribeEmail(input.email);
+  if (!projectId || !isValidPublicVoterId(userId) || !isValidSubscribeEmail(email)) {
+    throw new Error("Enter a valid email to star this project.");
   }
 
   const ratingRef = doc(db, PROJECT_STARS_COLLECTION, ratingDocId(projectId, userId));
   const statsRef = doc(db, PROJECT_STAR_STATS_COLLECTION, projectId);
   const existing = await getDoc(ratingRef);
   const previous = existing.exists() ? Number(existing.data()?.stars) || 0 : 0;
+  if (previous > 0) {
+    throw new Error("You already starred this project.");
+  }
+
   const next = input.stars == null || input.stars <= 0 ? 0 : clampStarRating(input.stars);
+  if (next <= 0) {
+    return { previous, next };
+  }
   const delta = starRatingDelta(previous, next);
   if (delta.sum === 0 && delta.count === 0) {
     return { previous, next };
@@ -111,27 +191,21 @@ export async function saveProjectStarRating(
 
   const now = new Date().toISOString();
   const batch = writeBatch(db);
-  if (next === 0) {
-    batch.delete(ratingRef);
-  } else {
-    const createdAt =
-      existing.exists() && typeof existing.data()?.created_at === "string"
-        ? existing.data()?.created_at
-        : now;
-    batch.set(ratingRef, {
-      project_id: projectId,
-      user_id: userId,
-      stars: next,
-      created_at: createdAt,
-      updated_at: now,
-    });
-  }
+  batch.set(ratingRef, {
+    project_id: projectId,
+    user_id: userId,
+    stars: next,
+    email,
+    created_at: now,
+    updated_at: now,
+  });
   batch.set(
     statsRef,
     {
       star_sum: increment(delta.sum),
       star_count: increment(delta.count),
       updated_at: now,
+      last_voter_id: userId,
     },
     { merge: true },
   );

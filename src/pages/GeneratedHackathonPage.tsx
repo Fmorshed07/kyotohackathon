@@ -16,6 +16,7 @@ import {
 import AnimatedBackground from "@/components/AnimatedBackground";
 import { EventRichText } from "@/components/EventRichText";
 import SiteHeader from "@/components/SiteHeader";
+import { HackathonSubscribeForm } from "@/components/hackathons/HackathonSubscribeForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fetchAiHackathon, type HostedHackathon } from "@/lib/aiHackathons";
@@ -825,8 +826,8 @@ export default function GeneratedHackathonPage() {
                   </h2>
                   <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                     {event.lumaUrl
-                      ? "Register through the organiser link, then create a Cognisor account to submit and collaborate."
-                      : "Create your portal account to participate, submit projects, and receive organiser updates."}
+                      ? "Register through the organiser link, or subscribe for more hackathons — no account needed."
+                      : "Subscribe for more hackathons, or create a portal account later if you want to submit a project."}
                   </p>
                   <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-3">
                     {event.lumaUrl ? (
@@ -836,11 +837,17 @@ export default function GeneratedHackathonPage() {
                         </a>
                       </Button>
                     ) : null}
-                    <Button asChild variant={event.lumaUrl ? "outline" : "default"} className="w-full gap-2 sm:w-auto">
+                    <Button asChild variant="outline" className="w-full gap-2 sm:w-auto">
                       <Link to={participantSignupHref(event.id)}>
                         Create participant account <ArrowLeft className="h-4 w-4 rotate-180" />
                       </Link>
                     </Button>
+                  </div>
+                  <div className="mx-auto mt-6 max-w-md text-left">
+                    <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Or subscribe for more hackathons
+                    </p>
+                    <HackathonSubscribeForm source={`event-${event.id}`} compact />
                   </div>
                 </section>
               </div>

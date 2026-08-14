@@ -40,6 +40,11 @@ import { sendParticipantEmail, queueParticipantEmail } from "@/lib/participantEm
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import { createJudgeInvite } from "@/lib/portalInvites";
 import { buildAdminTeamDetails } from "@/lib/teamRoster";
+import { setSubmissionPublicPreview } from "@/lib/projectSocial";
+import {
+  fetchNewsletterSubscribers,
+  type NewsletterSubscriber,
+} from "@/lib/hackathonSubscribe";
 import {
   publishAiHackathon,
   publishManualHackathon,
@@ -160,6 +165,7 @@ export default function AdminDashboardPage() {
   const [pendingRoles, setPendingRoles] = useState<Record<string, PortalRole>>({});
   const [isCreatingSubmission, setIsCreatingSubmission] = useState(false);
   const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
+  const [publishingSubmissionId, setPublishingSubmissionId] = useState<string | null>(null);
   const [isSavingCriteria, setIsSavingCriteria] = useState(false);
   const [adminGrantEmail, setAdminGrantEmail] = useState("");
   const [pendingAdminGrants, setPendingAdminGrants] = useState<AdminGrantRecord[]>([]);
@@ -182,6 +188,8 @@ export default function AdminDashboardPage() {
   const [judgeInviteUrl, setJudgeInviteUrl] = useState<string | null>(null);
   const [judgeInviteMessage, setJudgeInviteMessage] = useState<string | null>(null);
   const [isCreatingJudgeInvite, setIsCreatingJudgeInvite] = useState(false);
+  const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
+  const [isLoadingNewsletter, setIsLoadingNewsletter] = useState(false);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -279,9 +287,26 @@ export default function AdminDashboardPage() {
       }
     };
 
+    const loadNewsletter = async () => {
+      setIsLoadingNewsletter(true);
+      try {
+        const subscribers = await fetchNewsletterSubscribers(db);
+        setNewsletterSubscribers(subscribers);
+      } catch (error: unknown) {
+        const text =
+          typeof error === "object" && error && "message" in error
+            ? String((error as { message?: string }).message)
+            : "Failed to load newsletter emails.";
+        setMessage(text);
+      } finally {
+        setIsLoadingNewsletter(false);
+      }
+    };
+
     void loadUsers();
     void loadPendingAdminGrants();
     void loadSubmissions();
+    void loadNewsletter();
   }, [sessionUser, db]);
 
   useEffect(() => {
@@ -462,6 +487,7 @@ export default function AdminDashboardPage() {
         projectUrl: submission.project_url,
         submissionPdfUrl: submission.submission_pdf_url,
         demoVideoUrl: submission.demo_video_url,
+        isPublic: submission.public_preview_consent === true,
         judgeMarks: marks,
         averageScore:
           validScores.length > 0
@@ -1017,6 +1043,49 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleSetSubmissionPublic = async (submissionId: string, makePublic: boolean) => {
+    const submission = allSubmissions.find((item) => item.id === submissionId);
+    if (!submission) {
+      setMessage("Submission not found.");
+      return;
+    }
+
+    setMessage(null);
+    setPublishingSubmissionId(submissionId);
+    try {
+      const updatedAt = await setSubmissionPublicPreview(
+        db,
+        {
+          ...submission,
+          hackathon_id: submission.hackathon_id || getSubmissionHackathonId(submission),
+        },
+        makePublic,
+      );
+      setAllSubmissions((current) =>
+        current.map((item) =>
+          item.id === submissionId
+            ? { ...item, public_preview_consent: makePublic, updated_at: updatedAt }
+            : item,
+        ),
+      );
+      setMessage(
+        makePublic
+          ? "Project is now on hackathon boards and the public gallery."
+          : "Project was hidden from boards and the public gallery.",
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : makePublic
+            ? "Failed to make project public."
+            : "Failed to unpublish project.";
+      setMessage(text);
+    } finally {
+      setPublishingSubmissionId(null);
+    }
+  };
+
   const persistPlatformOps = async (next: PlatformOpsState, note?: string) => {
     const withTime = { ...next, updatedAt: new Date().toISOString() };
     await savePlatformOps(db, selectedHackathonId, withTime);
@@ -1382,8 +1451,10 @@ export default function AdminDashboardPage() {
         onSendParticipantBroadcast={handleSendParticipantBroadcast}
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}
+        publishingSubmissionId={publishingSubmissionId}
         onCreateSubmission={handleCreateSubmission}
         onDeleteSubmission={handleDeleteSubmission}
+        onSetSubmissionPublic={handleSetSubmissionPublic}
         top3RankingSummary={top3RankingSummary}
         isLoadingTop3Rankings={isLoadingTop3Rankings}
         top3SubmissionLookup={top3SubmissionLookup}
@@ -1428,6 +1499,8 @@ export default function AdminDashboardPage() {
         judgeInviteMessage={judgeInviteMessage}
         isCreatingJudgeInvite={isCreatingJudgeInvite}
         onCreateJudgeInvite={handleCreateJudgeInvite}
+        newsletterSubscribers={newsletterSubscribers}
+        isLoadingNewsletter={isLoadingNewsletter}
       />
     </DashboardLayout>
   );

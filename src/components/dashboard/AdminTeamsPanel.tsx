@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Crown, Mail, Search, Users } from "lucide-react";
+import { Crown, Globe, GlobeLock, Mail, Search, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import type { PortalHackathon } from "@/lib/hackathons";
@@ -18,12 +19,15 @@ export type AdminTeamRow = {
   memberCount: number;
   members: AdminTeamMemberView[];
   extraMemberNames: string[];
+  isPublic?: boolean;
 };
 
 type AdminTeamsPanelProps = {
   selectedHackathon: PortalHackathon;
   submissions: AdminTeamRow[];
   isLoading: boolean;
+  publishingSubmissionId?: string | null;
+  onSetSubmissionPublic?: (submissionId: string, makePublic: boolean) => Promise<void>;
 };
 
 const getInitials = (name: string) => {
@@ -37,6 +41,8 @@ export function AdminTeamsPanel({
   selectedHackathon,
   submissions,
   isLoading,
+  publishingSubmissionId = null,
+  onSetSubmissionPublic,
 }: AdminTeamsPanelProps) {
   const [query, setQuery] = useState("");
   const totalMembers = submissions.reduce((sum, row) => sum + row.memberCount, 0);
@@ -59,7 +65,7 @@ export function AdminTeamsPanel({
   }, [query, submissions]);
 
   return (
-    <section className={sectionClass} id="event-teams" aria-labelledby="event-teams-heading">
+    <section className={`${sectionClass} scroll-mt-24`} id="event-teams" aria-labelledby="event-teams-heading">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-4">
         <div className="flex min-w-0 items-start gap-3">
           <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
@@ -72,6 +78,9 @@ export function AdminTeamsPanel({
             </h2>
             <p className="dash-subtitle">
               Name, leader, and members for every project in {selectedHackathon.shortName}.
+              {onSetSubmissionPublic
+                ? " Make a project public to show it on boards and the gallery."
+                : ""}
             </p>
           </div>
         </div>
@@ -129,9 +138,17 @@ export function AdminTeamsPanel({
                     {row.title?.trim() || "Untitled project"}
                   </p>
                 </div>
-                <Badge variant="outline" className="shrink-0 uppercase tracking-[0.12em]">
-                  {row.memberCount} {row.memberCount === 1 ? "member" : "members"}
-                </Badge>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <Badge
+                    variant={row.isPublic ? "default" : "outline"}
+                    className="uppercase tracking-[0.12em]"
+                  >
+                    {row.isPublic ? "Public" : "Private"}
+                  </Badge>
+                  <Badge variant="outline" className="uppercase tracking-[0.12em]">
+                    {row.memberCount} {row.memberCount === 1 ? "member" : "members"}
+                  </Badge>
+                </div>
               </div>
 
               <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -196,6 +213,34 @@ export function AdminTeamsPanel({
                   </li>
                 ))}
               </ul>
+
+              {onSetSubmissionPublic ? (
+                <Button
+                  size="sm"
+                  variant={row.isPublic ? "outline" : "default"}
+                  className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
+                  disabled={publishingSubmissionId === row.id}
+                  onClick={async () => {
+                    const makePublic = !row.isPublic;
+                    const confirmed = window.confirm(
+                      makePublic
+                        ? "Show this project on hackathon boards and the public gallery?"
+                        : "Hide this project from boards and the public gallery?",
+                    );
+                    if (!confirmed) return;
+                    await onSetSubmissionPublic(row.id, makePublic);
+                  }}
+                >
+                  {row.isPublic ? <GlobeLock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+                  {publishingSubmissionId === row.id
+                    ? row.isPublic
+                      ? "Hiding..."
+                      : "Publishing..."
+                    : row.isPublic
+                      ? "Unpublish"
+                      : "Make public"}
+                </Button>
+              ) : null}
             </article>
           ))}
         </div>

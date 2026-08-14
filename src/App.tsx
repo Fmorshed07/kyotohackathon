@@ -2,12 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { usePortalAuth } from "./hooks/usePortalAuth";
 import {
   canAccessStaffDashboard,
   getDashboardPathForUser,
   participantNeedsOnboarding,
+  safeInternalPath,
 } from "./lib/portalRoutes";
 import Index from "./pages/Index";
 import SignIn from "./pages/SignIn";
@@ -42,10 +43,13 @@ function FullScreenMessage({ message }: { message: string }) {
 
 function PublicOnlyRoute({ children }: { children: JSX.Element }) {
   const { sessionUser, loading } = usePortalAuth();
+  const location = useLocation();
+  const nextPath = safeInternalPath(new URLSearchParams(location.search).get("next"));
   if (loading) return <FullScreenMessage message="Loading..." />;
   // Keep auth-only users (signed into Google, no portal role yet) on signup/signin
   // so they can finish participant enrollment without admin help.
   if (!sessionUser?.role) return children;
+  if (nextPath) return <Navigate to={nextPath} replace />;
   return (
     <Navigate
       to={getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus, {

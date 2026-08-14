@@ -1,3 +1,4 @@
+import { deleteDoc, doc, setDoc, type Firestore } from "firebase/firestore";
 import type { Submission } from "@/types/portal";
 
 const PRIVATE_JUDGING_KEYS = [
@@ -154,6 +155,88 @@ export function stripPrivateJudgingFields<T extends Record<string, unknown>>(dat
     delete next[key];
   }
   return next;
+}
+
+export type PublicProjectWriteSource = Pick<
+  Submission,
+  | "user_id"
+  | "hackathon_id"
+  | "title"
+  | "short_description"
+  | "project_url"
+  | "submission_pdf_url"
+  | "demo_video_url"
+  | "cover_url"
+  | "gallery_urls"
+  | "team_name"
+  | "member_names"
+  | "member_name_list"
+  | "team_members"
+  | "member_user_ids"
+  | "team_leader_id"
+  | "owner_name"
+  | "owner_email"
+  | "created_at"
+  | "updated_at"
+>;
+
+/** Gallery/board copy. Never includes judge scores or notes. */
+export function buildPublicProjectWritePayload(
+  submission: PublicProjectWriteSource,
+  updatedAt: string,
+): Record<string, unknown> {
+  const ownerId = submission.user_id;
+  return {
+    owner_id: ownerId,
+    user_id: ownerId,
+    hackathon_id: submission.hackathon_id ?? null,
+    title: submission.title,
+    short_description: submission.short_description,
+    project_url: submission.project_url,
+    submission_pdf_url: submission.submission_pdf_url,
+    demo_video_url: submission.demo_video_url,
+    cover_url: submission.cover_url ?? null,
+    gallery_urls: submission.gallery_urls ?? [],
+    team_name: submission.team_name ?? null,
+    member_names: submission.member_names ?? null,
+    member_name_list: submission.member_name_list ?? [],
+    team_members: submission.team_members ?? [],
+    member_user_ids: submission.member_user_ids ?? [],
+    team_leader_id: submission.team_leader_id ?? ownerId,
+    owner_name: submission.owner_name ?? null,
+    owner_email: submission.owner_email ?? null,
+    created_at: submission.created_at,
+    updated_at: updatedAt,
+    public_preview_consent: true,
+  };
+}
+
+export async function setSubmissionPublicPreview(
+  db: Firestore,
+  submission: Submission,
+  makePublic: boolean,
+  updatedAt = new Date().toISOString(),
+) {
+  const submissionRef = doc(db, "submissions", submission.id);
+  const publicRef = doc(db, "public_projects", submission.id);
+
+  if (makePublic) {
+    await setDoc(
+      submissionRef,
+      { public_preview_consent: true, updated_at: updatedAt },
+      { merge: true },
+    );
+    await setDoc(publicRef, buildPublicProjectWritePayload(submission, updatedAt), { merge: true });
+  } else {
+    await setDoc(
+      submissionRef,
+      { public_preview_consent: false, updated_at: updatedAt },
+      { merge: true },
+    );
+    await deleteDoc(publicRef).catch(() => undefined);
+  }
+
+  return updatedAt;
 }
 
 export function toPublicGallerySubmission(

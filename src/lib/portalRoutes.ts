@@ -24,6 +24,15 @@ export function participantNeedsOnboarding(
   return true;
 }
 
+/** Same-origin app path only. Rejects protocol-relative and absolute URLs. */
+export function safeInternalPath(value: string | null | undefined) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("/")) return null;
+  if (trimmed.startsWith("//") || trimmed.includes("://") || trimmed.includes("\\")) return null;
+  return trimmed;
+}
+
 export function getDashboardPathForUser(
   role?: PortalRole,
   judgeApprovalStatus?: JudgeApprovalStatus,

@@ -59,9 +59,11 @@ export function ProjectThemeMarksPanel({
 
   const rows = useMemo<ProjectScreeningMarkRow[]>(() => {
     return submissions.map((submission) => {
-      const title = submission.title?.trim() || "Untitled project";
+      const title =
+        (typeof submission.title === "string" ? submission.title.trim() : "") || "Untitled project";
       const concept =
-        submission.shortDescription?.trim() || submission.short_description?.trim() || "";
+        (typeof submission.shortDescription === "string" ? submission.shortDescription.trim() : "") ||
+        (typeof submission.short_description === "string" ? submission.short_description.trim() : "");
       const heuristic = evaluateProjectConcept(
         {
           title,
@@ -88,6 +90,9 @@ export function ProjectThemeMarksPanel({
         score: record?.score ?? evaluation.score,
         themeFit: evaluation.themeFit,
         conceptQuality: evaluation.conceptQuality,
+        summary: evaluation.summary,
+        strengths: evaluation.strengths,
+        gaps: evaluation.gaps,
       };
     });
   }, [hackathon.theme, ops?.projectScreens, submissions]);
@@ -114,7 +119,7 @@ export function ProjectThemeMarksPanel({
 
   return (
     <div id="project-marks" className="scroll-mt-24">
-      <ProjectScreeningMarksSection rows={rows} activeId={activeId} onSelect={setActiveId} />
+        <ProjectScreeningMarksSection rows={rows} activeId={activeId} onSelect={setActiveId} csvLabel={hackathon.name} />
     </div>
   );
 }

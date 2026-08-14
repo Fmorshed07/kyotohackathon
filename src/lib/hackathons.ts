@@ -250,10 +250,43 @@ export function groupByHackathon<T extends { hackathonId: HackathonId }>(
     });
 }
 
-const mapSubmissionDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Submission => ({
-  id: docSnap.id,
-  ...(docSnap.data() as Omit<Submission, "id">),
-});
+const asText = (value: unknown): string | null => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+};
+
+const asUrl = (value: unknown): string | null => {
+  const direct = asText(value);
+  if (direct?.trim()) return direct;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["url", "href", "link", "src"]) {
+      const nested = asText(record[key]);
+      if (nested?.trim()) return nested;
+    }
+  }
+  return null;
+};
+
+const mapSubmissionDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Submission => {
+  const data = docSnap.data() as Record<string, unknown>;
+  return {
+    ...(data as Omit<Submission, "id">),
+    id: docSnap.id,
+    title: asText(data.title),
+    team_name: asText(data.team_name),
+    member_names: asText(data.member_names),
+    owner_name: asText(data.owner_name),
+    owner_email: asText(data.owner_email),
+    short_description: asText(data.short_description),
+    project_url: asUrl(data.project_url),
+    submission_pdf_url: asUrl(data.submission_pdf_url),
+    demo_video_url: asUrl(data.demo_video_url),
+    cover_url: asUrl(data.cover_url),
+    judge_notes: asText(data.judge_notes),
+  };
+};
 
 export async function fetchAllSubmissions(db: Firestore): Promise<Submission[]> {
   const snapshot = await getDocs(collection(db, "submissions"));

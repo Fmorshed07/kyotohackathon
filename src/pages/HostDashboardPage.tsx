@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
+import { createPortal } from "react-dom";
 import {
   addDoc,
   collection,
@@ -9,8 +10,8 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { Activity, Radar, ScanSearch } from "lucide-react";
-import { DashboardLayout, sectionClass } from "@/components/dashboard/DashboardLayout";
+import { Activity, CalendarRange, ClipboardCheck, Gavel, Radar, Scale, ScanSearch, Ticket, Users } from "lucide-react";
+import { DashboardLayout, dashJumpLinkClass, sectionClass } from "@/components/dashboard/DashboardLayout";
 import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
 import {
   HostEventBriefEditor,
@@ -80,6 +81,15 @@ const emptyJudgeForm = {
   expertise: "",
 };
 
+const HOST_JUMP_LINKS = [
+  { href: "#event-details", label: "1. Event brief", icon: CalendarRange },
+  { href: "#event-teams", label: "2. Teams", icon: Users },
+  { href: "#tickets", label: "3. Tickets", icon: Ticket },
+  { href: "#check-in", label: "4. Check-in", icon: ClipboardCheck },
+  { href: "#judges", label: "5. Judges", icon: Scale },
+  { href: "#judging", label: "6. Scoring", icon: Gavel },
+] as const;
+
 const mapTicket = (id: string, data: Record<string, unknown>): HostEventTicket => ({
   id,
   host_id: typeof data.host_id === "string" ? data.host_id : "",
@@ -136,6 +146,7 @@ export default function HostDashboardPage() {
   const saveSelectedEventRef = useRef<((options?: { quiet?: boolean }) => Promise<void>) | null>(
     null,
   );
+  const [teamsAnchor, setTeamsAnchor] = useState<HTMLDivElement | null>(null);
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
@@ -832,52 +843,120 @@ export default function HostDashboardPage() {
       hackathons={hostBoardHackathons}
     >
       <div className="space-y-8">
-        <section id="overview" className={`${sectionClass} p-6`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Host portal</p>
-              <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight">
-                Event operations
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Create events, publish them publicly, screen applicants and project concepts, run live operations, issue
-                QR tickets, manage judges, review submissions, and track judging marks.
-              </p>
+        <section id="overview" className={`${sectionClass} dash-command-panel scroll-mt-24 p-6`}>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="dash-eyebrow">Host command center</p>
+                  <h2 className="dash-title">Overview</h2>
+                  <p className="dash-subtitle max-w-2xl">
+                    Run the event in order: brief and publish, review teams, issue tickets, check
+                    people in, invite judges, then score.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {sessionUser.role === "admin" ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link to="/dashboard/admin">Back to admin</Link>
+                    </Button>
+                  ) : null}
+                  <Badge variant="outline" className="uppercase tracking-[0.14em]">
+                    {sessionUser.role === "admin"
+                      ? "Admin"
+                      : sessionUser.hostApprovalStatus === "approved"
+                        ? "Approved"
+                        : "Pending approval"}
+                  </Badge>
+                </div>
+              </div>
+
+              <nav
+                aria-label="Host workflow"
+                className="mt-5 flex flex-wrap gap-1.5 border-t border-white/10 pt-4"
+              >
+                {HOST_JUMP_LINKS.map(({ href, label, icon: Icon }) => (
+                  <a key={href} href={href} className={dashJumpLinkClass}>
+                    <Icon className="h-3.5 w-3.5" aria-hidden />
+                    {label}
+                  </a>
+                ))}
+              </nav>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <a href="#event-details" className="dash-workflow-card block transition hover:border-primary/35">
+                  <div className="flex items-center gap-2 text-primary">
+                    <CalendarRange className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">Setup</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Edit the brief, then publish so teams and judges can join.
+                  </p>
+                </a>
+                <a href="#tickets" className="dash-workflow-card block transition hover:border-primary/35">
+                  <div className="flex items-center gap-2 text-emerald-300">
+                    <Ticket className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">Day-of</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Issue QR tickets and check attendees in as they arrive.
+                  </p>
+                </a>
+                <a href="#judging" className="dash-workflow-card block transition hover:border-primary/35">
+                  <div className="flex items-center gap-2 text-amber-300">
+                    <Gavel className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">Scoring</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Approve judges, set criteria, and review marks last.
+                  </p>
+                </a>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {sessionUser.role === "admin" ? (
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/dashboard/admin">Back to admin</Link>
-                </Button>
-              ) : null}
-              <Button asChild variant="outline" size="sm" className="gap-1.5">
-                <Link to="/dashboard/host/screening">
-                  <Radar className="h-4 w-4" />
-                  Screening agent
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="sm" className="gap-1.5">
-                <Link to="/dashboard/host/project-screening">
-                  <ScanSearch className="h-4 w-4" />
-                  Project agent
-                </Link>
-              </Button>
-              <Button asChild size="sm" className="gap-1.5">
-                <Link to="/dashboard/host/operations">
-                  <Activity className="h-4 w-4" />
-                  Operations
-                </Link>
-              </Button>
-              <Badge variant="outline" className="uppercase tracking-[0.14em]">
-                {sessionUser.role === "admin"
-                  ? "Admin"
-                  : sessionUser.hostApprovalStatus === "approved"
-                    ? "Approved"
-                    : "Pending approval"}
-              </Badge>
+
+            <div className="dash-stat-grid grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="dash-stat-tile dash-stat-tile--highlight">
+                <p className="dash-stat-value">{events.length}</p>
+                <p className="dash-stat-label">Events</p>
+              </div>
+              <div className="dash-stat-tile">
+                <p className="dash-stat-value">{eventTickets.length}</p>
+                <p className="dash-stat-label">Tickets</p>
+              </div>
+              <div className="dash-stat-tile">
+                <p className="dash-stat-value">
+                  {eventTickets.filter((ticket) => ticket.status === "checked_in").length}
+                </p>
+                <p className="dash-stat-label">Checked in</p>
+              </div>
+              <div className="dash-stat-tile">
+                <p className="dash-stat-value">{eventJudges.length}</p>
+                <p className="dash-stat-label">Judges</p>
+              </div>
             </div>
           </div>
-          {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
+
+          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link to="/dashboard/host/screening">
+                <Radar className="h-4 w-4" />
+                Screening agent
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link to="/dashboard/host/project-screening">
+                <ScanSearch className="h-4 w-4" />
+                Project agent
+              </Link>
+            </Button>
+            <Button asChild size="sm" className="gap-1.5">
+              <Link to="/dashboard/host/operations">
+                <Activity className="h-4 w-4" />
+                Operations
+              </Link>
+            </Button>
+          </div>
+          {message ? <p className="dash-message mt-4">{message}</p> : null}
           {selectedEvent?.public_hackathon_id ? (
             <p className="mt-2 text-sm">
               {publicListing?.published ? (
@@ -903,7 +982,7 @@ export default function HostDashboardPage() {
           ) : null}
         </section>
 
-        <section id="event-details" className={`${sectionClass} space-y-5 p-6`}>
+        <section id="event-details" className={`${sectionClass} scroll-mt-24 space-y-5 p-6`}>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="font-display text-xl font-semibold">Event brief</h2>
@@ -1099,7 +1178,9 @@ export default function HostDashboardPage() {
           ) : null}
         </section>
 
-        <section id="tickets" className={`${sectionClass} space-y-5 p-6`}>
+        <div ref={setTeamsAnchor} className="empty:hidden" />
+
+        <section id="tickets" className={`${sectionClass} scroll-mt-24 space-y-5 p-6`}>
           <div>
             <h2 className="font-display text-xl font-semibold">Tickets & QR</h2>
             <p className="mt-1 text-sm text-muted-foreground">Issue attendee tickets with QR payloads.</p>
@@ -1158,7 +1239,7 @@ export default function HostDashboardPage() {
           </div>
         </section>
 
-        <section id="check-in" className={`${sectionClass} space-y-5 p-6`}>
+        <section id="check-in" className={`${sectionClass} scroll-mt-24 space-y-5 p-6`}>
           <div>
             <h2 className="font-display text-xl font-semibold">Check-in</h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -1181,7 +1262,7 @@ export default function HostDashboardPage() {
           </p>
         </section>
 
-        <section id="judges" className={`${sectionClass} space-y-5 p-6`}>
+        <section id="judges" className={`${sectionClass} scroll-mt-24 space-y-5 p-6`}>
           <div>
             <h2 className="font-display text-xl font-semibold">Judges</h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -1281,7 +1362,15 @@ export default function HostDashboardPage() {
           <HostEventJudgingWorkspace
             hackathon={selectedPortalHackathon}
             onMessage={setMessage}
-          />
+          >
+            {({ teams, approvals, judging }) => (
+              <>
+                {teamsAnchor ? createPortal(teams, teamsAnchor) : null}
+                {approvals}
+                {judging}
+              </>
+            )}
+          </HostEventJudgingWorkspace>
         ) : (
           <HostJudgingUnavailableNotice />
         )}

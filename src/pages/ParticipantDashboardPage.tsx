@@ -734,10 +734,15 @@ export default function ParticipantDashboardPage() {
     }
 
     if (options.queueEmail) {
+      const emailTitle = data.title ?? participantForm.title;
+      const emailTeamName = data.team_name ?? participantForm.teamName;
+      // #region agent log
+      fetch('http://127.0.0.1:7752/ingest/e37c9ea6-3a22-4110-a9e4-4334f1ef0ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'608977'},body:JSON.stringify({sessionId:'608977',runId:'post-fix',hypothesisId:'A',location:'ParticipantDashboardPage.tsx:queueEmail',message:'submission email payload types',data:{titleType:typeof emailTitle,teamNameType:typeof emailTeamName,titleIsString:typeof emailTitle==='string',teamNameIsString:typeof emailTeamName==='string'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       queueParticipantEmail({
         type: hasScopedSubmission ? "submission_updated" : "submission_created",
-        title: data.title ?? payload.title,
-        teamName: data.team_name ?? payload.team_name,
+        title: emailTitle,
+        teamName: emailTeamName,
         hackathonName: selectedHackathon.name,
       });
     }

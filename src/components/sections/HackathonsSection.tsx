@@ -11,6 +11,7 @@ import {
 } from "@/lib/aiHackathons";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { PORTAL_HACKATHONS, type PortalHackathon } from "@/lib/hackathons";
+import { HackathonSubscribeForm } from "@/components/hackathons/HackathonSubscribeForm";
 import { cn } from "@/lib/utils";
 
 type BoardCategory =
@@ -608,6 +609,16 @@ const HackathonsSection = () => {
                 ))
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="mt-12 rounded-2xl border border-primary/25 bg-card/70 px-5 py-6 sm:px-7">
+          <p className="font-display text-lg font-semibold text-foreground">Subscribe for more hackathons</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Get an email when new events open. No account needed.
+          </p>
+          <div className="mt-4 max-w-xl">
+            <HackathonSubscribeForm source="hackathons-page" compact />
           </div>
         </div>
 
