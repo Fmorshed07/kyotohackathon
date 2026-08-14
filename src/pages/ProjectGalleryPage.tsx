@@ -298,7 +298,6 @@ export default function ProjectGalleryPage() {
   };
 
   const activePreviewUrl = previewSubmission ? getPreviewUrl(previewSubmission, previewKind) : "";
-  const previewAssets = previewSubmission ? getAssetKinds(previewSubmission) : [];
   const previewLinks = previewSubmission ? listPublicProjectLinks(previewSubmission) : [];
   const previewTitle = previewSubmission?.title?.trim() || "Untitled project";
   const previewTeam = previewSubmission?.team_name?.trim() || "Solo builder";
@@ -401,17 +400,17 @@ export default function ProjectGalleryPage() {
               </div>
               <ProjectPublicLinks links={previewLinks} className="mt-3" />
               <div className="mt-5 flex flex-wrap gap-2">
-                {previewAssets.map((kind) => (
+                {previewLinks.map((link) => (
                   <button
-                    key={kind}
+                    key={link.id}
                     type="button"
-                    onClick={() => setPreviewKind(kind)}
+                    onClick={() => setPreviewKind(link.id)}
                     className={cn(
-                      "rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition-colors",
-                      previewKind === kind ? "border-primary/45 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:text-foreground",
+                      "rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
+                      previewKind === link.id ? "border-primary/45 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {kind === "document" ? "PDF / document" : kind}
+                    {link.label}
                   </button>
                 ))}
               </div>

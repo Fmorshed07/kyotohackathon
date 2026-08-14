@@ -639,8 +639,8 @@ service cloud.firestore {
 
       function statsKeysOk() {
         return request.resource.data.keys().hasOnly(["star_sum", "star_count", "updated_at"])
-          && request.resource.data.star_sum is int
-          && request.resource.data.star_count is int
+          && request.resource.data.star_sum is number
+          && request.resource.data.star_count is number
           && request.resource.data.star_sum >= 0
           && request.resource.data.star_count >= 0
           && request.resource.data.star_sum <= request.resource.data.star_count * 5;

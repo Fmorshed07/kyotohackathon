@@ -95,7 +95,7 @@ function ProjectCard({
   const team = submission.team_name?.trim() || "Solo builder";
   const initial = (team[0] ?? "P").toUpperCase();
   const links = listPublicProjectLinks(submission);
-  const isPublic = submission.public_preview_consent !== false;
+  const isPublic = submission.public_preview_consent === true;
 
   return (
     <article

@@ -63,7 +63,7 @@ export function ProjectShareMenu({
         {canNativeShare ? (
           <DropdownMenuItem onSelect={() => void nativeShare()}>Share with friends</DropdownMenuItem>
         ) : null}
-        <DropdownMenuItem onSelect={() => void copyLink()}>
+        <DropdownMenuItem className="gap-2" onSelect={() => void copyLink()}>
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? "Link copied" : "Copy link"}
         </DropdownMenuItem>
