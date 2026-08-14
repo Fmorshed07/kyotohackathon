@@ -25,7 +25,6 @@ import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { hostEventsToPortalHackathons } from "@/hooks/useHostOpsCatalog";
 import {
-  fetchHackathonForAdmin,
   getHackathonVisibilityLabel,
   getHostedHackathonUrl,
   hostedToPortalHackathon,
@@ -33,6 +32,7 @@ import {
   setHackathonPublished,
   setHackathonStatus,
   setHackathonSubmissionMode,
+  subscribeHackathon,
   type HostedHackathon,
 } from "@/lib/aiHackathons";
 import { formDraftStorageKey } from "@/lib/formDrafts";
@@ -270,20 +270,13 @@ export default function HostDashboardPage() {
       setPublicListing(null);
       return;
     }
-    let cancelled = false;
-    const loadPublicListing = async () => {
-      try {
-        const listing = await fetchHackathonForAdmin(db, publicId);
-        if (!cancelled) setPublicListing(listing);
-      } catch {
-        if (!cancelled) setPublicListing(null);
-      }
-    };
-    void loadPublicListing();
-    return () => {
-      cancelled = true;
-    };
-  }, [db, selectedEvent?.public_hackathon_id, selectedEvent?.status, selectedEvent?.updated_at]);
+    return subscribeHackathon(
+      db,
+      publicId,
+      (listing) => setPublicListing(listing),
+      () => setPublicListing(null),
+    );
+  }, [db, selectedEvent?.public_hackathon_id]);
 
   useEffect(() => {
     if (!sessionUser) return;
@@ -1079,9 +1072,9 @@ export default function HostDashboardPage() {
                     mode={
                       publicListing
                         ? getHackathonSubmissionMode(publicListing)
-                        : "open"
+                        : "closed"
                     }
-                    disabled={isBusy}
+                    disabled={isBusy || !publicListing}
                     onChange={(mode) => void setSubmissionMode(mode)}
                   />
                 ) : (

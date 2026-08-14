@@ -33,6 +33,7 @@ import {
   type PortalHackathon,
 } from "@/lib/hackathons";
 import {
+  assertSubmissionsWritable,
   fetchJoinablePortalHackathons,
   fetchPortalHackathonCatalog,
   hostedToPortalHackathon,
@@ -224,6 +225,8 @@ export default function ParticipantDashboardPage() {
   const suppressFormSyncRef = useRef(false);
   const firestoreAutosaveTimerRef = useRef<number | null>(null);
   const isAutosavingRef = useRef(false);
+  const selectedHackathonRef = useRef(selectedHackathon);
+  selectedHackathonRef.current = selectedHackathon;
 
   const mapSubmissionToForm = (data: Submission): ParticipantProjectDraft => ({
     title: data.title ?? "",
@@ -566,9 +569,10 @@ export default function ParticipantDashboardPage() {
     queueEmail?: boolean;
   }) => {
     if (!sessionUser) return null;
-    if (!areSubmissionsWritable(selectedHackathon)) {
+    await assertSubmissionsWritable(db, selectedHackathonId);
+    if (!areSubmissionsWritable(selectedHackathonRef.current)) {
       throw new Error(
-        getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathon)) ??
+        getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathonRef.current)) ??
           "Submissions are locked for this hackathon.",
       );
     }
@@ -796,9 +800,16 @@ export default function ParticipantDashboardPage() {
   };
 
   // Cloud autosave so drafts survive sudden closes even across devices.
+  // Host pause/close must cancel this — never keep writing in the background.
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
-    if (isLoadingWorkspace || !areSubmissionsWritable(selectedHackathon)) return;
+    if (isLoadingWorkspace || !areSubmissionsWritable(selectedHackathon)) {
+      if (firestoreAutosaveTimerRef.current) {
+        window.clearTimeout(firestoreAutosaveTimerRef.current);
+        firestoreAutosaveTimerRef.current = null;
+      }
+      return;
+    }
     if (!isProjectDraftDirty || !projectDraftHasContent(projectDraftValue)) return;
     if (isSubmittingProject || isAutosavingRef.current) return;
 
@@ -809,12 +820,18 @@ export default function ParticipantDashboardPage() {
     firestoreAutosaveTimerRef.current = window.setTimeout(() => {
       void (async () => {
         if (isAutosavingRef.current || isSubmittingProject) return;
+        if (!areSubmissionsWritable(selectedHackathonRef.current)) return;
         isAutosavingRef.current = true;
         try {
           await persistParticipantProject({ announce: false, queueEmail: false });
         } catch {
-          // Keep local draft; cloud autosave can retry on next edit.
-          setAutosaveStatus("Draft saved on this device (cloud sync pending).");
+          if (!areSubmissionsWritable(selectedHackathonRef.current)) {
+            setAutosaveStatus(
+              getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathonRef.current)),
+            );
+          } else {
+            setAutosaveStatus("Draft saved on this device (cloud sync pending).");
+          }
         } finally {
           isAutosavingRef.current = false;
         }
@@ -824,6 +841,7 @@ export default function ParticipantDashboardPage() {
     return () => {
       if (firestoreAutosaveTimerRef.current) {
         window.clearTimeout(firestoreAutosaveTimerRef.current);
+        firestoreAutosaveTimerRef.current = null;
       }
     };
     // persistParticipantProject closes over latest form state intentionally.

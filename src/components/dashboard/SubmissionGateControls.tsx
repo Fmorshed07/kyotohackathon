@@ -57,8 +57,8 @@ export function SubmissionGateControls({
             Project submissions
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pause for a demo freeze or judging setup. Close after the deadline. Independent of live /
-            upcoming / past.
+            Pause for a demo freeze or judging setup. Close after the deadline. These buttons are the
+            only thing that change this — going live or saving the event will not reopen submissions.
           </p>
         </div>
       )}

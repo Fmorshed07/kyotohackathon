@@ -35,12 +35,11 @@ describe("submission mode", () => {
     ).toBe(true);
   });
 
-  it("honours an explicit pause on a live event", () => {
-    const paused = event({ status: "active", submissionMode: "paused" });
-    expect(getHackathonSubmissionMode(paused)).toBe("paused");
-    expect(areSubmissionsWritable(paused)).toBe(false);
-    expect(getSubmissionModeLabel("paused")).toBe("Submissions paused");
-    expect(getSubmissionLockCopy("paused")).toMatch(/paused/i);
+  it("keeps a host pause after the event is marked live — going live does not reopen", () => {
+    const pausedLive = event({ status: "active", submissionMode: "paused" });
+    expect(areSubmissionsWritable(pausedLive)).toBe(false);
+    expect(getHackathonSubmissionMode({ ...pausedLive, status: "upcoming" })).toBe("paused");
+    expect(getHackathonSubmissionMode({ ...pausedLive, status: "past" })).toBe("paused");
   });
 
   it("treats close as a deadline lock that can still be reversed", () => {

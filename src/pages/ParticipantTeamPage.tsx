@@ -7,7 +7,7 @@ import { TeamManagementWorkspace } from "@/components/dashboard/TeamManagementWo
 import { Button } from "@/components/ui/button";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
-import { fetchPortalHackathonCatalog, hostedToPortalHackathon, subscribeHackathon } from "@/lib/aiHackathons";
+import { assertSubmissionsWritable, fetchPortalHackathonCatalog, hostedToPortalHackathon, subscribeHackathon } from "@/lib/aiHackathons";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import {
@@ -172,6 +172,8 @@ export default function ParticipantTeamPage() {
   const isTeamNameDirtyRef = useRef(isTeamNameDirty);
   const isAutosavingTeamRef = useRef(false);
   const teamNameAutosaveTimerRef = useRef<number | null>(null);
+  const selectedHackathonRef = useRef(selectedHackathon);
+  selectedHackathonRef.current = selectedHackathon;
   isTeamNameDirtyRef.current = isTeamNameDirty;
 
   useEffect(() => {
@@ -350,9 +352,10 @@ export default function ParticipantTeamPage() {
 
   const persistTeamName = async (nextName = teamName) => {
     if (!sessionUser) return null;
-    if (!areSubmissionsWritable(selectedHackathon)) {
+    await assertSubmissionsWritable(db, selectedHackathonId);
+    if (!areSubmissionsWritable(selectedHackathonRef.current)) {
       throw new Error(
-        getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathon)) ??
+        getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathonRef.current)) ??
           "Submissions are locked for this hackathon.",
       );
     }
@@ -459,7 +462,13 @@ export default function ParticipantTeamPage() {
   };
 
   useEffect(() => {
-    if (isReadOnly || isLoadingWorkspace) return;
+    if (isReadOnly || isLoadingWorkspace) {
+      if (teamNameAutosaveTimerRef.current) {
+        window.clearTimeout(teamNameAutosaveTimerRef.current);
+        teamNameAutosaveTimerRef.current = null;
+      }
+      return;
+    }
     if (!isTeamNameDirty || !teamName.trim()) return;
     if (isSavingTeam || isAutosavingTeamRef.current) return;
 
@@ -467,12 +476,14 @@ export default function ParticipantTeamPage() {
       window.clearTimeout(teamNameAutosaveTimerRef.current);
     }
     teamNameAutosaveTimerRef.current = window.setTimeout(() => {
+      if (!areSubmissionsWritable(selectedHackathonRef.current)) return;
       void handleSaveTeam(teamName);
     }, 700);
 
     return () => {
       if (teamNameAutosaveTimerRef.current) {
         window.clearTimeout(teamNameAutosaveTimerRef.current);
+        teamNameAutosaveTimerRef.current = null;
       }
     };
     // persistTeamName closes over the latest roster/submission on purpose.

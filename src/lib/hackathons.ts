@@ -87,7 +87,7 @@ export const isHackathonId = (value: string): value is HackathonId =>
 export const isSubmissionMode = (value: unknown): value is SubmissionMode =>
   value === "open" || value === "paused" || value === "closed";
 
-/** Resolve the organiser gate. Explicit mode wins; past events default to closed. */
+/** Explicit host/admin gate always wins. Going live or marking past never reopens a pause. */
 export const getHackathonSubmissionMode = (
   hackathon: Pick<PortalHackathon, "status" | "submissionMode">,
 ): SubmissionMode => {

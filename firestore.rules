@@ -193,6 +193,44 @@ service cloud.firestore {
         );
     }
 
+    function canManageHackathon(hackathonId) {
+      return isAdmin() || (isApprovedHost() && ownsHackathon(hackathonId));
+    }
+
+    function hackathonPath(hackathonId) {
+      return /databases/$(database)/documents/hackathons/$(hackathonId);
+    }
+
+    function validSubmissionModeValue(value) {
+      return value == "open" || value == "paused" || value == "closed";
+    }
+
+    function validSubmissionModeOnWrite() {
+      return !("submissionMode" in request.resource.data)
+        || validSubmissionModeValue(request.resource.data.submissionMode);
+    }
+
+    // Missing docs and missing/unknown mode stay open so legacy events keep working.
+    // Pause and close only block participants — admins, hosts, and judges can still write.
+    function hackathonAllowsParticipantProjectWrites(hackathonId) {
+      return !(hackathonId is string && hackathonId.size() > 0)
+        || !exists(hackathonPath(hackathonId))
+        || (
+          get(hackathonPath(hackathonId)).data.submissionMode != "paused"
+          && get(hackathonPath(hackathonId)).data.submissionMode != "closed"
+        );
+    }
+
+    function requestHackathonId() {
+      return request.resource.data.hackathon_id is string
+        ? request.resource.data.hackathon_id
+        : "";
+    }
+
+    function existingHackathonId() {
+      return resource.data.hackathon_id is string ? resource.data.hackathon_id : "";
+    }
+
     // Approved hosts may approve pending judges/mentors for events they own.
     function canHostApproveJudge() {
       return isApprovedHost()
@@ -380,31 +418,6 @@ service cloud.firestore {
           && request.resource.data.user_id == resource.data.user_id;
       }
 
-      function hackathonPath(hackathonId) {
-        return /databases/$(database)/documents/hackathons/$(hackathonId);
-      }
-
-      // Missing docs and missing/unknown mode stay open so legacy events keep working.
-      // Pause and close only block participants — admins, hosts, and judges can still write.
-      function hackathonAllowsParticipantProjectWrites(hackathonId) {
-        return !(hackathonId is string && hackathonId.size() > 0)
-          || !exists(hackathonPath(hackathonId))
-          || (
-            get(hackathonPath(hackathonId)).data.submissionMode != "paused"
-            && get(hackathonPath(hackathonId)).data.submissionMode != "closed"
-          );
-      }
-
-      function createHackathonId() {
-        return request.resource.data.hackathon_id is string
-          ? request.resource.data.hackathon_id
-          : "";
-      }
-
-      function existingHackathonId() {
-        return resource.data.hackathon_id is string ? resource.data.hackathon_id : "";
-      }
-
       // Private by default. Public gallery/boards use public_projects only after explicit opt-in.
       allow read: if isAdmin()
         || isApprovedStaff()
@@ -420,7 +433,7 @@ service cloud.firestore {
         )
         || (
           request.auth.uid == request.resource.data.user_id
-          && hackathonAllowsParticipantProjectWrites(createHackathonId())
+          && hackathonAllowsParticipantProjectWrites(requestHackathonId())
         )
       );
       allow update: if isSignedIn() && (
@@ -539,73 +552,97 @@ service cloud.firestore {
     // A minimal public copy is created only by a participant who opts their project into the gallery.
     // This deliberately avoids publishing private submissions, judging notes, or score data.
     match /public_projects/{projectId} {
+      function isPublicProjectInviteJoin() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["member_names", "member_name_list", "team_members", "member_user_ids", "team_leader_id", "join_invite_token"])
+          && request.resource.data.keys().hasAll(["join_invite_token"])
+          && request.resource.data.join_invite_token is string
+          && exists(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token))
+          && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.status == "open"
+          && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.submission_id == projectId;
+      }
+
       allow read: if true;
-      allow create: if isAdmin() || (isSignedIn()
-        && request.resource.data.public_preview_consent == true
-        && (
-          request.resource.data.owner_id == request.auth.uid
-          || (
-            request.resource.data.owner_id is string
-            && request.resource.data.member_user_ids is list
-            && request.auth.uid in request.resource.data.member_user_ids
-            && exists(/databases/$(database)/documents/submissions/$(projectId))
-            && get(/databases/$(database)/documents/submissions/$(projectId)).data.user_id
-              == request.resource.data.owner_id
+      allow create: if isAdmin()
+        || (
+          request.resource.data.hackathon_id is string
+          && canManageHackathon(request.resource.data.hackathon_id)
+        )
+        || (
+          isSignedIn()
+          && request.resource.data.public_preview_consent == true
+          && hackathonAllowsParticipantProjectWrites(requestHackathonId())
+          && (
+            request.resource.data.owner_id == request.auth.uid
+            || (
+              request.resource.data.owner_id is string
+              && request.resource.data.member_user_ids is list
+              && request.auth.uid in request.resource.data.member_user_ids
+              && exists(/databases/$(database)/documents/submissions/$(projectId))
+              && get(/databases/$(database)/documents/submissions/$(projectId)).data.user_id
+                == request.resource.data.owner_id
+            )
           )
-        ));
+        );
       allow update: if isAdmin()
-        || (isSignedIn()
+        || (
+          resource.data.hackathon_id is string
+          && canManageHackathon(resource.data.hackathon_id)
+        )
+        || isPublicProjectInviteJoin()
+        || (
+          isSignedIn()
           && request.resource.data.owner_id == resource.data.owner_id
           && request.resource.data.public_preview_consent == true
+          && hackathonAllowsParticipantProjectWrites(existingHackathonId())
           && (
             request.resource.data.owner_id == request.auth.uid
             || (
               resource.data.member_user_ids is list
               && request.auth.uid in resource.data.member_user_ids
             )
-            || (
-              request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(["member_names", "member_name_list", "team_members", "member_user_ids", "team_leader_id", "join_invite_token"])
-              && request.resource.data.keys().hasAll(["join_invite_token"])
-              && request.resource.data.join_invite_token is string
-              && exists(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token))
-              && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.status == "open"
-              && get(/databases/$(database)/documents/team_invites/$(request.resource.data.join_invite_token)).data.submission_id == projectId
-            )
           )
         );
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.owner_id == request.auth.uid);
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.owner_id == request.auth.uid)
+        || (
+          resource.data.hackathon_id is string
+          && canManageHackathon(resource.data.hackathon_id)
+        );
     }
 
     match /hackathon_criteria/{hackathonId} {
       allow read: if true;
-      allow write: if isAdmin() || (
-        isApprovedHost()
-        && exists(/databases/$(database)/documents/hackathons/$(hackathonId))
-        && get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.createdBy == request.auth.uid
-      );
+      allow create, update: if canManageHackathon(hackathonId);
+      allow delete: if isAdmin();
     }
 
-    // Public pages load published events. Approved hosts can publish/update their own listings.
+    // Public pages load published events. Approved hosts can publish/update their own listings,
+    // including pausing or closing submissions on events they own.
     match /hackathons/{hackathonId} {
       allow get: if resource.data.published == true
-        || isAdmin()
-        || (isApprovedHost() && resource.data.createdBy == request.auth.uid);
+        || canManageHackathon(hackathonId);
       allow list: if resource.data.published == true || isAdmin();
-      allow create: if isAdmin() || (
-        isApprovedHost()
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.hostEventId is string
-        && request.resource.data.hostEventId.size() > 0
-        && ownsHostEvent(request.resource.data.hostEventId)
+      allow create: if validSubmissionModeOnWrite() && (
+        isAdmin()
+        || (
+          isApprovedHost()
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.hostEventId is string
+          && request.resource.data.hostEventId.size() > 0
+          && ownsHostEvent(request.resource.data.hostEventId)
+        )
       );
-      allow update: if isAdmin() || (
-        isApprovedHost()
-        && resource.data.createdBy == request.auth.uid
-        && request.resource.data.createdBy == resource.data.createdBy
-        && (
-          !("hostEventId" in resource.data)
-          || request.resource.data.hostEventId == resource.data.hostEventId
+      allow update: if validSubmissionModeOnWrite() && (
+        isAdmin()
+        || (
+          isApprovedHost()
+          && ownsHackathon(hackathonId)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && (
+            !("hostEventId" in resource.data)
+            || request.resource.data.hostEventId == resource.data.hostEventId
+          )
         )
       );
       allow delete: if isAdmin();
@@ -618,8 +655,7 @@ service cloud.firestore {
         || isApprovedStaff()
         || (isApprovedHost() && ownsHackathon(hackathonId))
       );
-      allow write: if isAdmin()
-        || (isApprovedHost() && ownsHackathon(hackathonId));
+      allow write: if canManageHackathon(hackathonId);
     }
 
     match /admin_grants/{grantEmail} {

@@ -27,6 +27,7 @@ import {
   type PortalHackathon,
   type SubmissionMode,
   getHackathonSubmissionMode,
+  getSubmissionLockCopy,
   isSubmissionMode,
 } from "@/lib/hackathons";
 import { buildHostEventSummary, formatPublicEventDate, type HostEvent } from "@/lib/hostEvents";
@@ -295,7 +296,7 @@ export async function publishHostEventPublicly(
   let createdAt = now;
   // Keep active/past lifecycle when re-publishing or updating an existing public listing.
   let lifecycleStatus: HackathonStatus = options?.status ?? "upcoming";
-  let submissionMode: SubmissionMode | undefined;
+  let storedSubmissionMode: SubmissionMode | undefined;
   if (existingId) {
     const existing = await getDoc(doc(db, "hackathons", existingId));
     if (existing.exists()) {
@@ -310,7 +311,7 @@ export async function publishHostEventPublicly(
         }
       }
       if (isSubmissionMode(previous.submissionMode)) {
-        submissionMode = previous.submissionMode;
+        storedSubmissionMode = previous.submissionMode;
       }
     }
   }
@@ -376,10 +377,13 @@ export async function publishHostEventPublicly(
     fontPreset: getEventFontPreset(hostEvent.fontPreset),
     layoutStyle: getEventLayoutStyle(hostEvent.layoutStyle),
     tagline: hostEvent.tagline.trim(),
-    ...(submissionMode ? { submissionMode } : {}),
+    ...(storedSubmissionMode ? { submissionMode: storedSubmissionMode } : {}),
   };
 
-  await setDoc(doc(db, "hackathons", id), event, { merge: Boolean(existingId) });
+  // Never write submissionMode here. Pause / close is a manual host/admin action and
+  // must survive save, republish, and go-live.
+  const { submissionMode: _omitSubmissionMode, ...listingFields } = event;
+  await setDoc(doc(db, "hackathons", id), listingFields, { merge: Boolean(existingId) });
   await setDoc(
     doc(db, "hackathon_criteria", id),
     { criteria: normalizeCriteria(DEFAULT_HOST_CRITERIA), updated_at: now },
@@ -933,6 +937,40 @@ export async function setHackathonSubmissionMode(
 ): Promise<void> {
   await ensurePortalCatalogHackathon(db, id);
   await setDoc(doc(db, "hackathons", id), { submissionMode }, { merge: true });
+}
+
+/** Live Firestore gate. Host pause/close must stop writes even if the catalog is stale. */
+export async function assertSubmissionsWritable(
+  db: Firestore,
+  hackathonId: string,
+): Promise<void> {
+  let snapshot;
+  try {
+    snapshot = await getDoc(doc(db, "hackathons", hackathonId));
+  } catch (error: unknown) {
+    const code =
+      typeof error === "object" && error && "code" in error
+        ? String((error as { code?: string }).code)
+        : "";
+    if (code.includes("permission")) {
+      throw new Error("Submissions are locked for this hackathon.");
+    }
+    throw error;
+  }
+  if (!snapshot.exists()) return;
+  const data = snapshot.data() as Record<string, unknown>;
+  const status: HackathonStatus =
+    data.status === "active" || data.status === "past" || data.status === "upcoming"
+      ? data.status
+      : "upcoming";
+  const mode = getHackathonSubmissionMode({
+    status,
+    submissionMode: isSubmissionMode(data.submissionMode) ? data.submissionMode : undefined,
+  });
+  if (mode === "open") return;
+  throw new Error(
+    getSubmissionLockCopy(mode) ?? "Submissions are locked for this hackathon.",
+  );
 }
 
 /** Live updates for a single listing (participant lock banners, host/admin gates). */
