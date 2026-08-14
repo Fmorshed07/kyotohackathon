@@ -55,17 +55,20 @@ const asList = (value: unknown): string[] =>
 const asDisplay = (value: unknown, fallback = "—") =>
   typeof value === "string" && value.trim() ? value : fallback;
 
-const FitBar = ({ value, label }: { value: number; label: string }) => (
+const FitBar = ({ value, label }: { value: number; label: string }) => {
+  const safe = Number.isFinite(value) ? value : 0;
+  return (
   <div>
     <div className="flex items-baseline justify-between gap-2">
       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="font-mono text-xs text-primary">{value}</p>
+      <p className="font-mono text-xs text-primary">{safe}</p>
     </div>
     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-      <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+      <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, safe))}%` }} />
     </div>
   </div>
-);
+  );
+};
 
 export function ProjectScreeningWorkspace({
   hackathon,

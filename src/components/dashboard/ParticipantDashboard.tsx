@@ -34,6 +34,7 @@ import { getPeopleProfileCompleteness } from "@/components/dashboard/PeopleProfi
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
 import { ProjectPublicLinks } from "@/components/projects/ProjectPublicLinks";
 import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
+import { useProjectShareCounts } from "@/hooks/useProjectShareCounts";
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import { listPublicProjectLinks } from "@/lib/projectSocial";
 import { buildTeamRoster } from "@/lib/teamRoster";
@@ -200,6 +201,7 @@ export function ParticipantDashboard({
   memberProfiles = {},
 }: ParticipantDashboardProps) {
   const [submissionSearchQuery, setSubmissionSearchQuery] = useState("");
+  const { recordShare } = useProjectShareCounts();
   const submissionMode = getHackathonSubmissionMode(selectedHackathon);
   const lockCopy = isReadOnly ? getSubmissionLockCopy(submissionMode) : null;
   const normalizedPdfUrl = ensureAbsoluteUrl(participantForm.submissionPdfUrl);
@@ -863,6 +865,7 @@ export function ParticipantDashboard({
               projectId={activeSubmissionId}
               title={participantForm.title || "Hackathon project"}
               teamName={participantForm.teamName}
+              onShare={() => recordShare(activeSubmissionId)}
             />
           </div>
         ) : null}

@@ -19,10 +19,12 @@ export function ProjectShareMenu({
   projectId,
   title,
   teamName,
+  onShare,
 }: {
   projectId: string;
   title: string;
   teamName?: string | null;
+  onShare?: () => void | Promise<void>;
 }) {
   const [copied, setCopied] = useState(false);
   const url = buildProjectPermalink(projectId);
@@ -30,11 +32,13 @@ export function ProjectShareMenu({
   const text = buildProjectShareText({ title: shareTitle, teamName });
   const targets = buildSocialShareTargets({ url, title: shareTitle, text });
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const recordShare = () => void onShare?.();
 
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      recordShare();
       toast.success("Link copied — share it with friends");
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -45,6 +49,7 @@ export function ProjectShareMenu({
   const nativeShare = async () => {
     try {
       await navigator.share({ title: shareTitle, text, url });
+      recordShare();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       await copyLink();
@@ -70,7 +75,7 @@ export function ProjectShareMenu({
         <DropdownMenuSeparator />
         {targets.map((target) => (
           <DropdownMenuItem key={target.id} asChild>
-            <a href={target.href} target="_blank" rel="noreferrer">
+            <a href={target.href} target="_blank" rel="noreferrer" onClick={recordShare}>
               {target.label}
             </a>
           </DropdownMenuItem>

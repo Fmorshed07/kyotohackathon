@@ -14,11 +14,13 @@ import {
 } from "lucide-react";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { ProjectPublicLinks } from "@/components/projects/ProjectPublicLinks";
+import { ProjectEngagementStats } from "@/components/projects/ProjectEngagementStats";
 import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
 import { ProjectStarRating } from "@/components/projects/ProjectStarRating";
 import { ProjectStarEmailDialog } from "@/components/projects/ProjectStarEmailDialog";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useProjectCommunityStars } from "@/hooks/useProjectCommunityStars";
+import { useProjectShareCounts } from "@/hooks/useProjectShareCounts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { listPublicProjectLinks, toPublicGallerySubmission } from "@/lib/projectSocial";
 import {
@@ -77,17 +79,23 @@ function ProjectCard({
   hackathon,
   highlighted = false,
   starFill,
+  starCount,
+  shareCount,
   myRating,
   ratingDisabled,
   onRate,
+  onShare,
 }: {
   submission: Submission;
   hackathon: PortalHackathon;
   highlighted?: boolean;
   starFill: number;
+  starCount: number;
+  shareCount: number;
   myRating: number;
   ratingDisabled: boolean;
   onRate: (stars: number) => void;
+  onShare: () => void | Promise<void>;
 }) {
   const builders = countTeamBuilders(submission);
   const memberLabel = formatTeamMemberNames(submission).split("\n").filter(Boolean).join(" · ");
@@ -178,8 +186,11 @@ function ProjectCard({
             )}
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <ProjectStarRating fill={starFill} myRating={myRating} disabled={ratingDisabled} onRate={onRate} />
-            {isPublic ? <ProjectShareMenu projectId={submission.id} title={title} teamName={team} /> : null}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <ProjectStarRating fill={starFill} myRating={myRating} disabled={ratingDisabled} onRate={onRate} />
+              <ProjectEngagementStats starCount={starCount} shareCount={shareCount} />
+            </div>
+            {isPublic ? <ProjectShareMenu projectId={submission.id} title={title} teamName={team} onShare={onShare} /> : null}
           </div>
         </div>
       </div>
@@ -200,7 +211,8 @@ export default function HackathonBoardsPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { sessionUser, loading: authLoading } = usePortalAuth();
-  const { myRatingById, pendingId, emailPrompt, communityFill, rate, submitStarEmail, cancelStarEmail } = useProjectCommunityStars();
+  const { statsById, myRatingById, pendingId, emailPrompt, communityFill, rate, submitStarEmail, cancelStarEmail } = useProjectCommunityStars();
+  const { shareCount, recordShare } = useProjectShareCounts();
   const db = getFirestoreDb();
 
   const requestedHackathonId: HackathonId | null =
@@ -708,9 +720,12 @@ export default function HackathonBoardsPage() {
                   hackathon={selectedHackathon}
                   highlighted={submission.id === highlightedSubmissionId}
                   starFill={communityFill(submission.id)}
+                  starCount={statsById[submission.id]?.count ?? 0}
+                  shareCount={shareCount(submission.id)}
                   myRating={myRatingById[submission.id] ?? 0}
                   ratingDisabled={pendingId === submission.id || (myRatingById[submission.id] ?? 0) > 0}
                   onRate={(stars) => void rate(submission.id, stars)}
+                  onShare={() => recordShare(submission.id)}
                 />
               ))}
             </div>

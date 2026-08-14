@@ -50,6 +50,7 @@ import { type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole"
 import { AiHackathonLauncher } from "@/components/dashboard/AiHackathonLauncher";
 import { ManualHackathonLauncher } from "@/components/dashboard/ManualHackathonLauncher";
 import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
+import { AdminTeamsPanel } from "@/components/dashboard/AdminTeamsPanel";
 import { AdminNewsletterPanel } from "@/components/dashboard/AdminNewsletterPanel";
 import type { NewsletterSubscriber } from "@/lib/hackathonSubscribe";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";

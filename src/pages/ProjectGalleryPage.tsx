@@ -22,6 +22,7 @@ import {
 import AnimatedBackground from "@/components/AnimatedBackground";
 import SiteHeader from "@/components/SiteHeader";
 import { ProjectPublicLinks } from "@/components/projects/ProjectPublicLinks";
+import { ProjectEngagementStats } from "@/components/projects/ProjectEngagementStats";
 import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
 import { ProjectStarRating } from "@/components/projects/ProjectStarRating";
 import { ProjectStarEmailDialog } from "@/components/projects/ProjectStarEmailDialog";
@@ -38,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useProjectCommunityStars } from "@/hooks/useProjectCommunityStars";
+import { useProjectShareCounts } from "@/hooks/useProjectShareCounts";
 import type { Submission } from "@/types/portal";
 import { countTeamBuilders, formatTeamMemberNames } from "@/lib/teamRoster";
 import {
@@ -136,18 +138,24 @@ function ProjectCard({
   submission,
   event,
   starFill,
+  starCount,
+  shareCount,
   myRating,
   ratingDisabled,
   onPreview,
   onRate,
+  onShare,
 }: {
   submission: Submission;
   event: GalleryEvent;
   starFill: number;
+  starCount: number;
+  shareCount: number;
   myRating: number;
   ratingDisabled: boolean;
   onPreview: (submission: Submission, kind?: AssetKind) => void;
   onRate: (stars: number) => void;
+  onShare: () => void | Promise<void>;
 }) {
   const links = listPublicProjectLinks(submission);
   const title = submission.title?.trim() || "Untitled project";
@@ -184,8 +192,11 @@ function ProjectCard({
           </p>
         ) : null}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <ProjectStarRating fill={starFill} myRating={myRating} disabled={ratingDisabled} onRate={onRate} />
-          <ProjectShareMenu projectId={submission.id} title={title} teamName={team} />
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <ProjectStarRating fill={starFill} myRating={myRating} disabled={ratingDisabled} onRate={onRate} />
+            <ProjectEngagementStats starCount={starCount} shareCount={shareCount} />
+          </div>
+          <ProjectShareMenu projectId={submission.id} title={title} teamName={team} onShare={onShare} />
         </div>
         <ProjectPublicLinks links={links} className="mt-3" />
         <div className="mt-4">
@@ -203,6 +214,7 @@ export default function ProjectGalleryPage() {
   const navigate = useNavigate();
   const db = getFirestoreDb();
   const { statsById, myRatingById, pendingId, emailPrompt, communityFill, rate, submitStarEmail, cancelStarEmail } = useProjectCommunityStars();
+  const { shareCount, recordShare } = useProjectShareCounts();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [hostedEvents, setHostedEvents] = useState<HostedHackathon[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -376,10 +388,13 @@ export default function ProjectGalleryPage() {
                     submission={submission}
                     event={getEvent(submission, eventById)}
                     starFill={communityFill(submission.id)}
+                    starCount={statsById[submission.id]?.count ?? 0}
+                    shareCount={shareCount(submission.id)}
                     myRating={myRatingById[submission.id] ?? 0}
                     ratingDisabled={pendingId === submission.id || (myRatingById[submission.id] ?? 0) > 0}
                     onPreview={openPreview}
                     onRate={(stars) => void rate(submission.id, stars)}
+                    onShare={() => recordShare(submission.id)}
                   />
                 ))}
               </div>
@@ -401,13 +416,24 @@ export default function ProjectGalleryPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <ProjectStarRating
-                  fill={communityFill(previewSubmission.id)}
-                  myRating={myRatingById[previewSubmission.id] ?? 0}
-                  disabled={pendingId === previewSubmission.id || (myRatingById[previewSubmission.id] ?? 0) > 0}
-                  onRate={(stars) => void rate(previewSubmission.id, stars)}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <ProjectStarRating
+                    fill={communityFill(previewSubmission.id)}
+                    myRating={myRatingById[previewSubmission.id] ?? 0}
+                    disabled={pendingId === previewSubmission.id || (myRatingById[previewSubmission.id] ?? 0) > 0}
+                    onRate={(stars) => void rate(previewSubmission.id, stars)}
+                  />
+                  <ProjectEngagementStats
+                    starCount={statsById[previewSubmission.id]?.count ?? 0}
+                    shareCount={shareCount(previewSubmission.id)}
+                  />
+                </div>
+                <ProjectShareMenu
+                  projectId={previewSubmission.id}
+                  title={previewTitle}
+                  teamName={previewTeam}
+                  onShare={() => recordShare(previewSubmission.id)}
                 />
-                <ProjectShareMenu projectId={previewSubmission.id} title={previewTitle} teamName={previewTeam} />
               </div>
               <ProjectPublicLinks links={previewLinks} className="mt-3" />
               <div className="mt-5 flex flex-wrap gap-2">
