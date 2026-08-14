@@ -32,7 +32,10 @@ import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector
 import { GalleryUploadField, ImageUploadField } from "@/components/dashboard/ImageUploadField";
 import { getPeopleProfileCompleteness } from "@/components/dashboard/PeopleProfileSection";
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
+import { ProjectPublicLinks } from "@/components/projects/ProjectPublicLinks";
+import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
+import { listPublicProjectLinks } from "@/lib/projectSocial";
 import { buildTeamRoster } from "@/lib/teamRoster";
 import { formatSubmissionDateTime } from "@/lib/datetime";
 import {
@@ -841,9 +844,28 @@ export function ParticipantDashboard({
           />
           <span>
             <span className="block text-sm font-semibold text-foreground">Show this project on hackathon boards and the public Projects & demos gallery</span>
-            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">Only opt-in projects are visible on boards and the public gallery. You can remove permission at any time by saving this form again.</span>
+            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">Friends can star it and share the gallery link. You can remove permission at any time by saving this form again.</span>
           </span>
         </label>
+        {participantForm.allowPublicPreview && activeSubmissionId ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/15 px-4 py-3">
+            <div className="min-w-0 space-y-2">
+              <p className="text-sm font-semibold text-foreground">Share with friends</p>
+              <ProjectPublicLinks
+                links={listPublicProjectLinks({
+                  demo_video_url: participantForm.demoVideoUrl,
+                  project_url: participantForm.projectUrl,
+                  submission_pdf_url: participantForm.submissionPdfUrl,
+                })}
+              />
+            </div>
+            <ProjectShareMenu
+              projectId={activeSubmissionId}
+              title={participantForm.title || "Hackathon project"}
+              teamName={participantForm.teamName}
+            />
+          </div>
+        ) : null}
       </section>
 
       {/* Save submission */}

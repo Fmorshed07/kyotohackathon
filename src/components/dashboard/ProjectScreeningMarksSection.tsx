@@ -109,7 +109,7 @@ export function ProjectScreeningMarksSection({
       <div className="space-y-6 p-4 sm:p-6">
         <ChartContainer
           config={chartConfig}
-          className="aspect-auto w-full"
+          className="aspect-auto w-full min-h-[280px]"
           style={{ height: chartHeight }}
         >
           <BarChart

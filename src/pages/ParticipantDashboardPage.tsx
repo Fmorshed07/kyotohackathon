@@ -697,7 +697,7 @@ export default function ParticipantDashboardPage() {
         created_at: payload.created_at,
         updated_at: payload.updated_at,
         public_preview_consent: true,
-      });
+      }, { merge: true });
     } else {
       await deleteDoc(publicProjectRef).catch(() => undefined);
     }

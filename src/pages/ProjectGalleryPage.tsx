@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import {
   ArrowUpRight,
-  ExternalLink,
-  FileText,
   FolderKanban,
   LayoutGrid,
   Play,
@@ -18,11 +17,13 @@ import {
   getHackathonById,
   getSubmissionHackathonId,
   PORTAL_HACKATHONS,
-  type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import SiteHeader from "@/components/SiteHeader";
+import { ProjectPublicLinks } from "@/components/projects/ProjectPublicLinks";
+import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
+import { ProjectStarRating } from "@/components/projects/ProjectStarRating";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -34,31 +35,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useProjectCommunityStars } from "@/hooks/useProjectCommunityStars";
 import type { Submission } from "@/types/portal";
 import { countTeamBuilders, formatTeamMemberNames } from "@/lib/teamRoster";
+import {
+  listPublicProjectLinks,
+  normalizeHttpUrl,
+  toPublicGallerySubmission,
+  youtubeVideoId,
+} from "@/lib/projectSocial";
+import { compareStarStats, EMPTY_STAR_STATS } from "@/lib/projectStars";
 import { cn } from "@/lib/utils";
 import { formatSubmissionDateTime } from "@/lib/datetime";
 
 type AssetKind = "demo" | "project" | "document";
 type AssetFilter = "all" | AssetKind;
+type GallerySort = "newest" | "title" | "assets" | "stars";
 type GalleryEvent = PortalHackathon | HostedHackathon;
-
-const isExternalUrl = (value: string | null | undefined) => {
-  if (!value?.trim()) return "";
-  const candidate = value.trim().match(/^https?:\/\//i) ? value.trim() : `https://${value.trim()}`;
-  try {
-    const url = new URL(candidate);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
-  } catch {
-    return "";
-  }
-};
 
 const getGoogleDriveFileId = (url: string) =>
   url.match(/drive\.google\.com\/file\/d\/([^/]+)/i)?.[1] ?? url.match(/[?&]id=([^&]+)/i)?.[1] ?? null;
 
 const documentPreviewUrl = (url: string) => {
-  const normalized = isExternalUrl(url);
+  const normalized = normalizeHttpUrl(url);
   const fileId = getGoogleDriveFileId(normalized);
   if (fileId) return `https://drive.google.com/file/d/${fileId}/preview`;
   if (/dropbox\.com/i.test(normalized)) {
@@ -67,29 +66,18 @@ const documentPreviewUrl = (url: string) => {
   return normalized;
 };
 
-const youtubeVideoId = (url: string | null | undefined) => {
-  const normalized = isExternalUrl(url);
-  if (!normalized) return null;
-  return normalized.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{6,})/i)?.[1] ?? null;
-};
-
 const getPreviewUrl = (submission: Submission, kind: AssetKind) => {
   if (kind === "demo") {
-    const url = isExternalUrl(submission.demo_video_url);
+    const url = normalizeHttpUrl(submission.demo_video_url);
     const videoId = youtubeVideoId(url);
     return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : url;
   }
   if (kind === "document") return documentPreviewUrl(submission.submission_pdf_url ?? "");
-  return isExternalUrl(submission.project_url);
+  return normalizeHttpUrl(submission.project_url);
 };
 
-const getAssetKinds = (submission: Submission): AssetKind[] => {
-  const kinds: AssetKind[] = [];
-  if (isExternalUrl(submission.demo_video_url)) kinds.push("demo");
-  if (isExternalUrl(submission.project_url)) kinds.push("project");
-  if (isExternalUrl(submission.submission_pdf_url)) kinds.push("document");
-  return kinds;
-};
+const getAssetKinds = (submission: Submission): AssetKind[] =>
+  listPublicProjectLinks(submission).map((link) => link.id);
 
 const getBuilderCount = (submission: Submission) => countTeamBuilders(submission);
 
@@ -107,15 +95,23 @@ const initialFor = (value: string) => value.trim().slice(0, 2).toUpperCase() || 
 
 function ProjectVisual({ submission }: { submission: Submission }) {
   const videoId = youtubeVideoId(submission.demo_video_url);
-  const projectImage = isExternalUrl(submission.cover_url) || isExternalUrl(submission.gallery_urls?.[0]);
+  const projectImage = normalizeHttpUrl(submission.cover_url) || normalizeHttpUrl(submission.gallery_urls?.[0]);
   const projectTitle = submission.title?.trim() || "Untitled project";
-  const hasDemo = Boolean(videoId || isExternalUrl(submission.demo_video_url));
+  const hasDemo = Boolean(videoId || normalizeHttpUrl(submission.demo_video_url));
 
   return (
     <div className="relative aspect-[16/10] overflow-hidden bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.45),transparent_42%),linear-gradient(135deg,hsl(225_34%_12%),hsl(215_40%_6%))]">
-      {videoId ? <img src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" loading="lazy" /> : projectImage ? <img src={projectImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" loading="lazy" /> : null}
+      {videoId ? (
+        <img src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" loading="lazy" />
+      ) : projectImage ? (
+        <img src={projectImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" loading="lazy" />
+      ) : null}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
-      {!videoId && !projectImage ? <span className="absolute right-5 top-4 font-display text-6xl font-semibold tracking-tighter text-white/10">{initialFor(projectTitle)}</span> : null}
+      {!videoId && !projectImage ? (
+        <span className="absolute right-5 top-4 font-display text-6xl font-semibold tracking-tighter text-white/10">
+          {initialFor(projectTitle)}
+        </span>
+      ) : null}
       <div className="absolute left-3 top-3 flex items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-md bg-black/70 px-2.5 py-1 font-body text-[11px] font-semibold text-white backdrop-blur">
           {hasDemo ? <Play className="h-3 w-3 fill-current" /> : <FolderKanban className="h-3 w-3" />}
@@ -124,7 +120,11 @@ function ProjectVisual({ submission }: { submission: Submission }) {
       </div>
       <div className="absolute inset-x-4 bottom-4 flex items-end justify-between gap-3">
         <p className="line-clamp-2 max-w-[75%] font-display text-lg font-semibold tracking-tight text-white">{projectTitle}</p>
-        {hasDemo ? <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/15 text-white backdrop-blur"><Play className="ml-0.5 h-4 w-4 fill-current" /></span> : null}
+        {hasDemo ? (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/15 text-white backdrop-blur">
+            <Play className="ml-0.5 h-4 w-4 fill-current" />
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -133,13 +133,21 @@ function ProjectVisual({ submission }: { submission: Submission }) {
 function ProjectCard({
   submission,
   event,
+  starFill,
+  myRating,
+  ratingDisabled,
   onPreview,
+  onRate,
 }: {
   submission: Submission;
   event: GalleryEvent;
+  starFill: number;
+  myRating: number;
+  ratingDisabled: boolean;
   onPreview: (submission: Submission, kind?: AssetKind) => void;
+  onRate: (stars: number) => void;
 }) {
-  const assetKinds = getAssetKinds(submission);
+  const links = listPublicProjectLinks(submission);
   const title = submission.title?.trim() || "Untitled project";
   const team = submission.team_name?.trim() || "Solo builder";
   const builders = getBuilderCount(submission);
@@ -150,12 +158,21 @@ function ProjectCard({
       <div className="p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="border-primary/30 bg-primary/5 text-[10px] text-primary">{event.shortName}</Badge>
-          {assetKinds.map((kind) => <span key={kind} className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium capitalize text-muted-foreground">{kind}</span>)}
+          {links.map((link) => (
+            <span key={link.id} className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {link.label}
+            </span>
+          ))}
         </div>
         <h2 className="mt-3 truncate font-display text-lg font-semibold tracking-tight text-foreground">{title}</h2>
-        <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground">{submission.short_description?.trim() || event.theme}</p>
+        <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground">
+          {submission.short_description?.trim() || event.theme}
+        </p>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-          <span className="inline-flex min-w-0 items-center gap-1.5"><Users className="h-3.5 w-3.5 text-primary" />{builders} {builders === 1 ? "Builder" : "Builders"}</span>
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 text-primary" />
+            {builders} {builders === 1 ? "Builder" : "Builders"}
+          </span>
           <span className="truncate">{team}</span>
         </div>
         {formatSubmissionDateTime(submission.created_at) ? (
@@ -164,11 +181,15 @@ function ProjectCard({
             {formatSubmissionDateTime(submission.created_at)}
           </p>
         ) : null}
-        <div className="mt-4 flex items-center gap-2">
-          <Button size="sm" className="flex-1 gap-1.5" onClick={() => onPreview(submission)} disabled={assetKinds.length === 0}>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <ProjectStarRating fill={starFill} myRating={myRating} disabled={ratingDisabled} onRate={onRate} />
+          <ProjectShareMenu projectId={submission.id} title={title} teamName={team} />
+        </div>
+        <ProjectPublicLinks links={links} className="mt-3" />
+        <div className="mt-4">
+          <Button size="sm" className="w-full gap-1.5" onClick={() => onPreview(submission)} disabled={links.length === 0}>
             <Play className="h-3.5 w-3.5" /> Preview
           </Button>
-          {isExternalUrl(submission.project_url) ? <Button asChild size="sm" variant="outline" className="px-3"><a href={isExternalUrl(submission.project_url)} target="_blank" rel="noreferrer" aria-label={`Open ${title}`}><ExternalLink className="h-3.5 w-3.5" /></a></Button> : null}
         </div>
       </div>
     </article>
@@ -176,7 +197,10 @@ function ProjectCard({
 }
 
 export default function ProjectGalleryPage() {
+  const { projectId: projectIdParam } = useParams();
+  const navigate = useNavigate();
   const db = getFirestoreDb();
+  const { statsById, myRatingById, pendingId, communityFill, rate } = useProjectCommunityStars();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [hostedEvents, setHostedEvents] = useState<HostedHackathon[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,7 +208,7 @@ export default function ProjectGalleryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [eventFilter, setEventFilter] = useState("all");
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
-  const [sortMode, setSortMode] = useState<"newest" | "title" | "assets">("newest");
+  const [sortMode, setSortMode] = useState<GallerySort>("newest");
   const [previewSubmission, setPreviewSubmission] = useState<Submission | null>(null);
   const [previewKind, setPreviewKind] = useState<AssetKind>("demo");
 
@@ -200,9 +224,8 @@ export default function ProjectGalleryPage() {
         if (!isCurrent) return;
         setSubmissions(
           snapshot.docs
-            .map((item) => ({ id: item.id, ...(item.data() as Omit<Submission, "id">) }) as Submission)
-            // Only opted-in public copies. Explicit false is excluded; missing flag is legacy opt-in.
-            .filter((item) => item.public_preview_consent !== false),
+            .map((item) => toPublicGallerySubmission(item.id, item.data() as Record<string, unknown>))
+            .filter((item): item is Submission => item != null),
         );
         setHostedEvents(events);
       })
@@ -238,19 +261,47 @@ export default function ProjectGalleryPage() {
       .sort((left, right) => {
         if (sortMode === "title") return (left.title ?? "").localeCompare(right.title ?? "");
         if (sortMode === "assets") return getAssetKinds(right).length - getAssetKinds(left).length || getSubmittedAt(right) - getSubmittedAt(left);
+        if (sortMode === "stars") {
+          return compareStarStats(
+            statsById[left.id] ?? EMPTY_STAR_STATS,
+            statsById[right.id] ?? EMPTY_STAR_STATS,
+          ) || getSubmittedAt(right) - getSubmittedAt(left);
+        }
         return getSubmittedAt(right) - getSubmittedAt(left);
       });
-  }, [assetFilter, eventById, eventFilter, searchQuery, sortMode, submissions]);
+  }, [assetFilter, eventById, eventFilter, searchQuery, sortMode, statsById, submissions]);
 
   const openPreview = (submission: Submission, kind?: AssetKind) => {
     const available = getAssetKinds(submission);
     if (available.length === 0) return;
     setPreviewSubmission(submission);
     setPreviewKind(kind && available.includes(kind) ? kind : available[0]);
+    if (projectIdParam !== submission.id) {
+      navigate(`/projects/${submission.id}`);
+    }
+  };
+
+  useEffect(() => {
+    if (!projectIdParam || isLoading) return;
+    const match = submissions.find((submission) => submission.id === projectIdParam);
+    if (match) {
+      const available = getAssetKinds(match);
+      if (available.length === 0) return;
+      setPreviewSubmission(match);
+      setPreviewKind((current) => (available.includes(current) ? current : available[0]));
+    }
+  }, [isLoading, projectIdParam, submissions]);
+
+  const closePreview = () => {
+    setPreviewSubmission(null);
+    if (projectIdParam) navigate("/projects", { replace: true });
   };
 
   const activePreviewUrl = previewSubmission ? getPreviewUrl(previewSubmission, previewKind) : "";
   const previewAssets = previewSubmission ? getAssetKinds(previewSubmission) : [];
+  const previewLinks = previewSubmission ? listPublicProjectLinks(previewSubmission) : [];
+  const previewTitle = previewSubmission?.title?.trim() || "Untitled project";
+  const previewTeam = previewSubmission?.team_name?.trim() || "Solo builder";
 
   return (
     <div className="relative min-h-svh bg-background text-foreground">
@@ -264,7 +315,9 @@ export default function ProjectGalleryPage() {
             <div className="max-w-2xl">
               <p className="dash-eyebrow">Public hackathon showcase</p>
               <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Projects & demos</h1>
-              <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">Explore the projects participants chose to share publicly. Preview demos or documents in place, then open the original project when you want to explore further.</p>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                Explore projects participants chose to share. Star the ones you like, send a link to friends, and open the live demo, repo, or document.
+              </p>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/15 px-4 py-3 backdrop-blur">
               <Sparkles className="h-5 w-5 text-primary" />
@@ -293,19 +346,94 @@ export default function ProjectGalleryPage() {
           <main className="min-w-0">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative w-full sm:max-w-xl"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search projects, teams, members, or themes" className="h-11 pl-9" /></div>
-              <Select value={sortMode} onValueChange={(value: "newest" | "title" | "assets") => setSortMode(value)}><SelectTrigger className="h-11 w-full sm:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="newest">Newest</SelectItem><SelectItem value="assets">Most complete</SelectItem><SelectItem value="title">A–Z</SelectItem></SelectContent></Select>
+              <Select value={sortMode} onValueChange={(value: GallerySort) => setSortMode(value)}>
+                <SelectTrigger className="h-11 w-full sm:w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  <SelectItem value="stars">Most starred</SelectItem>
+                  <SelectItem value="assets">Most complete</SelectItem>
+                  <SelectItem value="title">A–Z</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="mt-4 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{filteredSubmissions.length} of {submissions.length} projects</p><span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><LayoutGrid className="h-3.5 w-3.5" />Gallery view</span></div>
 
-            {isLoading ? <div className="mt-5 rounded-2xl border border-white/10 bg-card/50 px-5 py-20 text-center text-sm text-muted-foreground">Loading submitted projects...</div> : loadError ? <div className="mt-5 rounded-2xl border border-destructive/30 bg-destructive/10 px-5 py-20 text-center text-sm text-destructive">{loadError}</div> : filteredSubmissions.length === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-card/40 px-5 py-20 text-center"><FolderKanban className="mx-auto h-9 w-9 text-muted-foreground/60" /><h2 className="mt-4 font-display text-xl font-semibold text-foreground">No matching projects yet</h2><p className="mt-2 text-sm text-muted-foreground">Only projects participants chose to share appear here. Try a different search or filter.</p></div> : <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">{filteredSubmissions.map((submission) => <ProjectCard key={submission.id} submission={submission} event={getEvent(submission, eventById)} onPreview={openPreview} />)}</div>}
+            {isLoading ? <div className="mt-5 rounded-2xl border border-white/10 bg-card/50 px-5 py-20 text-center text-sm text-muted-foreground">Loading submitted projects...</div> : loadError ? <div className="mt-5 rounded-2xl border border-destructive/30 bg-destructive/10 px-5 py-20 text-center text-sm text-destructive">{loadError}</div> : filteredSubmissions.length === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-card/40 px-5 py-20 text-center"><FolderKanban className="mx-auto h-9 w-9 text-muted-foreground/60" /><h2 className="mt-4 font-display text-xl font-semibold text-foreground">No matching projects yet</h2><p className="mt-2 text-sm text-muted-foreground">Only projects participants chose to share appear here. Try a different search or filter.</p></div> : (
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+                {filteredSubmissions.map((submission) => (
+                  <ProjectCard
+                    key={submission.id}
+                    submission={submission}
+                    event={getEvent(submission, eventById)}
+                    starFill={communityFill(submission.id)}
+                    myRating={myRatingById[submission.id] ?? 0}
+                    ratingDisabled={pendingId === submission.id}
+                    onPreview={openPreview}
+                    onRate={(stars) => void rate(submission.id, stars)}
+                  />
+                ))}
+              </div>
+            )}
           </main>
         </section>
         </div>
       </main>
 
-      <Dialog open={Boolean(previewSubmission)} onOpenChange={(open) => { if (!open) setPreviewSubmission(null); }}>
+      <Dialog open={Boolean(previewSubmission)} onOpenChange={(open) => { if (!open) closePreview(); }}>
         <DialogContent className="max-h-[92svh] max-w-5xl overflow-y-auto border-white/10 bg-background p-0">
-          {previewSubmission ? <div className="p-5 sm:p-7"><DialogHeader><p className="dash-eyebrow">Project preview</p><DialogTitle className="pr-8 font-display text-2xl text-foreground">{previewSubmission.title?.trim() || "Untitled project"}</DialogTitle><DialogDescription className="max-w-3xl leading-relaxed">{previewSubmission.short_description?.trim() || "Open the submitted asset below."}</DialogDescription></DialogHeader><div className="mt-5 flex flex-wrap gap-2">{previewAssets.map((kind) => <button key={kind} type="button" onClick={() => setPreviewKind(kind)} className={cn("rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition-colors", previewKind === kind ? "border-primary/45 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:text-foreground")}>{kind === "document" ? "PDF / document" : kind}</button>)}</div><div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-black"><iframe title={`${previewSubmission.title ?? "Project"} ${previewKind} preview`} src={activePreviewUrl} className="h-[min(60svh,620px)] w-full bg-black" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /></div><div className="mt-4 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-muted-foreground">If a provider blocks embedded previews, open it in a new tab.</p><Button asChild variant="outline" size="sm" className="gap-1.5"><a href={activePreviewUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight className="h-3.5 w-3.5" /></a></Button></div></div> : null}
+          {previewSubmission ? (
+            <div className="p-5 sm:p-7">
+              <DialogHeader>
+                <p className="dash-eyebrow">Project preview</p>
+                <DialogTitle className="pr-8 font-display text-2xl text-foreground">{previewTitle}</DialogTitle>
+                <DialogDescription className="max-w-3xl leading-relaxed">
+                  {previewSubmission.short_description?.trim() || "Open the submitted asset below."}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <ProjectStarRating
+                  fill={communityFill(previewSubmission.id)}
+                  myRating={myRatingById[previewSubmission.id] ?? 0}
+                  disabled={pendingId === previewSubmission.id}
+                  onRate={(stars) => void rate(previewSubmission.id, stars)}
+                />
+                <ProjectShareMenu projectId={previewSubmission.id} title={previewTitle} teamName={previewTeam} />
+              </div>
+              <ProjectPublicLinks links={previewLinks} className="mt-3" />
+              <div className="mt-5 flex flex-wrap gap-2">
+                {previewAssets.map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => setPreviewKind(kind)}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition-colors",
+                      previewKind === kind ? "border-primary/45 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {kind === "document" ? "PDF / document" : kind}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-black">
+                <iframe
+                  title={`${previewTitle} ${previewKind} preview`}
+                  src={activePreviewUrl}
+                  className="h-[min(60svh,620px)] w-full bg-black"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">If a provider blocks embedded previews, open it in a new tab.</p>
+                {activePreviewUrl ? (
+                  <Button asChild variant="outline" size="sm" className="gap-1.5">
+                    <a href={activePreviewUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight className="h-3.5 w-3.5" /></a>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

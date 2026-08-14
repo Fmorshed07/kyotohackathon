@@ -164,6 +164,7 @@ const App = () => (
           <Route path="/boards" element={<ProtectedRoute><HackathonBoardsPage /></ProtectedRoute>} />
           <Route path="/boards/:hackathonId" element={<ProtectedRoute><HackathonBoardsPage /></ProtectedRoute>} />
           <Route path="/projects" element={<ProjectGalleryPage />} />
+          <Route path="/projects/:projectId" element={<ProjectGalleryPage />} />
           <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/invite/:kind/:token" element={<InviteAcceptPage />} />
           <Route path="*" element={<NotFound />} />

@@ -13,8 +13,13 @@ import {
   Users,
 } from "lucide-react";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { ProjectPublicLinks } from "@/components/projects/ProjectPublicLinks";
+import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
+import { ProjectStarRating } from "@/components/projects/ProjectStarRating";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
+import { useProjectCommunityStars } from "@/hooks/useProjectCommunityStars";
 import { getFirestoreDb } from "@/lib/firebaseClient";
+import { listPublicProjectLinks, toPublicGallerySubmission } from "@/lib/projectSocial";
 import {
   buildParticipantHackathonSummaries,
   collectAccessibleHackathonIds,
@@ -44,23 +49,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 const DISCORD_URL = "https://discord.gg/cQEFjQDFm";
 
-type PublicProjectDoc = Omit<Submission, "id" | "user_id"> & {
-  owner_id?: string | null;
-  user_id?: string | null;
-};
-
-function mapPublicProject(id: string, data: PublicProjectDoc): Submission | null {
-  // Legacy public docs without the flag still count as opt-in (they only exist via consent write).
-  // Explicit false must never appear on boards.
-  if (data.public_preview_consent === false) return null;
-  return {
-    id,
-    ...data,
-    user_id: data.user_id ?? data.owner_id ?? "",
-    public_preview_consent: true,
-  };
-}
-
 const statusStyles: Record<PortalHackathon["status"], string> = {
   active: "border-primary/50 bg-primary/15 text-primary",
   upcoming: "border-white/15 bg-white/5 text-white/60",
@@ -87,10 +75,18 @@ function ProjectCard({
   submission,
   hackathon,
   highlighted = false,
+  starFill,
+  myRating,
+  ratingDisabled,
+  onRate,
 }: {
   submission: Submission;
   hackathon: PortalHackathon;
   highlighted?: boolean;
+  starFill: number;
+  myRating: number;
+  ratingDisabled: boolean;
+  onRate: (stars: number) => void;
 }) {
   const builders = countTeamBuilders(submission);
   const memberLabel = formatTeamMemberNames(submission).split("\n").filter(Boolean).join(" · ");
@@ -98,7 +94,8 @@ function ProjectCard({
   const title = submission.title?.trim() || "Untitled project";
   const team = submission.team_name?.trim() || "Solo builder";
   const initial = (team[0] ?? "P").toUpperCase();
-  const projectUrl = submission.project_url?.trim();
+  const links = listPublicProjectLinks(submission);
+  const isPublic = submission.public_preview_consent !== false;
 
   return (
     <article
@@ -173,19 +170,15 @@ function ProjectCard({
                 </span>
               ) : null}
             </p>
-            {projectUrl ? (
-              <a
-                href={projectUrl.startsWith("http") ? projectUrl : `https://${projectUrl}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-primary transition-opacity hover:opacity-80"
-              >
-                Open project
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+            {links.length > 0 ? (
+              <ProjectPublicLinks links={links} />
             ) : (
               <span className="text-xs text-muted-foreground/70">No public link yet</span>
             )}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <ProjectStarRating fill={starFill} myRating={myRating} disabled={ratingDisabled} onRate={onRate} />
+            {isPublic ? <ProjectShareMenu projectId={submission.id} title={title} teamName={team} /> : null}
           </div>
         </div>
       </div>
@@ -206,6 +199,7 @@ export default function HackathonBoardsPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { sessionUser, loading: authLoading } = usePortalAuth();
+  const { myRatingById, pendingId, communityFill, rate } = useProjectCommunityStars();
   const db = getFirestoreDb();
 
   const requestedHackathonId: HackathonId | null =
@@ -262,7 +256,7 @@ export default function HackathonBoardsPage() {
 
       const boardRows = boardSnapshot
         ? boardSnapshot.docs
-            .map((docSnap) => mapPublicProject(docSnap.id, docSnap.data() as PublicProjectDoc))
+            .map((docSnap) => toPublicGallerySubmission(docSnap.id, docSnap.data() as Record<string, unknown>))
             .filter((project): project is Submission => project != null)
             .filter((project) =>
               requestedHackathonId
@@ -712,6 +706,10 @@ export default function HackathonBoardsPage() {
                   submission={submission}
                   hackathon={selectedHackathon}
                   highlighted={submission.id === highlightedSubmissionId}
+                  starFill={communityFill(submission.id)}
+                  myRating={myRatingById[submission.id] ?? 0}
+                  ratingDisabled={pendingId === submission.id}
+                  onRate={(stars) => void rate(submission.id, stars)}
                 />
               ))}
             </div>

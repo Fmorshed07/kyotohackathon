@@ -132,7 +132,7 @@ const PROBLEM_SOLUTION_RE =
 export const tokenizeThemeText = (value: string): string[] => {
   const seen = new Set<string>();
   const tokens: string[] = [];
-  for (const raw of value
+  for (const raw of (value ?? "")
     .toLowerCase()
     .replace(/['’]s\b/g, "")
     .replace(/['’]/g, "")
@@ -151,7 +151,7 @@ const familyHitsBlob = (family: (typeof THEME_FAMILIES)[number], blob: string) =
   family.tokens.some((token) => blobHasToken(blob, token) || blob.includes(token));
 
 export const activeThemeFamilies = (theme: string): string[] => {
-  const themeBlob = theme.toLowerCase();
+  const themeBlob = (theme ?? "").toLowerCase();
   return THEME_FAMILIES.filter((family) => familyHitsBlob(family, themeBlob)).map((family) => family.id);
 };
 
@@ -169,6 +169,7 @@ export const evaluateProjectConcept = (
   },
   theme: string,
 ): ProjectScreeningResult => {
+  theme = theme ?? "";
   const title = concept.title?.trim() ?? "";
   const description = concept.description?.trim() ?? "";
   const support = [concept.interests, concept.bio].filter(hasText).join(" ");

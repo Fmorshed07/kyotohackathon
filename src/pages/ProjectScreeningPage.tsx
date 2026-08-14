@@ -198,6 +198,8 @@ export default function ProjectScreeningPage() {
               Ask an admin to grant you access to a hackathon before screening concepts.
             </p>
           </div>
+        ) : !ops.selectedHackathon ? (
+          <p className="font-body text-sm text-muted-foreground">Select an event to screen concepts.</p>
         ) : (
           <ProjectScreeningWorkspace
             hackathon={ops.selectedHackathon}

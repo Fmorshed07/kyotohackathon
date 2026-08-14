@@ -8,6 +8,7 @@ import {
 import type { PortalHackathon } from "@/lib/hackathons";
 import type { UserProfile } from "@/types/portal";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { ProjectScreeningMarksSection } from "@/components/dashboard/ProjectScreeningMarksSection";
 
 export type ProjectScreeningParticipant = {
@@ -148,7 +149,9 @@ export function ProjectScreeningWorkspace({
 
       <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 sm:px-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary">Event theme</p>
-        <p className="mt-1 font-display text-lg font-semibold tracking-tight text-foreground">{hackathon.theme}</p>
+        <p className="mt-1 font-display text-lg font-semibold tracking-tight text-foreground">
+          {hackathon.theme?.trim() || "Theme not set yet"}
+        </p>
         <p className="mt-1 font-body text-sm text-muted-foreground">
           The agent ranks submitted projects and leftover pitches by how closely they match this brief.
         </p>
