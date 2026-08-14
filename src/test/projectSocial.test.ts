@@ -22,6 +22,7 @@ import {
   starRatingDelta,
   voterIdFromEmail,
 } from "@/lib/projectStars";
+import { parseShareStats, shareDocId } from "@/lib/projectShares";
 
 describe("project stars", () => {
   it("clamps ratings to whole stars from 1 to 5", () => {
@@ -64,6 +65,13 @@ describe("project stars", () => {
     ).toBeGreaterThan(0);
     expect(ratingDocId("proj-1", "user-9")).toBe("proj-1_user-9");
     expect(parseStarStats({ star_sum: 12, star_count: 3 })).toEqual({ sum: 12, count: 3 });
+  });
+
+  it("parses distinct project share counts", () => {
+    expect(shareDocId("proj-1", "sharer-9")).toBe("proj-1_sharer-9");
+    expect(parseShareStats({ share_count: 4 })).toEqual({ count: 4 });
+    expect(parseShareStats({ share_count: -2 })).toEqual({ count: 0 });
+    expect(parseShareStats(null)).toEqual({ count: 0 });
   });
 });
 
