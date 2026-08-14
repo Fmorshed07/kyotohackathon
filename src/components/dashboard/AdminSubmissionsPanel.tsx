@@ -233,6 +233,11 @@ function SubmissionTable({
                     variant={submission.isPublic ? "outline" : "default"}
                     className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
                     disabled={isBusy}
+                    aria-label={
+                      submission.isPublic
+                        ? `Make ${submission.title || "this project"} private`
+                        : `Make ${submission.title || "this project"} public`
+                    }
                     onClick={async () => {
                       const makePublic = !submission.isPublic;
                       const confirmed = window.confirm(
@@ -254,7 +259,7 @@ function SubmissionTable({
                         ? "Hiding..."
                         : "Publishing..."
                       : submission.isPublic
-                        ? "Unpublish"
+                        ? "Make private"
                         : "Make public"}
                   </Button>
                   <Button
