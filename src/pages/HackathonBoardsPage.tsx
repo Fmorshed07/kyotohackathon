@@ -190,7 +190,18 @@ function ProjectCard({
               <ProjectStarRating fill={starFill} myRating={myRating} disabled={ratingDisabled} onRate={onRate} />
               <ProjectEngagementStats starCount={starCount} shareCount={shareCount} />
             </div>
-            {isPublic ? <ProjectShareMenu projectId={submission.id} title={title} teamName={team} onShare={onShare} /> : null}
+            {isPublic ? (
+              <ProjectShareMenu
+                projectId={submission.id}
+                title={title}
+                teamName={team}
+                description={submission.short_description || hackathon.theme}
+                imageUrl={submission.cover_url || submission.gallery_urls?.[0]}
+                demoVideoUrl={submission.demo_video_url}
+                eventName={hackathon.shortName}
+                onShare={onShare}
+              />
+            ) : null}
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import {
   ArrowUpRight,
@@ -12,7 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { fetchPublishedHackathons, type HostedHackathon } from "@/lib/aiHackathons";
+import { fetchPublishedHackathons, isAiIdeathonEvent, type HostedHackathon } from "@/lib/aiHackathons";
 import {
   getHackathonById,
   getSubmissionHackathonId,
@@ -196,7 +196,16 @@ function ProjectCard({
             <ProjectStarRating fill={starFill} myRating={myRating} disabled={ratingDisabled} onRate={onRate} />
             <ProjectEngagementStats starCount={starCount} shareCount={shareCount} />
           </div>
-          <ProjectShareMenu projectId={submission.id} title={title} teamName={team} onShare={onShare} />
+          <ProjectShareMenu
+            projectId={submission.id}
+            title={title}
+            teamName={team}
+            description={submission.short_description || event.theme}
+            imageUrl={submission.cover_url || submission.gallery_urls?.[0]}
+            demoVideoUrl={submission.demo_video_url}
+            eventName={event.shortName}
+            onShare={onShare}
+          />
         </div>
         <ProjectPublicLinks links={links} className="mt-3" />
         <div className="mt-4">
@@ -212,6 +221,7 @@ function ProjectCard({
 export default function ProjectGalleryPage() {
   const { projectId: projectIdParam } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const db = getFirestoreDb();
   const { statsById, myRatingById, pendingId, emailPrompt, communityFill, rate, submitStarEmail, cancelStarEmail } = useProjectCommunityStars();
   const { shareCount, recordShare } = useProjectShareCounts();
@@ -260,6 +270,12 @@ export default function ProjectGalleryPage() {
   const eventOptions = useMemo(() => Array.from(new Set(submissions.map(getSubmissionHackathonId)))
     .map((id) => ({ id, event: eventById.get(id) ?? getHackathonById(id) }))
     .sort((left, right) => left.event.name.localeCompare(right.event.name)), [eventById, submissions]);
+
+  useEffect(() => {
+    if (searchParams.get("spotlight") !== "ai-ideathon-2026") return;
+    const ideathon = hostedEvents.find(isAiIdeathonEvent);
+    if (ideathon) setEventFilter(ideathon.id);
+  }, [hostedEvents, searchParams]);
 
   const filteredSubmissions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -432,6 +448,10 @@ export default function ProjectGalleryPage() {
                   projectId={previewSubmission.id}
                   title={previewTitle}
                   teamName={previewTeam}
+                  description={previewSubmission.short_description}
+                  imageUrl={previewSubmission.cover_url || previewSubmission.gallery_urls?.[0]}
+                  demoVideoUrl={previewSubmission.demo_video_url}
+                  eventName={getEvent(previewSubmission, eventById).shortName}
                   onShare={() => recordShare(previewSubmission.id)}
                 />
               </div>

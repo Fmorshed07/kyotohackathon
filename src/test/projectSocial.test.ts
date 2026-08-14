@@ -95,7 +95,13 @@ describe("project social links", () => {
     expect(buildProjectPermalink("proj-1", "https://cognisor.test")).toBe(
       "https://cognisor.test/projects/proj-1",
     );
-    expect(buildProjectShareText({ title: "KyoCare", teamName: "Nova" })).toContain("KyoCare");
+    expect(buildProjectShareText({
+      title: "KyoCare",
+      teamName: "Nova",
+      description: "A clinic navigation assistant.",
+    })).toBe(
+      "Check out KyoCare by Nova\n\nA clinic navigation assistant.\n\nExplore it on Global Impact Hackathons.",
+    );
     const targets = buildSocialShareTargets({
       url: "https://cognisor.test/projects/proj-1",
       title: "KyoCare",

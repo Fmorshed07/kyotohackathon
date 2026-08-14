@@ -105,10 +105,18 @@ export function buildProjectPermalink(projectId: string, origin = getPublicOrigi
   return origin ? `${origin}${path}` : path;
 }
 
-export function buildProjectShareText(input: { title: string; teamName?: string | null }) {
+export function buildProjectShareText(input: {
+  title: string;
+  teamName?: string | null;
+  description?: string | null;
+}) {
   const title = input.title.trim() || "this hackathon project";
   const team = input.teamName?.trim();
-  return team ? `Check out ${title} by ${team} on Cognisor` : `Check out ${title} on Cognisor`;
+  const description = input.description?.replace(/\s+/g, " ").trim().slice(0, 160);
+  const headline = team ? `Check out ${title} by ${team}` : `Check out ${title}`;
+  return description
+    ? `${headline}\n\n${description}\n\nExplore it on Global Impact Hackathons.`
+    : `${headline} on Global Impact Hackathons.`;
 }
 
 export function buildSocialShareTargets(input: {

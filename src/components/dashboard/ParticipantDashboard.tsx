@@ -865,6 +865,9 @@ export function ParticipantDashboard({
               projectId={activeSubmissionId}
               title={participantForm.title || "Hackathon project"}
               teamName={participantForm.teamName}
+              description={participantForm.shortDescription}
+              imageUrl={participantForm.projectCoverUrl}
+              demoVideoUrl={participantForm.demoVideoUrl}
               onShare={() => recordShare(activeSubmissionId)}
             />
           </div>

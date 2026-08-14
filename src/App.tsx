@@ -34,6 +34,7 @@ import ResourcesPage from "./pages/ResourcesPage";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
 import NotFound from "./pages/NotFound";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
+import { AiIdeathonStarNotice } from "./components/AiIdeathonStarNotice";
 
 const queryClient = new QueryClient();
 
@@ -139,6 +140,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AiIdeathonStarNotice />
         <RouteErrorBoundary>
         <Routes>
           <Route path="/" element={<Index />} />
