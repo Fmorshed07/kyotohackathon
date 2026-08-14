@@ -47,6 +47,10 @@
   ],
   "rewrites": [
     {
+      "source": "/projects/:projectId",
+      "destination": "/api/project-preview?projectId=:projectId"
+    },
+    {
       "source": "/((?!api(?:/|$)|.*\\.).*)",
       "destination": "/index.html"
     }
