@@ -206,14 +206,13 @@ export function ProjectShareMenu({
               <div className="mt-2 grid grid-cols-3 gap-2">
                 {targets.map((target) => (
                   <a
-                    key={target.id}
-                    href={target.href}
-                    target={target.id === "email" ? undefined : "_blank"}
-                    rel={target.id === "email" ? undefined : "noreferrer"}
-                    onClick={() => {
-                      recordShare();
-                      setOpen(false);
-                    }}
+                  key={target.id}
+                  href={target.href}
+                  target={target.id === "email" || target.id === "linkedin" ? undefined : "_blank"}
+                  rel={target.id === "email" || target.id === "linkedin" ? undefined : "noopener"}
+                  onClick={() => {
+                    recordShare();
+                  }}
                     className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-2 py-3 text-center text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
                   >
                     <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-white/10 px-1.5 font-display text-xs font-bold">

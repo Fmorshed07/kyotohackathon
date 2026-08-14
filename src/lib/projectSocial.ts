@@ -43,6 +43,13 @@ export function youtubeVideoId(url: string | null | undefined) {
   );
 }
 
+/** Opens YouTube demos as normal watch pages, never as no-cookie embed pages. */
+export function youtubeWatchUrl(url: string | null | undefined) {
+  const normalized = normalizeHttpUrl(url);
+  const videoId = youtubeVideoId(normalized);
+  return videoId ? `https://www.youtube.com/watch?v=${videoId}` : normalized;
+}
+
 const hostnameOf = (url: string) => {
   try {
     return new URL(url).hostname.replace(/^www\./i, "").toLowerCase();
@@ -137,7 +144,7 @@ export function buildSocialShareTargets(input: {
     {
       id: "linkedin",
       label: "LinkedIn",
-      href: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
+      href: `https://www.linkedin.com/feed/?shareActive=true&shareUrl=${url}`,
     },
     {
       id: "facebook",

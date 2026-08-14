@@ -11,6 +11,7 @@ import {
   projectLinkLabel,
   toPublicGallerySubmission,
   youtubeVideoId,
+  youtubeWatchUrl,
 } from "@/lib/projectSocial";
 import {
   clampStarRating,
@@ -82,6 +83,9 @@ describe("project social links", () => {
     expect(demoLinkLabel("https://youtu.be/abc123xyz")).toBe("YouTube");
     expect(documentLinkLabel("https://drive.google.com/file/d/1/view")).toBe("Google Drive");
     expect(youtubeVideoId("https://www.youtube.com/watch?v=abc123xyz")).toBe("abc123xyz");
+    expect(youtubeWatchUrl("https://www.youtube-nocookie.com/embed/abc123xyz")).toBe(
+      "https://www.youtube.com/watch?v=abc123xyz",
+    );
 
     const links = listPublicProjectLinks({
       demo_video_url: "youtu.be/abc123xyz",
@@ -115,7 +119,9 @@ describe("project social links", () => {
       "email",
     ]);
     expect(targets[0]?.href).toContain("twitter.com/intent/tweet");
-    expect(targets[1]?.href).toContain("linkedin.com/sharing");
+    expect(targets[1]?.href).toBe(
+      "https://www.linkedin.com/feed/?shareActive=true&shareUrl=https%3A%2F%2Fcognisor.test%2Fprojects%2Fproj-1",
+    );
   });
 
   it("strips judge scores from public gallery copies", () => {

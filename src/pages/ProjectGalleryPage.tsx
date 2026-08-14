@@ -47,6 +47,7 @@ import {
   normalizeHttpUrl,
   toPublicGallerySubmission,
   youtubeVideoId,
+  youtubeWatchUrl,
 } from "@/lib/projectSocial";
 import { compareStarStats, EMPTY_STAR_STATS } from "@/lib/projectStars";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,12 @@ const getPreviewUrl = (submission: Submission, kind: AssetKind) => {
     return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : url;
   }
   if (kind === "document") return documentPreviewUrl(submission.submission_pdf_url ?? "");
+  return normalizeHttpUrl(submission.project_url);
+};
+
+const getOriginalPreviewUrl = (submission: Submission, kind: AssetKind) => {
+  if (kind === "demo") return youtubeWatchUrl(submission.demo_video_url);
+  if (kind === "document") return normalizeHttpUrl(submission.submission_pdf_url);
   return normalizeHttpUrl(submission.project_url);
 };
 
@@ -328,6 +335,9 @@ export default function ProjectGalleryPage() {
   };
 
   const activePreviewUrl = previewSubmission ? getPreviewUrl(previewSubmission, previewKind) : "";
+  const activeOriginalUrl = previewSubmission
+    ? getOriginalPreviewUrl(previewSubmission, previewKind)
+    : "";
   const previewLinks = previewSubmission ? listPublicProjectLinks(previewSubmission) : [];
   const previewTitle = previewSubmission?.title?.trim() || "Untitled project";
   const previewTeam = previewSubmission?.team_name?.trim() || "Solo builder";
@@ -482,9 +492,9 @@ export default function ProjectGalleryPage() {
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">If a provider blocks embedded previews, open it in a new tab.</p>
-                {activePreviewUrl ? (
+                {activeOriginalUrl ? (
                   <Button asChild variant="outline" size="sm" className="gap-1.5">
-                    <a href={activePreviewUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight className="h-3.5 w-3.5" /></a>
+                    <a href={activeOriginalUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight className="h-3.5 w-3.5" /></a>
                   </Button>
                 ) : null}
               </div>
