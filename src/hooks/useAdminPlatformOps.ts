@@ -27,6 +27,10 @@ import {
   type ApplicantOpsStatus,
   type PlatformOpsState,
 } from "@/lib/platformOps";
+import {
+  buildProjectConceptQueue,
+  evaluateQueuedConcept,
+} from "@/lib/projectScreening";
 import type { PortalRole, Submission, UserProfile } from "@/types/portal";
 
 type OpsParticipant = {
@@ -327,6 +331,81 @@ export function useAdminPlatformOps(options: UseAdminPlatformOpsOptions = {}) {
     }
   };
 
+  const handleRunProjectScreening = async () => {
+    const queue = buildProjectConceptQueue(submissionRows, participants);
+    if (queue.length === 0) {
+      setStatusMessage("No project concepts to screen yet.");
+      return;
+    }
+
+    setIsSavingOps(true);
+    try {
+      const profileById = Object.fromEntries(participants.map((person) => [person.id, person.profile]));
+      const projectScreens = { ...(platformOps.projectScreens ?? {}) };
+      for (const item of queue) {
+        const evaluation = evaluateQueuedConcept(item, selectedHackathon.theme, profileById[item.participantId]);
+        const existing = projectScreens[item.id];
+        projectScreens[item.id] = {
+          status:
+            existing?.status && existing.status !== "pending"
+              ? existing.status
+              : evaluation.recommendation === "shortlisted"
+                ? "shortlisted"
+                : "pending",
+          score: evaluation.score,
+        };
+      }
+      await persistPlatformOps(
+        { ...platformOps, projectScreens, projectsScreenedAt: new Date().toISOString() },
+        `Screened ${queue.length} concept${queue.length === 1 ? "" : "s"} against “${selectedHackathon.theme}”.`,
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to screen project concepts.";
+      setStatusMessage(text);
+    } finally {
+      setIsSavingOps(false);
+    }
+  };
+
+  const handleSetProjectScreenStatus = async (conceptId: string, status: ApplicantOpsStatus) => {
+    const queue = buildProjectConceptQueue(submissionRows, participants);
+    const item = queue.find((entry) => entry.id === conceptId);
+    const profile = participants.find((person) => person.id === item?.participantId)?.profile;
+    const evaluation = item
+      ? evaluateQueuedConcept(item, selectedHackathon.theme, profile)
+      : null;
+
+    setIsSavingOps(true);
+    try {
+      const existing = platformOps.projectScreens?.[conceptId] ?? {
+        status: "pending" as const,
+        score: null,
+      };
+      await persistPlatformOps({
+        ...platformOps,
+        projectScreens: {
+          ...(platformOps.projectScreens ?? {}),
+          [conceptId]: {
+            ...existing,
+            status,
+            score: existing.score ?? evaluation?.score ?? null,
+          },
+        },
+      });
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to update project screen.";
+      setStatusMessage(text);
+    } finally {
+      setIsSavingOps(false);
+    }
+  };
+
   const handleMatchTeams = async () => {
     const shortlisted = participants
       .filter((user) => platformOps.applicants[user.id]?.status === "shortlisted")
@@ -561,6 +640,8 @@ export function useAdminPlatformOps(options: UseAdminPlatformOpsOptions = {}) {
     opsCopilotNote,
     handleRunScreening,
     handleSetApplicantStatus,
+    handleRunProjectScreening,
+    handleSetProjectScreenStatus,
     handleMatchTeams,
     handleToggleCheckIn,
     handleOpsBroadcast,

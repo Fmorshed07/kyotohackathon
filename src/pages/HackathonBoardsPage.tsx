@@ -9,6 +9,7 @@ import {
   MapPin,
   Search,
   Sparkles,
+  Clock,
   Users,
 } from "lucide-react";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
@@ -37,6 +38,7 @@ import type { Submission } from "@/types/portal";
 import { countTeamBuilders, formatTeamMemberNames, isSubmissionCollaborator } from "@/lib/teamRoster";
 import { listAccessibleSubmissions } from "@/lib/portalInvites";
 import { cn } from "@/lib/utils";
+import { formatSubmissionDateTime } from "@/lib/datetime";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -163,6 +165,12 @@ function ProjectCard({
               {builders === 1 ? "Builder" : "Builders"}
               {memberLabel ? (
                 <span className="truncate text-muted-foreground/90">· {memberLabel}</span>
+              ) : null}
+              {formatSubmissionDateTime(submission.created_at) ? (
+                <span className="inline-flex items-center gap-1 text-muted-foreground/90">
+                  <Clock className="h-3.5 w-3.5 shrink-0 text-primary/80" />
+                  {formatSubmissionDateTime(submission.created_at)}
+                </span>
               ) : null}
             </p>
             {projectUrl ? (

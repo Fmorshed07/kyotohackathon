@@ -9,7 +9,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { Activity, Radar } from "lucide-react";
+import { Activity, Radar, ScanSearch } from "lucide-react";
 import { DashboardLayout, sectionClass } from "@/components/dashboard/DashboardLayout";
 import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
 import {
@@ -840,7 +840,7 @@ export default function HostDashboardPage() {
                 Event operations
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Create events, publish them publicly, screen applicants, run live operations, issue
+                Create events, publish them publicly, screen applicants and project concepts, run live operations, issue
                 QR tickets, manage judges, review submissions, and track judging marks.
               </p>
             </div>
@@ -854,6 +854,12 @@ export default function HostDashboardPage() {
                 <Link to="/dashboard/host/screening">
                   <Radar className="h-4 w-4" />
                   Screening agent
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="gap-1.5">
+                <Link to="/dashboard/host/project-screening">
+                  <ScanSearch className="h-4 w-4" />
+                  Project agent
                 </Link>
               </Button>
               <Button asChild size="sm" className="gap-1.5">

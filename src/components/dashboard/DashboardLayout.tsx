@@ -20,6 +20,7 @@ import {
   Settings,
   ChevronsUpDown,
   Radar,
+  ScanSearch,
   CalendarCheck2,
   BookOpen,
   Briefcase,
@@ -171,6 +172,11 @@ const buildAdminOperateNav: AdminNavBuilder = (hackathonId) => [
     icon: Radar,
   },
   {
+    href: withHackathonQuery("/dashboard/admin/project-screening", hackathonId),
+    label: "Project agent",
+    icon: ScanSearch,
+  },
+  {
     href: withHackathonQuery("/dashboard/admin/operations", hackathonId),
     label: "Operations",
     icon: Activity,
@@ -244,6 +250,11 @@ const buildAdminScoringNav: AdminNavBuilder = (hackathonId) => [
     href: withHackathonQuery("/dashboard/admin/judging#analytics", hackathonId),
     label: "Analytics",
     icon: BarChart3,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judging#project-marks", hackathonId),
+    label: "Theme marks",
+    icon: ScanSearch,
   },
   {
     href: withHackathonQuery("/dashboard/admin/judging#judge-marks", hackathonId),
@@ -775,6 +786,25 @@ function DashboardLayoutContent({
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink
+                        href="/dashboard/judge/project-screening"
+                        onNavigate={closeMobileNav}
+                      >
+                        <ScanSearch className={navIconClass} />
+                        <span>Project agent</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink href="/dashboard/judge#project-marks" onNavigate={closeMobileNav}>
+                        <BarChart3 className={navIconClass} />
+                        <span>Theme marks</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
                       <DashboardNavLink href="#top-3-ranking" onNavigate={closeMobileNav}>
                         <Trophy className={navIconClass} />
                         <span>Top 3 Ranking</span>
@@ -801,6 +831,17 @@ function DashboardLayoutContent({
                       >
                         <Radar className={navIconClass} />
                         <span>Screening agent</span>
+                      </DashboardNavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild className={menuButtonClass}>
+                      <DashboardNavLink
+                        href="/dashboard/host/project-screening"
+                        onNavigate={closeMobileNav}
+                      >
+                        <ScanSearch className={navIconClass} />
+                        <span>Project agent</span>
                       </DashboardNavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -862,6 +903,7 @@ function DashboardLayoutContent({
                   { href: "/dashboard/host#submission-marks", label: "Submissions", icon: ClipboardList },
                   { href: "/dashboard/host#marking-criteria", label: "Criteria", icon: ListChecks },
                   { href: "/dashboard/host#analytics", label: "Analytics", icon: BarChart3 },
+                  { href: "/dashboard/host#project-marks", label: "Theme marks", icon: ScanSearch },
                   { href: "/dashboard/host#top-3-marks", label: "Top 3 by score", icon: Medal },
                   { href: "/dashboard/host#top-3-ranking", label: "Top 3 ballots", icon: Trophy },
                 ]}

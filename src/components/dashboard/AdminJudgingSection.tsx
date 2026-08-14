@@ -1,10 +1,11 @@
-import { BarChart3, ClipboardCheck, ClipboardList, ListChecks, Medal, Trophy } from "lucide-react";
+import { BarChart3, ClipboardCheck, ClipboardList, ListChecks, Medal, ScanSearch, Trophy } from "lucide-react";
 import { MarkingCriteriaSection } from "@/components/dashboard/MarkingCriteriaSection";
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { AdminJudgeMarksPanel } from "@/components/dashboard/AdminJudgeMarksPanel";
 import { AdminTop3MarksPanel } from "@/components/dashboard/AdminTop3MarksPanel";
 import { AdminTop3RankingPanel } from "@/components/dashboard/AdminTop3RankingPanel";
 import { AdminSubmissionsPanel } from "@/components/dashboard/AdminSubmissionsPanel";
+import { ProjectThemeMarksPanel } from "@/components/dashboard/ProjectThemeMarksPanel";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import type { AdminSubmissionRow, AdminUser, NewSubmissionInput } from "@/components/dashboard/AdminDashboard";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 const JUDGING_JUMP_LINKS = [
   { href: "#marking-criteria", label: "Criteria", icon: ListChecks },
   { href: "#analytics", label: "Analytics", icon: BarChart3 },
+  { href: "#project-marks", label: "Theme marks", icon: ScanSearch },
   { href: "#judge-marks", label: "Mark check", icon: ClipboardCheck },
   { href: "#top-3-marks", label: "Top 3 by score", icon: Medal },
   { href: "#top-3-ranking", label: "Top 3 ballots", icon: Trophy },
@@ -171,6 +173,12 @@ export function AdminJudgingSection({
           ]}
         />
       </section>
+
+      <ProjectThemeMarksPanel
+        hackathon={selectedHackathon}
+        submissions={submissions}
+        isLoading={isLoadingSubmissions}
+      />
 
       <AdminJudgeMarksPanel
         selectedHackathon={selectedHackathon}

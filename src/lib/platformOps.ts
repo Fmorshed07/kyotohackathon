@@ -12,13 +12,20 @@ export type ApplicantOpsRecord = {
   checkedIn: boolean;
 };
 
+export type ProjectScreenRecord = {
+  status: ApplicantOpsStatus;
+  score: number | null;
+};
+
 export type PlatformOpsState = {
   applicants: Record<string, ApplicantOpsRecord>;
   projectScores: Record<string, number>;
   projectCriteria: Record<string, Record<string, number>>;
+  projectScreens: Record<string, ProjectScreenRecord>;
   lastBroadcast: string | null;
   replayedTo: HackathonId | null;
   screenedAt: string | null;
+  projectsScreenedAt: string | null;
   updatedAt: string | null;
 };
 
@@ -26,9 +33,11 @@ export const emptyPlatformOps = (): PlatformOpsState => ({
   applicants: {},
   projectScores: {},
   projectCriteria: {},
+  projectScreens: {},
   lastBroadcast: null,
   replayedTo: null,
   screenedAt: null,
+  projectsScreenedAt: null,
   updatedAt: null,
 });
 
@@ -274,6 +283,21 @@ export const parsePlatformOps = (value: unknown): PlatformOpsState => {
     }
   }
 
+  if (record.projectScreens && typeof record.projectScreens === "object") {
+    for (const [id, entry] of Object.entries(record.projectScreens as Record<string, unknown>)) {
+      if (!entry || typeof entry !== "object") continue;
+      const row = entry as Record<string, unknown>;
+      const status =
+        row.status === "shortlisted" || row.status === "passed" || row.status === "pending"
+          ? row.status
+          : "pending";
+      base.projectScreens[id] = {
+        status,
+        score: typeof row.score === "number" ? row.score : null,
+      };
+    }
+  }
+
   base.lastBroadcast = typeof record.lastBroadcast === "string" ? record.lastBroadcast : null;
   base.replayedTo =
     record.replayedTo === "impact-kyoto" ||
@@ -282,6 +306,8 @@ export const parsePlatformOps = (value: unknown): PlatformOpsState => {
       ? record.replayedTo
       : null;
   base.screenedAt = typeof record.screenedAt === "string" ? record.screenedAt : null;
+  base.projectsScreenedAt =
+    typeof record.projectsScreenedAt === "string" ? record.projectsScreenedAt : null;
   base.updatedAt = typeof record.updatedAt === "string" ? record.updatedAt : null;
   return base;
 };

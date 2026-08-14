@@ -9,6 +9,7 @@ import type { AdminSubmissionRow } from "@/components/dashboard/AdminDashboard";
 import type { PortalHackathon } from "@/lib/hackathons";
 import { matchesSearchQuery } from "@/lib/submissionSearch";
 import { cn } from "@/lib/utils";
+import { formatSubmissionDateTime } from "@/lib/datetime";
 
 type AdminJudgeMarksPanelProps = {
   selectedHackathon: PortalHackathon;
@@ -137,6 +138,11 @@ function SubmissionMarksCard({
             </h3>
             {submission.teamName ? (
               <p className="mt-0.5 text-xs text-muted-foreground">{submission.teamName}</p>
+            ) : null}
+            {formatSubmissionDateTime(submission.createdAt) ? (
+              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                Submitted {formatSubmissionDateTime(submission.createdAt)}
+              </p>
             ) : null}
             {submission.shortDescription ? (
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">

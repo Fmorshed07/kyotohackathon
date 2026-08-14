@@ -70,6 +70,7 @@ export type Submission = {
   /** Explicit participant consent required before a submission appears on hackathon boards and the public gallery. */
   public_preview_consent?: boolean | null;
   created_at: string | null;
+  updated_at?: string | null;
   judge_id?: string | null;
   judge_score: number | null;
   judge_notes: string | null;

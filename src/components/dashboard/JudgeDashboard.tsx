@@ -6,6 +6,7 @@ import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { JudgeScoringWorkspace } from "@/components/dashboard/JudgeScoringWorkspace";
 import { JudgeTop3RankingSection } from "@/components/dashboard/JudgeTop3RankingSection";
+import { ProjectThemeMarksPanel } from "@/components/dashboard/ProjectThemeMarksPanel";
 import {
   getSubmissionAccentStyle,
   getTeamAccentStyle,
@@ -15,18 +16,12 @@ import type { JudgeStatistics } from "@/lib/judgingStatistics";
 import type { PortalHackathon } from "@/lib/hackathons";
 import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
 import { collectTeamDisplayNames } from "@/lib/teamRoster";
+import { formatSubmissionDateTime } from "@/lib/datetime";
 
 type TeamSummary = {
   name: string;
   submissions: Submission[];
   members: string[];
-};
-
-const formatSubmittedAt = (createdAt: string | null | undefined) => {
-  if (!createdAt) return null;
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return createdAt;
-  return date.toLocaleString();
 };
 
 export type JudgeDashboardProps = {
@@ -486,7 +481,7 @@ export function JudgeDashboard({
                                 Submitted
                               </p>
                               <p className="mt-1 text-foreground">
-                                {formatSubmittedAt(submission.created_at) ?? "Unknown"}
+                                {formatSubmissionDateTime(submission.created_at, "Unknown")}
                               </p>
                             </div>
                             <div className="rounded-md border border-border/60 bg-muted/30 px-2.5 py-2">
@@ -522,6 +517,12 @@ export function JudgeDashboard({
           </div>
         )}
       </section>
+
+      <ProjectThemeMarksPanel
+        hackathon={selectedHackathon}
+        submissions={submissions}
+        isLoading={isLoadingSubmissions}
+      />
 
       <section
         className={`${sectionClass} overflow-hidden border-violet-500/20 bg-gradient-to-b from-violet-500/5 via-card/95 to-card/95 p-0`}

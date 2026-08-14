@@ -22,6 +22,7 @@ import JudgeDashboardPage from "./pages/JudgeDashboardPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import HostDashboardPage from "./pages/HostDashboardPage";
 import ScreeningAgentPage from "./pages/ScreeningAgentPage";
+import ProjectScreeningPage from "./pages/ProjectScreeningPage";
 import PlatformOperationsPage from "./pages/PlatformOperationsPage";
 import EventManagementPage from "./pages/EventManagementPage";
 import HackathonsPage from "./pages/HackathonsPage";
@@ -147,15 +148,18 @@ const App = () => (
           <Route path="/dashboard/participant/profile" element={<ParticipantProtectedRoute><ParticipantProfilePage /></ParticipantProtectedRoute>} />
           <Route path="/dashboard/participant/team" element={<ParticipantProtectedRoute><ParticipantTeamPage /></ParticipantProtectedRoute>} />
           <Route path="/dashboard/judge" element={<StaffProtectedRoute><JudgeDashboardPage /></StaffProtectedRoute>} />
+          <Route path="/dashboard/judge/project-screening" element={<StaffProtectedRoute><ProjectScreeningPage /></StaffProtectedRoute>} />
           <Route path="/dashboard/admin" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/create" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/people" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/judging" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/screening" element={<AdminProtectedRoute><ScreeningAgentPage /></AdminProtectedRoute>} />
+          <Route path="/dashboard/admin/project-screening" element={<AdminProtectedRoute><ProjectScreeningPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/operations" element={<AdminProtectedRoute><PlatformOperationsPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/events" element={<AdminProtectedRoute><EventManagementPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/host" element={<HostProtectedRoute><HostDashboardPage /></HostProtectedRoute>} />
           <Route path="/dashboard/host/screening" element={<HostProtectedRoute><ScreeningAgentPage /></HostProtectedRoute>} />
+          <Route path="/dashboard/host/project-screening" element={<HostProtectedRoute><ProjectScreeningPage /></HostProtectedRoute>} />
           <Route path="/dashboard/host/operations" element={<HostProtectedRoute><PlatformOperationsPage /></HostProtectedRoute>} />
           <Route path="/boards" element={<ProtectedRoute><HackathonBoardsPage /></ProtectedRoute>} />
           <Route path="/boards/:hackathonId" element={<ProtectedRoute><HackathonBoardsPage /></ProtectedRoute>} />

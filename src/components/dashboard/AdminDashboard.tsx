@@ -11,6 +11,7 @@ import {
   Mail,
   PenLine,
   Radar,
+  ScanSearch,
   ShieldCheck,
   Users,
   Wand2,
@@ -99,6 +100,8 @@ export type AdminSubmissionRow = {
   }>;
   averageScore: number | null;
   scoredByCount: number;
+  createdAt: string | null;
+  updatedAt: string | null;
 };
 
 export type NewSubmissionInput = {
@@ -1298,6 +1301,12 @@ export function AdminDashboard({
       title: "Screening agent",
       description: "Score and shortlist applicants.",
       icon: Radar,
+    },
+    {
+      to: withHackathonQuery("/dashboard/admin/project-screening", eventQuery),
+      title: "Project agent",
+      description: "Match concepts to the event theme.",
+      icon: ScanSearch,
     },
     {
       to: withHackathonQuery("/dashboard/admin/operations", eventQuery),

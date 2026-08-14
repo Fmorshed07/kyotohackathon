@@ -9,6 +9,7 @@ import {
   Play,
   Search,
   Sparkles,
+  Clock,
   Users,
 } from "lucide-react";
 import { getFirestoreDb } from "@/lib/firebaseClient";
@@ -36,6 +37,7 @@ import {
 import type { Submission } from "@/types/portal";
 import { countTeamBuilders, formatTeamMemberNames } from "@/lib/teamRoster";
 import { cn } from "@/lib/utils";
+import { formatSubmissionDateTime } from "@/lib/datetime";
 
 type AssetKind = "demo" | "project" | "document";
 type AssetFilter = "all" | AssetKind;
@@ -152,10 +154,16 @@ function ProjectCard({
         </div>
         <h2 className="mt-3 truncate font-display text-lg font-semibold tracking-tight text-foreground">{title}</h2>
         <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground">{submission.short_description?.trim() || event.theme}</p>
-        <div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <span className="inline-flex min-w-0 items-center gap-1.5"><Users className="h-3.5 w-3.5 text-primary" />{builders} {builders === 1 ? "Builder" : "Builders"}</span>
           <span className="truncate">{team}</span>
         </div>
+        {formatSubmissionDateTime(submission.created_at) ? (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5 text-primary" />
+            {formatSubmissionDateTime(submission.created_at)}
+          </p>
+        ) : null}
         <div className="mt-4 flex items-center gap-2">
           <Button size="sm" className="flex-1 gap-1.5" onClick={() => onPreview(submission)} disabled={assetKinds.length === 0}>
             <Play className="h-3.5 w-3.5" /> Preview

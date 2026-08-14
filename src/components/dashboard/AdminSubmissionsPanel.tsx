@@ -26,6 +26,7 @@ import {
   type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
+import { formatSubmissionDate, formatSubmissionTime } from "@/lib/datetime";
 
 type AdminSubmissionsPanelProps = {
   selectedHackathon: PortalHackathon;
@@ -58,6 +59,7 @@ function SubmissionTable({
             <TableHead className="dash-table-head w-[180px]">Participant</TableHead>
             <TableHead className="dash-table-head w-[240px]">Team</TableHead>
             <TableHead className="dash-table-head w-[220px]">Project</TableHead>
+            <TableHead className="dash-table-head w-[150px]">Submitted</TableHead>
             <TableHead className="dash-table-head">Links</TableHead>
             <TableHead className="dash-table-head w-[90px] text-right">Avg</TableHead>
             <TableHead className="dash-table-head w-[100px] text-right">Judges</TableHead>
@@ -96,6 +98,27 @@ function SubmissionTable({
                 <p className="mt-1 line-clamp-3 text-[0.7rem] text-muted-foreground">
                   {submission.shortDescription || "No description provided."}
                 </p>
+              </TableCell>
+              <TableCell className="align-top">
+                {formatSubmissionDate(submission.createdAt) ? (
+                  <>
+                    <p className="text-sm font-medium tabular-nums">
+                      {formatSubmissionDate(submission.createdAt)}
+                    </p>
+                    <p className="mt-1 font-mono text-[0.7rem] text-muted-foreground">
+                      {formatSubmissionTime(submission.createdAt)}
+                    </p>
+                    {submission.updatedAt &&
+                    submission.updatedAt !== submission.createdAt &&
+                    formatSubmissionTime(submission.updatedAt) ? (
+                      <p className="mt-1 text-[0.65rem] text-muted-foreground">
+                        Updated {formatSubmissionTime(submission.updatedAt)}
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">—</p>
+                )}
               </TableCell>
               <TableCell className="align-top">
                 <div className="space-y-1 text-[0.7rem]">

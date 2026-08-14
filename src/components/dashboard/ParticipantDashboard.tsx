@@ -34,6 +34,7 @@ import { getPeopleProfileCompleteness } from "@/components/dashboard/PeopleProfi
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import { buildTeamRoster } from "@/lib/teamRoster";
+import { formatSubmissionDateTime } from "@/lib/datetime";
 import {
   getEventBoardPath,
   getHackathonSubmissionMode,
@@ -212,6 +213,12 @@ export function ParticipantDashboard({
       submissionMatchesSearch(submissionSearchQuery, submission)
     );
   }, [participantSubmissions, submissionSearchQuery]);
+  const activeSubmission =
+    participantSubmissions.find((submission) => submission.id === activeSubmissionId) ??
+    participantSubmissions[0] ??
+    null;
+  const submittedAtLabel = formatSubmissionDateTime(activeSubmission?.created_at);
+  const lastSavedAtLabel = formatSubmissionDateTime(activeSubmission?.updated_at);
   const teamRoster = useMemo(
     () =>
       buildTeamRoster({
@@ -394,6 +401,14 @@ export function ParticipantDashboard({
               <p className="dash-subtitle">
                 {lockCopy ?? "Keep your project details up to date before judging starts."}
               </p>
+              {submittedAtLabel ? (
+                <p className="mt-1.5 font-mono text-xs text-muted-foreground">
+                  Submitted {submittedAtLabel}
+                  {lastSavedAtLabel && lastSavedAtLabel !== submittedAtLabel
+                    ? ` · Last saved ${lastSavedAtLabel}`
+                    : ""}
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="dash-stat-grid grid w-full gap-2 sm:grid-cols-3 sm:gap-3 lg:w-auto lg:gap-4">
@@ -440,6 +455,9 @@ export function ParticipantDashboard({
                     <SelectItem key={submission.id} value={submission.id}>
                       {submission.title?.trim() || `Untitled submission (${submission.id.slice(0, 8)})`}
                       {submission.team_name?.trim() ? ` — ${submission.team_name.trim()}` : ""}
+                      {formatSubmissionDateTime(submission.created_at)
+                        ? ` · ${formatSubmissionDateTime(submission.created_at)}`
+                        : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -843,6 +861,14 @@ export function ParticipantDashboard({
               <p className="dash-subtitle">
                 {lockCopy ?? "You can update until organisers pause or close submissions. Ensure all links are accessible."}
               </p>
+              {submittedAtLabel ? (
+                <p className="mt-1.5 font-mono text-xs text-muted-foreground">
+                  Submitted {submittedAtLabel}
+                  {lastSavedAtLabel && lastSavedAtLabel !== submittedAtLabel
+                    ? ` · Last saved ${lastSavedAtLabel}`
+                    : ""}
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">

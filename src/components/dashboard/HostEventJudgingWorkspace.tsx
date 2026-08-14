@@ -346,6 +346,8 @@ export function HostEventJudgingWorkspace({
                 ? validScores.reduce((total, score) => total + score, 0) / validScores.length
                 : null,
             scoredByCount: validScores.length,
+            createdAt: submission.created_at ?? null,
+            updatedAt: submission.updated_at ?? null,
           };
         })
         .sort((a, b) => {

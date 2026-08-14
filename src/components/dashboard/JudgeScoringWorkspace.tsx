@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { formatSubmissionDateTime } from "@/lib/datetime";
 import type { Submission } from "@/types/portal";
 import {
   calculateTotalFromCriteria,
@@ -153,6 +154,11 @@ export function JudgeScoringWorkspace({
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
                   {submission.team_name?.trim() || "Unnamed team"}
                 </p>
+                {formatSubmissionDateTime(submission.created_at) ? (
+                  <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                    {formatSubmissionDateTime(submission.created_at)}
+                  </p>
+                ) : null}
                 <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
                   {isComplete
                     ? "Complete · edit anytime"
@@ -181,6 +187,11 @@ export function JudgeScoringWorkspace({
             <p className="line-clamp-2 text-sm text-muted-foreground">
               {activeSubmission.short_description || "No description provided."}
             </p>
+            {formatSubmissionDateTime(activeSubmission.created_at) ? (
+              <p className="font-mono text-xs text-muted-foreground">
+                Submitted {formatSubmissionDateTime(activeSubmission.created_at)}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             {activeSubmission.project_url ? (

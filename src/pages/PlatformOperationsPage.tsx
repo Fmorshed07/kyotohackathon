@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { ArrowLeft, CalendarCheck2, Radar } from "lucide-react";
+import { ArrowLeft, CalendarCheck2, Radar, ScanSearch } from "lucide-react";
 import { DashboardLayout, sectionClass } from "@/components/dashboard/DashboardLayout";
 import { LiveOpsWorkspace } from "@/components/dashboard/LiveOpsWorkspace";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
@@ -82,6 +82,12 @@ export default function PlatformOperationsPage() {
           <Link to={screeningHref}>
             <Radar className="h-4 w-4" />
             Open screening agent
+          </Link>
+        </Button>
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Link to={isHostPortal ? "/dashboard/host/project-screening" : "/dashboard/admin/project-screening"}>
+            <ScanSearch className="h-4 w-4" />
+            Project agent
           </Link>
         </Button>
         {!isHostPortal ? (
