@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { fetchPlatformOps, type PlatformOpsState } from "@/lib/platformOps";
-import { evaluateProjectConcept } from "@/lib/projectScreening";
+import { evaluateProjectConcept, applyPersistedProjectScreen } from "@/lib/projectScreening";
 import type { PortalHackathon } from "@/lib/hackathons";
 import {
   ProjectScreeningMarksSection,
@@ -62,7 +62,7 @@ export function ProjectThemeMarksPanel({
       const title = submission.title?.trim() || "Untitled project";
       const concept =
         submission.shortDescription?.trim() || submission.short_description?.trim() || "";
-      const evaluation = evaluateProjectConcept(
+      const heuristic = evaluateProjectConcept(
         {
           title,
           description: concept,
@@ -73,6 +73,7 @@ export function ProjectThemeMarksPanel({
         hackathon.theme,
       );
       const record = ops?.projectScreens?.[submission.id];
+      const evaluation = applyPersistedProjectScreen(heuristic, record);
       return {
         id: submission.id,
         title,

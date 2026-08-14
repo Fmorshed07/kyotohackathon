@@ -15,6 +15,18 @@ export type ApplicantOpsRecord = {
 export type ProjectScreenRecord = {
   status: ApplicantOpsStatus;
   score: number | null;
+  themeFit?: number | null;
+  conceptQuality?: number | null;
+  problemClarity?: number | null;
+  solutionDepth?: number | null;
+  feasibility?: number | null;
+  originality?: number | null;
+  impact?: number | null;
+  summary?: string | null;
+  strengths?: string[] | null;
+  gaps?: string[] | null;
+  analysisMode?: "heuristic" | "ai" | "blended" | null;
+  rankedPosition?: number | null;
 };
 
 export type PlatformOpsState = {
@@ -291,9 +303,29 @@ export const parsePlatformOps = (value: unknown): PlatformOpsState => {
         row.status === "shortlisted" || row.status === "passed" || row.status === "pending"
           ? row.status
           : "pending";
+      const stringList = (value: unknown) =>
+        Array.isArray(value)
+          ? value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+          : undefined;
+      const analysisMode =
+        row.analysisMode === "heuristic" || row.analysisMode === "ai" || row.analysisMode === "blended"
+          ? row.analysisMode
+          : undefined;
       base.projectScreens[id] = {
         status,
         score: typeof row.score === "number" ? row.score : null,
+        themeFit: typeof row.themeFit === "number" ? row.themeFit : null,
+        conceptQuality: typeof row.conceptQuality === "number" ? row.conceptQuality : null,
+        problemClarity: typeof row.problemClarity === "number" ? row.problemClarity : null,
+        solutionDepth: typeof row.solutionDepth === "number" ? row.solutionDepth : null,
+        feasibility: typeof row.feasibility === "number" ? row.feasibility : null,
+        originality: typeof row.originality === "number" ? row.originality : null,
+        impact: typeof row.impact === "number" ? row.impact : null,
+        summary: typeof row.summary === "string" ? row.summary : null,
+        strengths: stringList(row.strengths) ?? null,
+        gaps: stringList(row.gaps) ?? null,
+        analysisMode: analysisMode ?? null,
+        rankedPosition: typeof row.rankedPosition === "number" ? row.rankedPosition : null,
       };
     }
   }

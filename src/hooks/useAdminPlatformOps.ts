@@ -29,8 +29,12 @@ import {
 } from "@/lib/platformOps";
 import {
   buildProjectConceptQueue,
+  blendScreeningResults,
+  compareProjectScreenScores,
   evaluateQueuedConcept,
+  toProjectScreenRecord,
 } from "@/lib/projectScreening";
+import { requestAiProjectScreens, toAiProjectScreenConcept } from "@/lib/projectScreeningAi";
 import type { PortalRole, Submission, UserProfile } from "@/types/portal";
 
 type OpsParticipant = {
@@ -341,23 +345,55 @@ export function useAdminPlatformOps(options: UseAdminPlatformOpsOptions = {}) {
     setIsSavingOps(true);
     try {
       const profileById = Object.fromEntries(participants.map((person) => [person.id, person.profile]));
-      const projectScreens = { ...(platformOps.projectScreens ?? {}) };
-      for (const item of queue) {
-        const evaluation = evaluateQueuedConcept(item, selectedHackathon.theme, profileById[item.participantId]);
-        const existing = projectScreens[item.id];
-        projectScreens[item.id] = {
-          status:
-            existing?.status && existing.status !== "pending"
-              ? existing.status
-              : evaluation.recommendation === "shortlisted"
-                ? "shortlisted"
-                : "pending",
-          score: evaluation.score,
-        };
+      const heuristicById = Object.fromEntries(
+        queue.map((item) => [item.id, evaluateQueuedConcept(item, selectedHackathon.theme, profileById[item.participantId])]),
+      );
+
+      let aiById: Awaited<ReturnType<typeof requestAiProjectScreens>> = {};
+      let usedAi = false;
+      try {
+        aiById = await requestAiProjectScreens({
+          theme: selectedHackathon.theme,
+          eventName: selectedHackathon.name,
+          concepts: queue.map(toAiProjectScreenConcept),
+        });
+        usedAi = Object.keys(aiById).length > 0;
+      } catch (error: unknown) {
+        const text =
+          typeof error === "object" && error && "message" in error
+            ? String((error as { message?: string }).message)
+            : "AI screening unavailable.";
+        setStatusMessage(`${text} Ranking with the local depth model instead.`);
       }
+
+      const ranked = [...queue].sort((left, right) =>
+        compareProjectScreenScores(
+          blendScreeningResults(heuristicById[left.id], aiById[left.id]),
+          blendScreeningResults(heuristicById[right.id], aiById[right.id]),
+        ),
+      );
+
+      const projectScreens = { ...(platformOps.projectScreens ?? {}) };
+      ranked.forEach((item, index) => {
+        const evaluation = blendScreeningResults(heuristicById[item.id], aiById[item.id]);
+        const existing = projectScreens[item.id];
+        projectScreens[item.id] = toProjectScreenRecord(
+          evaluation,
+          existing?.status && existing.status !== "pending"
+            ? existing.status
+            : evaluation.recommendation === "shortlisted"
+              ? "shortlisted"
+              : "pending",
+          index + 1,
+        );
+      });
+
+      const top = ranked[0] ? blendScreeningResults(heuristicById[ranked[0].id], aiById[ranked[0].id]) : null;
       await persistPlatformOps(
         { ...platformOps, projectScreens, projectsScreenedAt: new Date().toISOString() },
-        `Screened ${queue.length} concept${queue.length === 1 ? "" : "s"} against “${selectedHackathon.theme}”.`,
+        usedAi
+          ? `AI ranked ${ranked.length} concept${ranked.length === 1 ? "" : "s"} against “${selectedHackathon.theme}”. #1 ${ranked[0]?.title ?? ""} (${top?.score ?? "—"}).`
+          : `Ranked ${ranked.length} concept${ranked.length === 1 ? "" : "s"} with the local depth model against “${selectedHackathon.theme}”.`,
       );
     } catch (error: unknown) {
       const text =

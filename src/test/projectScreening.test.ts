@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   activeThemeFamilies,
+  blendScreeningResults,
   buildProjectConceptQueue,
+  compareProjectScreenScores,
   evaluateProjectConcept,
+  parseAiScreeningEvaluations,
   tokenizeThemeText,
 } from "@/lib/projectScreening";
 
@@ -104,5 +107,66 @@ describe("projectScreening", () => {
     expect(queue[1].id).toBe("pitch:u2");
     expect(queue[1].source).toBe("pitch");
     expect(queue[1].concept).toContain("Kansai");
+  });
+
+  it("scores a specific mechanism higher than a generic AI slogan", () => {
+    const deep = evaluateProjectConcept(
+      {
+        title: "KyoCare Agent",
+        description:
+          "A civic care agent for Kyoto clinics that routes follow-ups and helps patients navigate public services after discharge.",
+        projectUrl: "https://example.com/kyocare",
+        demoVideoUrl: "https://example.com/demo",
+      },
+      KYOTO_THEME,
+    );
+    const generic = evaluateProjectConcept(
+      {
+        title: "AI Helper",
+        description: "We will use AI to help people improve their lives with an app.",
+      },
+      KYOTO_THEME,
+    );
+
+    expect(deep.solutionDepth).toBeGreaterThan(generic.solutionDepth);
+    expect(deep.problemClarity).toBeGreaterThan(generic.problemClarity);
+    expect(deep.score).toBeGreaterThan(generic.score);
+    expect(deep.strengths.length).toBeGreaterThan(0);
+    expect(generic.recommendation).not.toBe("shortlisted");
+  });
+
+  it("blends AI depth scores over the local model and ranks by mark", () => {
+    const heuristic = evaluateProjectConcept(
+      {
+        title: "Transit Copilot",
+        description: "A mobility platform that helps commuters reroute around congestion using live city transport data.",
+      },
+      "AI for Urban Transformation",
+    );
+    const blended = blendScreeningResults(heuristic, {
+      score: 91,
+      themeFit: 88,
+      conceptQuality: 84,
+      problemClarity: 80,
+      solutionDepth: 86,
+      summary: "Directly serves urban mobility with a concrete routing mechanism.",
+      strengths: ["Named commuters", "Live transport data"],
+      gaps: ["Needs a prototype link"],
+    });
+    expect(blended.analysisMode).toBe("blended");
+    expect(blended.score).toBeGreaterThan(heuristic.score);
+    expect(blended.summary).toContain("urban mobility");
+
+    const parsed = parseAiScreeningEvaluations({
+      evaluations: [{ id: "s1", themeFit: 90, score: 88, summary: "On theme.", strengths: ["Clear user"] }],
+    });
+    expect(parsed.s1.themeFit).toBe(90);
+    expect(parsed.s1.summary).toBe("On theme.");
+
+    const ranked = [
+      { score: 70, themeFit: 80, title: "B" },
+      { score: 91, themeFit: 88, title: "A" },
+    ].sort(compareProjectScreenScores);
+    expect(ranked[0].title).toBe("A");
   });
 });

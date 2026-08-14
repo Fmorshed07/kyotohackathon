@@ -1,4 +1,9 @@
-import type { ApplicantOpsStatus, ScreeningConfidence, ScreeningSignal } from "@/lib/platformOps";
+import type {
+  ApplicantOpsStatus,
+  ProjectScreenRecord,
+  ScreeningConfidence,
+  ScreeningSignal,
+} from "@/lib/platformOps";
 import { getApplicantDisplayName } from "@/lib/platformOps";
 import type { UserProfile } from "@/types/portal";
 
@@ -18,16 +23,26 @@ export type ProjectConceptInput = {
   demoVideoUrl: string | null;
 };
 
+export type ProjectAnalysisMode = "heuristic" | "ai" | "blended";
+
 export type ProjectScreeningResult = {
   score: number;
   themeFit: number;
   conceptQuality: number;
+  problemClarity: number;
+  solutionDepth: number;
+  feasibility: number;
+  originality: number;
+  impact: number;
   recommendation: ApplicantOpsStatus;
   confidence: ScreeningConfidence;
   summary: string;
+  strengths: string[];
+  gaps: string[];
   matchedKeywords: string[];
   missingKeywords: string[];
   signals: ScreeningSignal[];
+  analysisMode: ProjectAnalysisMode;
 };
 
 const SHORTLIST_THRESHOLD = 75;
@@ -126,8 +141,17 @@ const TOKEN_EXPANSIONS: Record<string, string[]> = {
   education: ["education", "learning", "student", "tutor"],
 };
 
-const PROBLEM_SOLUTION_RE =
-  /\b(problem|solve|help|reduce|enable|improve|build|platform|prototype|agent|app|system|for)\b/i;
+const PROBLEM_RE =
+  /\b(problem|pain|need|challenge|lack|shortage|delay|barrier|gap|inefficien|bottleneck|underserved)\b/i;
+const WHO_RE =
+  /\b(patient|patients|clinic|clinics|commuter|commuters|resident|residents|citizen|citizens|student|students|teacher|teachers|farmer|farmers|nurse|nurses|builder|founder|ngo|city|ward|municip)\b/i;
+const MECHANISM_RE =
+  /\b(agent|agents|orchestrat\w*|route|routes|routing|match|detect|predict|recommend|automat\w*|workflow|copilot|dashboard|api|sensor|map|rag|llm)\b/i;
+const FEASIBILITY_RE =
+  /\b(prototype|mvp|demo|dataset|api|pilot|interview|figma|langchain|firebase|openai|next\.js|python)\b/i;
+const GENERIC_PITCH_RE =
+  /\b(we will use ai|an? ai (?:app|tool|platform) (?:to|that) help|use ai to (?:help|improve|solve))\b/i;
+const PLACE_RE = /\b(japan|japanese|kyoto|tokyo|osaka|kansai|dhaka|bangladesh)\b/i;
 
 export const tokenizeThemeText = (value: string): string[] => {
   const seen = new Set<string>();
@@ -156,6 +180,10 @@ export const activeThemeFamilies = (theme: string): string[] => {
 };
 
 const hasText = (value: string | null | undefined) => Boolean(value?.trim());
+
+const clampScore = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Math.round(value)));
+
+const hitCount = (blob: string, pattern: RegExp) => blob.match(new RegExp(pattern.source, "gi"))?.length ?? 0;
 
 export const evaluateProjectConcept = (
   concept: {
@@ -213,13 +241,47 @@ export const evaluateProjectConcept = (
   const descLen = description.length;
   const substancePoints = descLen >= 160 ? 16 : descLen >= 80 ? 12 : descLen >= 40 ? 8 : descLen > 0 ? 4 : 0;
   const titlePoints = title && !/^untitled/i.test(title) ? 8 : title ? 3 : 0;
-  const problemSolutionPoints = PROBLEM_SOLUTION_RE.test(primaryBlob) ? 8 : 0;
+  const problemHits = hitCount(primaryBlob, PROBLEM_RE);
+  const whoHits = hitCount(fullBlob, WHO_RE);
+  const mechanismHits = hitCount(fullBlob, MECHANISM_RE);
+  const feasibilityHits = hitCount(fullBlob, FEASIBILITY_RE);
   const urlPoints = hasText(concept.projectUrl) ? 6 : 0;
   const pdfPoints = hasText(concept.submissionPdfUrl) ? 4 : 0;
   const demoPoints = hasText(concept.demoVideoUrl) ? 6 : 0;
-  const conceptQuality = Math.max(
-    0,
-    Math.min(100, Math.round((titlePoints + substancePoints + problemSolutionPoints + urlPoints + pdfPoints + demoPoints) * 2)),
+  const artifactPoints = urlPoints + pdfPoints + demoPoints;
+  const genericPitch = GENERIC_PITCH_RE.test(primaryBlob) && descLen < 120;
+  const placeBonus = PLACE_RE.test(fullBlob) && families.includes("japan") ? 12 : 0;
+
+  const problemClarity = clampScore(
+    (problemHits > 0 ? 28 : 8) + Math.min(24, whoHits * 12) + (descLen >= 80 ? 18 : descLen >= 40 ? 10 : 0) + titlePoints,
+  );
+  const solutionDepth = clampScore(
+    Math.min(40, mechanismHits * 14) + substancePoints * 2 + (descLen >= 140 ? 16 : descLen >= 80 ? 8 : 0),
+  );
+  const feasibility = clampScore(
+    artifactPoints * 4 + Math.min(28, feasibilityHits * 10) + (descLen >= 60 ? 12 : 4),
+  );
+  const originality = clampScore(
+    42 +
+      (genericPitch ? -22 : 10) +
+      (mechanismHits >= 2 ? 16 : mechanismHits === 1 ? 8 : 0) +
+      (whoHits > 0 ? 10 : 0) +
+      (descLen >= 100 ? 12 : 0),
+  );
+  const impact = clampScore(
+    (whoHits > 0 ? 28 : 8) +
+      placeBonus +
+      (matchedFamilies.filter((id) => id !== "ai").length * 10) +
+      (problemHits > 0 ? 14 : 0) +
+      (descLen >= 80 ? 12 : 0),
+  );
+
+  const conceptQuality = clampScore(
+    problemClarity * 0.22 +
+      solutionDepth * 0.28 +
+      feasibility * 0.18 +
+      originality * 0.16 +
+      impact * 0.16,
   );
 
   const signals: ScreeningSignal[] = [
@@ -248,66 +310,276 @@ export const evaluateProjectConcept = (
       present: titleBonus > 0,
     },
     {
-      id: "substance",
-      label: descLen >= 80 ? "Concept write-up has depth" : "Concept write-up",
-      points: substancePoints,
-      present: substancePoints > 0,
+      id: "problem-clarity",
+      label: problemHits > 0 ? "Names a concrete problem and who it hits" : "Problem and user are named",
+      points: Math.round(problemClarity / 8),
+      present: problemHits > 0 && whoHits > 0,
     },
     {
-      id: "problem-solution",
-      label: "Problem / solution language",
-      points: problemSolutionPoints,
-      present: problemSolutionPoints > 0,
+      id: "solution-depth",
+      label: mechanismHits > 0 ? "Explains how the system works" : "Mechanism / how it works",
+      points: Math.round(solutionDepth / 8),
+      present: mechanismHits > 0 && descLen >= 80,
     },
     {
-      id: "demo-pack",
-      label: "Link, deck, or demo",
-      points: urlPoints + pdfPoints + demoPoints,
-      present: urlPoints + pdfPoints + demoPoints > 0,
+      id: "feasibility",
+      label: artifactPoints > 0 ? "Link, deck, or demo attached" : "Prototype evidence",
+      points: artifactPoints + Math.min(8, feasibilityHits * 3),
+      present: artifactPoints > 0 || feasibilityHits > 0,
     },
   ];
 
-  let score = Math.round(themeFit * 0.64 + conceptQuality * 0.36);
+  let score = clampScore(themeFit * 0.58 + conceptQuality * 0.42, 18, 99);
   if (noThemeSignal) score = Math.min(score, PASS_THRESHOLD - 1);
   if (!primaryBlob) score = Math.min(score, 36);
-  score = Math.max(18, Math.min(99, score));
 
-  const recommendation: ApplicantOpsStatus =
-    score >= SHORTLIST_THRESHOLD && themeFit >= 55
-      ? "shortlisted"
-      : score < PASS_THRESHOLD
-        ? "passed"
-        : "pending";
-
+  const recommendation = recommendationFromScores(score, themeFit);
   const confidence: ScreeningConfidence =
     score >= 88 || score < 40 ? "high" : score >= SHORTLIST_THRESHOLD || score < 58 ? "medium" : "low";
 
   const missingKeywords = distinctive.filter((token) => !matchedDistinctive.includes(token)).slice(0, 4);
   const matchedKeywords = [...matchedDistinctive, ...matchedGeneric].slice(0, 8);
-
-  const summary =
-    recommendation === "shortlisted"
-      ? `Strong fit for “${theme}”. Hits ${matchedKeywords.slice(0, 3).join(", ") || "core theme language"} with a usable concept write-up.`
-      : recommendation === "passed"
-        ? noThemeSignal
-          ? `Off-theme for “${theme}”. Missing ${missingKeywords.slice(0, 3).join(", ") || "the event’s core language"}.`
-          : `Thin concept. Needs a clearer write-up against “${theme}”.`
-        : `Partial fit for “${theme}”. Review manually — ${
-            missingKeywords.length ? `weak on ${missingKeywords.slice(0, 2).join(" and ")}` : "theme is close but the write-up is light"
-          }.`;
+  const { strengths, gaps, summary } = buildHeuristicNarrative({
+    theme,
+    recommendation,
+    noThemeSignal,
+    matchedKeywords,
+    missingKeywords,
+    problemClarity,
+    solutionDepth,
+    feasibility,
+    originality,
+    impact,
+  });
 
   return {
     score,
     themeFit,
     conceptQuality,
+    problemClarity,
+    solutionDepth,
+    feasibility,
+    originality,
+    impact,
     recommendation,
     confidence,
     summary,
+    strengths,
+    gaps,
     matchedKeywords,
     missingKeywords,
     signals,
+    analysisMode: "heuristic",
   };
 };
+
+export const recommendationFromScores = (score: number, themeFit: number): ApplicantOpsStatus =>
+  score >= SHORTLIST_THRESHOLD && themeFit >= 55
+    ? "shortlisted"
+    : score < PASS_THRESHOLD
+      ? "passed"
+      : "pending";
+
+const buildHeuristicNarrative = (input: {
+  theme: string;
+  recommendation: ApplicantOpsStatus;
+  noThemeSignal: boolean;
+  matchedKeywords: string[];
+  missingKeywords: string[];
+  problemClarity: number;
+  solutionDepth: number;
+  feasibility: number;
+  originality: number;
+  impact: number;
+}): { strengths: string[]; gaps: string[]; summary: string } => {
+  const strengths: string[] = [];
+  const gaps: string[] = [];
+  if (input.matchedKeywords.length > 0) strengths.push(`Theme language: ${input.matchedKeywords.slice(0, 3).join(", ")}`);
+  if (input.problemClarity >= 60) strengths.push("Clear problem and user");
+  if (input.solutionDepth >= 60) strengths.push("Mechanism is spelled out");
+  if (input.feasibility >= 55) strengths.push("Some prototype evidence");
+  if (input.impact >= 60) strengths.push("Named beneficiaries / local impact");
+  if (input.missingKeywords.length > 0) gaps.push(`Weak on ${input.missingKeywords.slice(0, 3).join(", ")}`);
+  if (input.problemClarity < 50) gaps.push("Problem and user are vague");
+  if (input.solutionDepth < 50) gaps.push("How it works is thin");
+  if (input.feasibility < 45) gaps.push("Little evidence it can ship in the event");
+  if (input.originality < 45) gaps.push("Reads like a generic AI pitch");
+
+  const summary =
+    input.recommendation === "shortlisted"
+      ? `Strong fit for “${input.theme}”. Hits ${input.matchedKeywords.slice(0, 3).join(", ") || "core theme language"} with a usable concept write-up.`
+      : input.recommendation === "passed"
+        ? input.noThemeSignal
+          ? `Off-theme for “${input.theme}”. Missing ${input.missingKeywords.slice(0, 3).join(", ") || "the event’s core language"}.`
+          : `Thin concept. Needs a clearer write-up against “${input.theme}”.`
+        : `Partial fit for “${input.theme}”. Review manually — ${
+            input.missingKeywords.length
+              ? `weak on ${input.missingKeywords.slice(0, 2).join(" and ")}`
+              : "theme is close but the write-up is light"
+          }.`;
+
+  return { strengths: strengths.slice(0, 4), gaps: gaps.slice(0, 4), summary };
+};
+
+const clampAiScore = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) ? clampScore(value) : null;
+
+const cleanStringList = (value: unknown, limit: number) =>
+  Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, limit)
+    : [];
+
+export const blendScreeningResults = (
+  heuristic: ProjectScreeningResult,
+  ai?: Partial<ProjectScreeningResult> | null,
+): ProjectScreeningResult => {
+  if (!ai) return heuristic;
+  const pick = (aiValue: number | undefined, heuristicValue: number, aiWeight = 0.74) =>
+    typeof aiValue === "number"
+      ? clampScore(aiValue * aiWeight + heuristicValue * (1 - aiWeight))
+      : heuristicValue;
+
+  const themeFit = pick(ai.themeFit, heuristic.themeFit, 0.78);
+  const problemClarity = pick(ai.problemClarity, heuristic.problemClarity);
+  const solutionDepth = pick(ai.solutionDepth, heuristic.solutionDepth);
+  const feasibility = pick(ai.feasibility, heuristic.feasibility);
+  const originality = pick(ai.originality, heuristic.originality);
+  const impact = pick(ai.impact, heuristic.impact);
+  const conceptQuality = pick(
+    ai.conceptQuality,
+    clampScore(
+      problemClarity * 0.22 +
+        solutionDepth * 0.28 +
+        feasibility * 0.18 +
+        originality * 0.16 +
+        impact * 0.16,
+    ),
+  );
+  let score = pick(ai.score, clampScore(themeFit * 0.58 + conceptQuality * 0.42, 18, 99), 0.76);
+  if (themeFit < 32) score = Math.min(score, PASS_THRESHOLD - 1);
+  score = clampScore(score, 18, 99);
+
+  return {
+    score,
+    themeFit,
+    conceptQuality,
+    problemClarity,
+    solutionDepth,
+    feasibility,
+    originality,
+    impact,
+    recommendation: recommendationFromScores(score, themeFit),
+    confidence: ai.confidence ?? heuristic.confidence,
+    summary: ai.summary?.trim() || heuristic.summary,
+    strengths: ai.strengths?.length ? ai.strengths.slice(0, 4) : heuristic.strengths,
+    gaps: ai.gaps?.length ? ai.gaps.slice(0, 4) : heuristic.gaps,
+    matchedKeywords: ai.matchedKeywords?.length ? ai.matchedKeywords.slice(0, 8) : heuristic.matchedKeywords,
+    missingKeywords: ai.missingKeywords?.length ? ai.missingKeywords.slice(0, 4) : heuristic.missingKeywords,
+    signals: heuristic.signals,
+    analysisMode: "blended",
+  };
+};
+
+export const parseAiScreeningEvaluations = (
+  payload: unknown,
+): Record<string, Partial<ProjectScreeningResult>> => {
+  const source = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  const rows = Array.isArray(source.evaluations) ? source.evaluations : [];
+  const mapped: Record<string, Partial<ProjectScreeningResult>> = {};
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const record = row as Record<string, unknown>;
+    const id = typeof record.id === "string" ? record.id.trim() : "";
+    if (!id) continue;
+    const recommendation =
+      record.recommendation === "shortlisted" ||
+      record.recommendation === "passed" ||
+      record.recommendation === "pending"
+        ? record.recommendation
+        : undefined;
+    const confidence =
+      record.confidence === "high" || record.confidence === "medium" || record.confidence === "low"
+        ? record.confidence
+        : undefined;
+    mapped[id] = {
+      themeFit: clampAiScore(record.themeFit) ?? undefined,
+      conceptQuality: clampAiScore(record.conceptQuality) ?? undefined,
+      problemClarity: clampAiScore(record.problemClarity) ?? undefined,
+      solutionDepth: clampAiScore(record.solutionDepth) ?? undefined,
+      feasibility: clampAiScore(record.feasibility) ?? undefined,
+      originality: clampAiScore(record.originality) ?? undefined,
+      impact: clampAiScore(record.impact) ?? undefined,
+      score: clampAiScore(record.score) ?? undefined,
+      recommendation,
+      confidence,
+      summary: typeof record.summary === "string" ? record.summary.trim() : undefined,
+      strengths: cleanStringList(record.strengths, 4),
+      gaps: cleanStringList(record.gaps, 4),
+      matchedKeywords: cleanStringList(record.matchedKeywords, 8),
+      missingKeywords: cleanStringList(record.missingKeywords, 4),
+      analysisMode: "ai",
+    };
+  }
+  return mapped;
+};
+
+export const applyPersistedProjectScreen = (
+  heuristic: ProjectScreeningResult,
+  record?: {
+    score?: number | null;
+    themeFit?: number | null;
+    conceptQuality?: number | null;
+    problemClarity?: number | null;
+    solutionDepth?: number | null;
+    feasibility?: number | null;
+    originality?: number | null;
+    impact?: number | null;
+    summary?: string | null;
+    strengths?: string[] | null;
+    gaps?: string[] | null;
+    analysisMode?: ProjectAnalysisMode | null;
+  } | null,
+): ProjectScreeningResult => {
+  if (!record) return heuristic;
+  const hasAi =
+    record.analysisMode === "ai" ||
+    record.analysisMode === "blended" ||
+    typeof record.themeFit === "number" ||
+    Boolean(record.summary?.trim());
+  if (!hasAi) {
+    return {
+      ...heuristic,
+      score: typeof record.score === "number" ? record.score : heuristic.score,
+    };
+  }
+  return blendScreeningResults(heuristic, {
+    score: record.score ?? undefined,
+    themeFit: record.themeFit ?? undefined,
+    conceptQuality: record.conceptQuality ?? undefined,
+    problemClarity: record.problemClarity ?? undefined,
+    solutionDepth: record.solutionDepth ?? undefined,
+    feasibility: record.feasibility ?? undefined,
+    originality: record.originality ?? undefined,
+    impact: record.impact ?? undefined,
+    summary: record.summary ?? undefined,
+    strengths: record.strengths ?? undefined,
+    gaps: record.gaps ?? undefined,
+    analysisMode: record.analysisMode ?? "blended",
+  });
+};
+
+export const compareProjectScreenScores = (
+  left: { score: number; themeFit?: number; conceptQuality?: number; title?: string },
+  right: { score: number; themeFit?: number; conceptQuality?: number; title?: string },
+) =>
+  right.score - left.score ||
+  (right.themeFit ?? 0) - (left.themeFit ?? 0) ||
+  (right.conceptQuality ?? 0) - (left.conceptQuality ?? 0) ||
+  (left.title ?? "").localeCompare(right.title ?? "");
 
 type QueueParticipant = {
   id: string;
@@ -395,3 +667,24 @@ export const evaluateQueuedConcept = (
     },
     theme,
   );
+
+export const toProjectScreenRecord = (
+  evaluation: ProjectScreeningResult,
+  status: ApplicantOpsStatus,
+  rankedPosition?: number,
+): ProjectScreenRecord => ({
+  status,
+  score: evaluation.score,
+  themeFit: evaluation.themeFit,
+  conceptQuality: evaluation.conceptQuality,
+  problemClarity: evaluation.problemClarity,
+  solutionDepth: evaluation.solutionDepth,
+  feasibility: evaluation.feasibility,
+  originality: evaluation.originality,
+  impact: evaluation.impact,
+  summary: evaluation.summary,
+  strengths: evaluation.strengths,
+  gaps: evaluation.gaps,
+  analysisMode: evaluation.analysisMode,
+  rankedPosition: rankedPosition ?? null,
+});

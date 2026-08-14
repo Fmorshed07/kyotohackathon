@@ -88,14 +88,32 @@ describe("platformOps", () => {
         u1: { status: "shortlisted", score: 91, teamName: "Team Nova", checkedIn: true },
       },
       projectScores: { s1: 54 },
-      projectScreens: { s1: { status: "shortlisted", score: 88 } },
+      projectScreens: {
+        s1: {
+          status: "shortlisted",
+          score: 88,
+          themeFit: 91,
+          conceptQuality: 80,
+          summary: "Strong civic agent for Kyoto clinics.",
+          strengths: ["Named users"],
+          gaps: ["No demo"],
+          analysisMode: "blended",
+          rankedPosition: 1,
+        },
+      },
       lastBroadcast: "Doors open",
       replayedTo: "impact-dhaka",
       projectsScreenedAt: "2026-08-14T00:00:00.000Z",
     });
     expect(parsed.applicants.u1.status).toBe("shortlisted");
     expect(parsed.projectScores.s1).toBe(54);
-    expect(parsed.projectScreens.s1).toEqual({ status: "shortlisted", score: 88 });
+    expect(parsed.projectScreens.s1).toMatchObject({
+      status: "shortlisted",
+      score: 88,
+      themeFit: 91,
+      analysisMode: "blended",
+      rankedPosition: 1,
+    });
     expect(parsed.projectsScreenedAt).toBe("2026-08-14T00:00:00.000Z");
     expect(parsed.replayedTo).toBe("impact-dhaka");
   });

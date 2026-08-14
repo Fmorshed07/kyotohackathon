@@ -11,6 +11,11 @@ import {
   getSubmissionAccentStyle,
   getTeamAccentStyle,
 } from "@/components/dashboard/judgeDashboardAccents";
+import {
+  calculateTotalFromCriteria,
+  type JudgingCriterion,
+  type JudgingCriterionId,
+} from "@/components/dashboard/judgingCriteria";
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import type { JudgeStatistics } from "@/lib/judgingStatistics";
 import type { PortalHackathon } from "@/lib/hackathons";

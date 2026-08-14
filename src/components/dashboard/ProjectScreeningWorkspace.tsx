@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ScanSearch, Sparkles } from "lucide-react";
 import type { ApplicantOpsStatus, PlatformOpsState } from "@/lib/platformOps";
 import {
+  applyPersistedProjectScreen,
   buildProjectConceptQueue,
+  compareProjectScreenScores,
   evaluateQueuedConcept,
 } from "@/lib/projectScreening";
 import type { PortalHackathon } from "@/lib/hackathons";
@@ -80,7 +82,8 @@ export function ProjectScreeningWorkspace({
     const concepts = buildProjectConceptQueue(submissions, participants);
     return concepts.map((item) => {
       const record = ops.projectScreens?.[item.id];
-      const evaluation = evaluateQueuedConcept(item, hackathon.theme, profileById[item.participantId]);
+      const heuristic = evaluateQueuedConcept(item, hackathon.theme, profileById[item.participantId]);
+      const evaluation = applyPersistedProjectScreen(heuristic, record);
       return {
         ...item,
         status: record?.status ?? "pending",
@@ -92,7 +95,12 @@ export function ProjectScreeningWorkspace({
 
   const rankedQueue = useMemo(() => {
     if (!ops.projectsScreenedAt) return queue;
-    return [...queue].sort((left, right) => right.score - left.score);
+    return [...queue].sort((left, right) =>
+      compareProjectScreenScores(
+        { score: left.score, themeFit: left.evaluation.themeFit, conceptQuality: left.evaluation.conceptQuality, title: left.title },
+        { score: right.score, themeFit: right.evaluation.themeFit, conceptQuality: right.evaluation.conceptQuality, title: right.title },
+      ),
+    );
   }, [ops.projectsScreenedAt, queue]);
 
   useEffect(() => {
@@ -129,7 +137,7 @@ export function ProjectScreeningWorkspace({
             <p className="dash-subtitle">
               {hackathon.name} · {reviewed}/{rankedQueue.length} decided · {shortlisted} shortlisted ·{" "}
               <a href="#marks-chart" className="text-primary hover:underline">
-                Marks chart
+                Ranked marks
               </a>
             </p>
           </div>
@@ -142,7 +150,7 @@ export function ProjectScreeningWorkspace({
             className="gap-2"
           >
             <Sparkles className="h-4 w-4" />
-            Run agent on all
+            {isBusy ? "Ranking…" : "Run AI depth ranking"}
           </Button>
         )}
       </div>
@@ -153,7 +161,7 @@ export function ProjectScreeningWorkspace({
           {hackathon.theme?.trim() || "Theme not set yet"}
         </p>
         <p className="mt-1 font-body text-sm text-muted-foreground">
-          The agent ranks submitted projects and leftover pitches by how closely they match this brief.
+          The agent reads each write-up with OpenAI, scores theme fit plus problem, solution, feasibility, originality, and impact, then ranks the queue.
         </p>
       </div>
 
@@ -217,8 +225,11 @@ export function ProjectScreeningWorkspace({
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3 sm:px-6">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    {active.source === "pitch" ? "Profile pitch" : "Submission"} · {activeIndex + 1} of{" "}
+                    {active.source === "pitch" ? "Profile pitch" : "Submission"} · rank {activeIndex + 1} of{" "}
                     {rankedQueue.length}
+                    {active.evaluation.analysisMode === "blended" || active.evaluation.analysisMode === "ai"
+                      ? " · AI depth"
+                      : ""}
                   </p>
                   <h2 className="mt-1 font-display text-xl font-semibold tracking-tight text-foreground">
                     {active.title}
@@ -265,11 +276,40 @@ export function ProjectScreeningWorkspace({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FitBar value={active.evaluation.themeFit} label="Theme fit" />
                   <FitBar value={active.evaluation.conceptQuality} label="Concept quality" />
+                  <FitBar value={active.evaluation.problemClarity} label="Problem clarity" />
+                  <FitBar value={active.evaluation.solutionDepth} label="Solution depth" />
+                  <FitBar value={active.evaluation.feasibility} label="Feasibility" />
+                  <FitBar value={active.evaluation.originality} label="Originality" />
+                  <FitBar value={active.evaluation.impact} label="Impact" />
                 </div>
 
                 <p className="font-body text-sm leading-relaxed text-muted-foreground">
                   {active.evaluation.summary}
                 </p>
+                {(active.evaluation.strengths.length > 0 || active.evaluation.gaps.length > 0) && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {active.evaluation.strengths.length > 0 && (
+                      <div className="rounded-lg bg-emerald-500/10 px-3 py-3">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-300">Strengths</p>
+                        <ul className="mt-2 space-y-1 font-body text-sm text-foreground">
+                          {active.evaluation.strengths.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {active.evaluation.gaps.length > 0 && (
+                      <div className="rounded-lg bg-white/[0.04] px-3 py-3">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Gaps</p>
+                        <ul className="mt-2 space-y-1 font-body text-sm text-muted-foreground">
+                          {active.evaluation.gaps.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
