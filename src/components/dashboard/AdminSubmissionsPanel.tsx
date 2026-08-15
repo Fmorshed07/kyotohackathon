@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,14 +10,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CalendarDays, ClipboardList, Download, Globe, GlobeLock, MapPin, PlusCircle, Star, Trash2 } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Download,
+  Globe,
+  GlobeLock,
+  MapPin,
+  PlusCircle,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import type { AdminSubmissionRow, AdminUser, NewSubmissionInput } from "@/components/dashboard/AdminDashboard";
 import {
@@ -109,10 +120,54 @@ function SubmissionTable({
   onSetSubmissionPublic: (submissionId: string, makePublic: boolean) => Promise<void>;
   onSetFinalShortlisted: (submissionId: string, shortlisted: boolean) => Promise<void>;
 }) {
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollColumns = (direction: -1 | 1) => {
+    const container = tableScrollRef.current;
+    if (!container) return;
+    container.scrollBy({
+      left: direction * Math.max(280, container.clientWidth * 0.75),
+      behavior: "smooth",
+    });
+  };
+
   return (
-    <div className="dash-table-scroll rounded-xl border border-white/10">
-      <Table>
-        <TableHeader>
+    <div className="overflow-hidden rounded-xl border border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-muted/10 px-3 py-2">
+        <p className="text-xs text-muted-foreground">
+          Use the arrows to view scores, judges, finalists, and actions.
+        </p>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            aria-label="Show previous table columns"
+            onClick={() => scrollColumns(-1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            aria-label="Show more table columns"
+            onClick={() => scrollColumns(1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <div
+        ref={tableScrollRef}
+        className="dash-table-scroll"
+        tabIndex={0}
+        aria-label="Participant project submissions. Scroll horizontally to view all columns."
+      >
+        <table className="min-w-[90rem] caption-bottom text-sm">
+          <TableHeader>
           <TableRow className="border-white/10 bg-muted/15 hover:bg-muted/15">
             <TableHead className="dash-table-head w-[180px]">Participant</TableHead>
             <TableHead className="dash-table-head w-[240px]">Team</TableHead>
@@ -327,8 +382,9 @@ function SubmissionTable({
             </TableRow>
             );
           })}
-        </TableBody>
-      </Table>
+          </TableBody>
+        </table>
+      </div>
     </div>
   );
 }

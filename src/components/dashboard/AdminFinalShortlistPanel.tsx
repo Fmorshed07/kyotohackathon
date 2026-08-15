@@ -21,6 +21,7 @@ export function AdminFinalShortlistPanel({
   onSetFinalShortlisted,
 }: AdminFinalShortlistPanelProps) {
   const finalists = submissions.filter((submission) => submission.isFinalShortlisted);
+  const candidates = submissions.filter((submission) => !submission.isFinalShortlisted);
 
   return (
     <section
@@ -37,7 +38,7 @@ export function AdminFinalShortlistPanel({
             <p className="dash-eyebrow">Final round</p>
             <h2 id="admin-final-shortlist-heading" className="dash-title">Final shortlist</h2>
             <p className="dash-subtitle">
-              Select finalists from the submissions table. Judges see these teams in their final scoring queue.
+              Click a team below to add it. Judges see selected teams in their final scoring queue.
             </p>
           </div>
         </div>
@@ -46,15 +47,87 @@ export function AdminFinalShortlistPanel({
         </Badge>
       </div>
 
-      <div className="p-5 sm:p-6">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading final shortlist…</p>
-        ) : finalists.length === 0 ? (
-          <div className="dash-empty">
-            No finalists selected for {selectedHackathon.name}. Use “Add finalist” in the submissions table above.
-          </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="space-y-7 p-5 sm:p-6">
+        {isLoading ? <p className="text-sm text-muted-foreground">Loading final shortlist…</p> : (
+          <>
+            <div>
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Choose finalists</p>
+                  <h3 className="mt-1 text-lg font-semibold text-foreground">Available teams</h3>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {candidates.length} team{candidates.length === 1 ? "" : "s"} available
+                </span>
+              </div>
+
+              {submissions.length === 0 ? (
+                <div className="dash-empty">No submissions yet for {selectedHackathon.name}.</div>
+              ) : candidates.length === 0 ? (
+                <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/[0.06] px-4 py-3 text-sm text-emerald-200">
+                  Every submitted team is already in the final shortlist.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {candidates.map((submission) => (
+                    <article
+                      key={submission.id}
+                      className="flex min-h-36 flex-col justify-between rounded-xl border border-white/10 bg-white/[0.025] p-4 transition hover:border-primary/30 hover:bg-primary/[0.04]"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h4 className="truncate text-base font-semibold text-foreground">
+                              {submission.teamName?.trim() || "Unnamed team"}
+                            </h4>
+                            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                              {submission.title?.trim() || "Untitled project"}
+                            </p>
+                          </div>
+                          {submission.averageScore != null ? (
+                            <span className="shrink-0 rounded-full border border-primary/20 bg-primary/[0.06] px-2 py-1 font-mono text-[0.65rem] text-primary">
+                              {submission.averageScore.toFixed(1)}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Users className="h-3 w-3" aria-hidden />
+                          {submission.memberCount} {submission.memberCount === 1 ? "member" : "members"}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="mt-4 w-full gap-2"
+                        disabled={shortlistingSubmissionId === submission.id}
+                        onClick={() => void onSetFinalShortlisted(submission.id, true)}
+                      >
+                        <Star className="h-3.5 w-3.5" />
+                        {shortlistingSubmissionId === submission.id ? "Adding…" : "Add finalist"}
+                      </Button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-white/10 pt-6">
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-300">Selected</p>
+                  <h3 className="mt-1 text-lg font-semibold text-foreground">Final-round teams</h3>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {finalists.length} finalist{finalists.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              {finalists.length === 0 ? (
+                <div className="dash-empty">
+                  No finalists selected for {selectedHackathon.name}. Choose a team above to begin.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {finalists.map((submission, index) => (
               <article
                 key={submission.id}
@@ -109,7 +182,10 @@ export function AdminFinalShortlistPanel({
                 </div>
               </article>
             ))}
-          </div>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
     </section>
