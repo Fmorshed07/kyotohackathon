@@ -777,8 +777,14 @@ export default function JudgeDashboardPage() {
   const handleSaveTop3Ranking = useCallback(async () => {
     if (!sessionUser || !canAccessSelectedHackathon) return;
 
-    const submissionIds = judgeSubmissionsRef.current.map((submission) => submission.id);
-    const validationError = validateTop3Ranks(top3Ranks, submissionIds);
+    const finalistIds = judgeSubmissionsRef.current
+      .filter((submission) => submission.final_shortlisted)
+      .map((submission) => submission.id);
+    if (finalistIds.length < 3) {
+      setJudgeMessage("At least three finalists must be selected before the Top 3 ballot can be saved.");
+      return;
+    }
+    const validationError = validateTop3Ranks(top3Ranks, finalistIds);
     if (validationError) {
       setJudgeMessage(validationError);
       return;
@@ -881,6 +887,11 @@ export default function JudgeDashboardPage() {
             onNotesChange={handleFinalJudgeNotesChange}
             onSave={handleFinalJudgeSave}
             savingSubmissionId={savingFinalSubmissionId}
+            top3Ranks={top3Ranks}
+            top3SavedAt={top3SavedAt}
+            isSavingTop3={isSavingTop3}
+            onTop3RankChange={handleTop3RankChange}
+            onSaveTop3Ranking={handleSaveTop3Ranking}
           />
         </div>
       ) : (
@@ -896,11 +907,6 @@ export default function JudgeDashboardPage() {
           onNotesChange={handleJudgeNotesChange}
           onSave={handleJudgeSave}
           savingSubmissionId={savingSubmissionId}
-          top3Ranks={top3Ranks}
-          top3SavedAt={top3SavedAt}
-          isSavingTop3={isSavingTop3}
-          onTop3RankChange={handleTop3RankChange}
-          onSaveTop3Ranking={handleSaveTop3Ranking}
         />
       )}
     </DashboardLayout>

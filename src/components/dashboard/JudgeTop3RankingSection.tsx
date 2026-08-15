@@ -12,7 +12,6 @@ import {
   TOP3_RANK_SLOTS,
   TOP3_SLOT_LABELS,
   TOP3_SLOT_POINTS,
-  isTop3RankingComplete,
 } from "@/lib/judgeTop3Rankings";
 import { getSubmissionAccentStyle } from "@/components/dashboard/judgeDashboardAccents";
 import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
@@ -58,11 +57,14 @@ export function JudgeTop3RankingSection({
   onRankChange,
   onSave,
 }: JudgeTop3RankingSectionProps) {
-  const isComplete = isTop3RankingComplete(ranks);
+  const submissionIds = new Set(submissions.map((submission) => submission.id));
+  const isValidRankId = (submissionId: string | null) =>
+    submissionId != null && submissionIds.has(submissionId);
   const selectedIds = new Set(
-    TOP3_RANK_SLOTS.map((slot) => ranks[slot]).filter(Boolean) as string[]
+    TOP3_RANK_SLOTS.map((slot) => ranks[slot]).filter(isValidRankId) as string[]
   );
-  const picksCount = TOP3_RANK_SLOTS.filter((slot) => ranks[slot] != null).length;
+  const picksCount = TOP3_RANK_SLOTS.filter((slot) => isValidRankId(ranks[slot])).length;
+  const isComplete = picksCount === TOP3_RANK_SLOTS.length;
 
   const getAvailableSubmissions = (currentSlot: Top3RankSlot) => {
     const currentId = ranks[currentSlot];
@@ -100,7 +102,7 @@ export function JudgeTop3RankingSection({
 
       <div className="grid gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
         {TOP3_RANK_SLOTS.map((slot) => {
-          const selectedId = ranks[slot];
+          const selectedId = isValidRankId(ranks[slot]) ? ranks[slot] : null;
           const selectedSubmission = submissions.find((s) => s.id === selectedId) ?? null;
           const accent = selectedSubmission
             ? getSubmissionAccentStyle(selectedSubmission)

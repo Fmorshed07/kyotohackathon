@@ -345,7 +345,11 @@ const judgeScoringNav: NavItem[] = [
   { href: "#judge-marks-chart", label: "My marks", icon: BarChart3 },
   { href: "#project-marks", label: "Theme marks", icon: ScanSearch },
   { href: "/dashboard/judge/final-shortlist", label: "Final shortlist", icon: Star },
-  { href: "#top-3-ranking", label: "Top 3 Ranking", icon: Trophy },
+  {
+    href: "/dashboard/judge/final-shortlist#top-3-ranking",
+    label: "Top 3 Ranking",
+    icon: Trophy,
+  },
 ];
 
 const judgeToolsNav: NavItem[] = [
@@ -499,8 +503,12 @@ function AdminHashScroll() {
       return;
     }
 
-    if (id === "final-shortlist" && location.pathname === "/dashboard/judge") {
-      navigate(`/dashboard/judge/final-shortlist${location.search}`, { replace: true });
+    if (
+      (id === "final-shortlist" || id === "top-3-ranking") &&
+      location.pathname === "/dashboard/judge"
+    ) {
+      const targetHash = id === "top-3-ranking" ? "#top-3-ranking" : "";
+      navigate(`/dashboard/judge/final-shortlist${location.search}${targetHash}`, { replace: true });
       return;
     }
 
@@ -547,7 +555,8 @@ function AdminHashScroll() {
 
     if (
       !location.pathname.startsWith("/dashboard/admin") &&
-      location.pathname !== "/dashboard/host"
+      location.pathname !== "/dashboard/host" &&
+      location.pathname !== "/dashboard/judge/final-shortlist"
     ) {
       return;
     }

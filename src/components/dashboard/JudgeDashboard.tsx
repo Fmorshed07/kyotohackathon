@@ -6,7 +6,6 @@ import {
   Gavel,
   ScanSearch,
   Star,
-  Trophy,
   Users,
 } from "lucide-react";
 import { dashJumpLinkClass, sectionClass } from "@/components/dashboard/DashboardLayout";
@@ -14,7 +13,6 @@ import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchIn
 import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector";
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { JudgeScoringWorkspace } from "@/components/dashboard/JudgeScoringWorkspace";
-import { JudgeTop3RankingSection } from "@/components/dashboard/JudgeTop3RankingSection";
 import { JudgeMarksChartPanel } from "@/components/dashboard/JudgeMarksChartPanel";
 import { ProjectThemeMarksPanel } from "@/components/dashboard/ProjectThemeMarksPanel";
 import {
@@ -29,7 +27,7 @@ import {
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import type { JudgeStatistics } from "@/lib/judgingStatistics";
 import { withHackathonQuery, type PortalHackathon } from "@/lib/hackathons";
-import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
+import type { Submission } from "@/types/portal";
 import { collectTeamDisplayNames } from "@/lib/teamRoster";
 import { formatSubmissionDateTime } from "@/lib/datetime";
 import { getFinalShortlist } from "@/lib/finalShortlist";
@@ -38,7 +36,6 @@ const JUDGE_JUMP_LINKS = [
   { href: "#teams", label: "1. Teams", icon: Users },
   { href: "#submissions", label: "2. Score", icon: ClipboardList },
   { href: "#project-marks", label: "3. Theme marks", icon: ScanSearch },
-  { href: "#top-3-ranking", label: "4. Top 3", icon: Trophy },
 ] as const;
 
 type TeamSummary = {
@@ -67,11 +64,6 @@ export type JudgeDashboardProps = {
   onNotesChange: (id: string, value: string) => void;
   onSave: (submissionId: string) => Promise<void>;
   savingSubmissionId?: string | null;
-  top3Ranks: JudgeTop3Ranks;
-  top3SavedAt: string | null;
-  isSavingTop3: boolean;
-  onTop3RankChange: (slot: Top3RankSlot, submissionId: string | null) => void;
-  onSaveTop3Ranking: () => Promise<void>;
 };
 
 export function JudgeDashboard({
@@ -86,11 +78,6 @@ export function JudgeDashboard({
   onNotesChange,
   onSave,
   savingSubmissionId,
-  top3Ranks,
-  top3SavedAt,
-  isSavingTop3,
-  onTop3RankChange,
-  onSaveTop3Ranking,
 }: JudgeDashboardProps) {
   const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -200,7 +187,7 @@ export function JudgeDashboard({
             </div>
 
             {!isLoadingSubmissions && submissions.length > 0 ? (
-              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <a href="#teams" className="dash-workflow-card block transition hover:border-primary/35">
                   <div className="flex items-center gap-2 text-primary">
                     <Users className="h-4 w-4" aria-hidden />
@@ -233,15 +220,6 @@ export function JudgeDashboard({
                       : "Waiting for organizers to select the finalists."}
                   </p>
                 </Link>
-                <a href="#top-3-ranking" className="dash-workflow-card block transition hover:border-primary/35">
-                  <div className="flex items-center gap-2 text-amber-300">
-                    <Trophy className="h-4 w-4" aria-hidden />
-                    <p className="text-xs font-semibold uppercase">4. Rank</p>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    After scoring, lock a clean top 3 ballot.
-                  </p>
-                </a>
               </div>
             ) : null}
           </div>
@@ -658,36 +636,6 @@ export function JudgeDashboard({
         isLoading={isLoadingSubmissions}
       />
 
-      <section
-        className={`${sectionClass} scroll-mt-24 overflow-hidden border-violet-500/20 bg-gradient-to-b from-violet-500/5 via-card/95 to-card/95 p-0`}
-        id="top-3-ranking"
-        aria-label="Top 3 idea ranking"
-      >
-        <div className="border-b border-white/10 px-4 py-5 sm:px-6 sm:py-6 md:px-8">
-          <div className="flex items-center gap-2 text-violet-300">
-            <Trophy className="h-4 w-4" aria-hidden />
-            <p className="text-xs font-semibold uppercase tracking-[0.14em]">Ballot</p>
-          </div>
-        </div>
-        <div className="p-4 sm:p-6 md:p-8">
-          {isLoadingSubmissions ? (
-            <p className="text-sm text-muted-foreground">Loading submissions…</p>
-          ) : submissions.length === 0 ? (
-            <p className="dash-empty">
-              No submissions yet. Top 3 ranking will be available once teams submit.
-            </p>
-          ) : (
-            <JudgeTop3RankingSection
-              submissions={submissions}
-              ranks={top3Ranks}
-              savedAt={top3SavedAt}
-              isSaving={isSavingTop3}
-              onRankChange={onTop3RankChange}
-              onSave={onSaveTop3Ranking}
-            />
-          )}
-        </div>
-      </section>
     </div>
   );
 }

@@ -63,6 +63,11 @@ describe("judge final shortlist section", () => {
         onNotesChange={vi.fn()}
         onSave={vi.fn()}
         savingSubmissionId={null}
+        top3Ranks={{ first: null, second: null, third: null }}
+        top3SavedAt={null}
+        isSavingTop3={false}
+        onTop3RankChange={vi.fn()}
+        onSaveTop3Ranking={vi.fn()}
       />,
     );
 
