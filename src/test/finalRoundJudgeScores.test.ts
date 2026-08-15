@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildHumanFinalJudgeMarks,
   buildFinalJudgeScoreFirestoreUpdate,
   mapSubmissionForFinalJudge,
 } from "@/lib/judgeSubmissionScores";
@@ -49,5 +50,25 @@ describe("final-round judge marks", () => {
       "final_judge_notes_by_judge.judge-1": "Final-round notes",
       "final_judge_criteria_scores_by_judge.judge-1": { impact: 91 },
     });
+  });
+
+  it("keeps only real human judge accounts out of mixed final score data", () => {
+    const mixedSubmission: Submission = {
+      ...submission,
+      final_judge_scores: { "judge-1": 91, "project-agent": 99 },
+      final_judge_criteria_scores_by_judge: {
+        "judge-1": { impact: 91 },
+        "project-agent": { impact: 99 },
+      },
+    };
+
+    const marks = buildHumanFinalJudgeMarks(mixedSubmission, criteria, {
+      "judge-1": { email: "judge@example.com", role: "judge" },
+      "project-agent": { email: "agent@system.local", role: "admin" },
+    });
+
+    expect(marks).toEqual([
+      expect.objectContaining({ judgeId: "judge-1", judgeEmail: "judge@example.com", score: 91 }),
+    ]);
   });
 });

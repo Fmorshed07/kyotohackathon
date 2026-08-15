@@ -1,7 +1,6 @@
 import { BarChart3, ClipboardCheck, ClipboardList, Gavel, ListChecks, Medal, ScanSearch, Trophy } from "lucide-react";
 import { MarkingCriteriaSection } from "@/components/dashboard/MarkingCriteriaSection";
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
-import { AdminJudgeMarksPanel } from "@/components/dashboard/AdminJudgeMarksPanel";
 import { AdminTop3MarksPanel } from "@/components/dashboard/AdminTop3MarksPanel";
 import { AdminTop3RankingPanel } from "@/components/dashboard/AdminTop3RankingPanel";
 import { AdminSubmissionsPanel } from "@/components/dashboard/AdminSubmissionsPanel";
@@ -17,12 +16,11 @@ import type { PortalHackathon } from "@/lib/hackathons";
 const JUDGING_JUMP_LINKS = [
   { href: "#marking-criteria", label: "1. Criteria", icon: ListChecks },
   { href: "#submission-marks", label: "2. Submissions", icon: ClipboardList },
-  { href: "#judge-marks", label: "3. Mark check", icon: ClipboardCheck },
-  { href: "#judge-marks-chart", label: "4. Judge chart", icon: Gavel },
-  { href: "#analytics", label: "5. Analytics", icon: BarChart3 },
-  { href: "#project-marks", label: "6. Agent marks", icon: ScanSearch },
-  { href: "#top-3-marks", label: "7. Top 3 by score", icon: Medal },
-  { href: "#top-3-ranking", label: "8. Top 3 ballots", icon: Trophy },
+  { href: "#judge-marks-chart", label: "3. Judge chart", icon: Gavel },
+  { href: "#analytics", label: "4. Analytics", icon: BarChart3 },
+  { href: "#project-marks", label: "5. Agent marks", icon: ScanSearch },
+  { href: "#top-3-marks", label: "6. Top 3 by score", icon: Medal },
+  { href: "#top-3-ranking", label: "7. Top 3 ballots", icon: Trophy },
 ] as const;
 
 type AdminJudgingSectionProps = {
@@ -89,10 +87,10 @@ export function AdminJudgingSection({
             </span>
             <div className="min-w-0">
               <p className="dash-eyebrow">Judging</p>
-              <h2 className="dash-title">Scoring & mark check</h2>
+              <h2 className="dash-title">Scoring operations</h2>
               <p className="dash-subtitle">
-                Work in order for {selectedHackathon.name}: set criteria, review submissions, check
-                judge marks, then read analytics and lock top 3. Agent scores stay on a separate chart.
+                Set criteria, review submissions, monitor analytics, and review final rankings for
+                {" "}{selectedHackathon.name}. Individual judge marks are available in their own workspace.
               </p>
             </div>
           </div>
@@ -137,13 +135,6 @@ export function AdminJudgingSection({
         onCreateSubmission={onCreateSubmission}
         onDeleteSubmission={onDeleteSubmission}
         onSetSubmissionPublic={onSetSubmissionPublic}
-      />
-
-      <AdminJudgeMarksPanel
-        selectedHackathon={selectedHackathon}
-        submissions={submissions}
-        judgingCriteria={judgingCriteria}
-        isLoading={isLoadingSubmissions}
       />
 
       <JudgeMarksChartPanel

@@ -4,6 +4,7 @@ import {
   AdminJudgingSection,
 } from "@/components/dashboard/AdminJudgingSection";
 import { AdminFinalShortlistPanel } from "@/components/dashboard/AdminFinalShortlistPanel";
+import { AdminFinalJudgeScoresPanel } from "@/components/dashboard/AdminFinalJudgeScoresPanel";
 import { AdminTeamsPanel } from "@/components/dashboard/AdminTeamsPanel";
 import {
   JudgeApprovalPanel,
@@ -24,7 +25,10 @@ import {
   getUserHackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
-import { getJudgeTotalScoreForJudge } from "@/lib/judgeSubmissionScores";
+import {
+  buildHumanFinalJudgeMarks,
+  getJudgeTotalScoreForJudge,
+} from "@/lib/judgeSubmissionScores";
 import {
   buildAdminTop3RankingSummary,
   fetchJudgeRankingsForHackathon,
@@ -328,6 +332,14 @@ export function HostEventJudgingWorkspace({
           const validScores = marks
             .map((mark) => mark.score)
             .filter((value): value is number => typeof value === "number");
+          const finalJudgeMarks = buildHumanFinalJudgeMarks(
+            submission,
+            judgingCriteria,
+            judgeById,
+          );
+          const validFinalScores = finalJudgeMarks
+            .map((mark) => mark.score)
+            .filter((value): value is number => typeof value === "number");
 
           const team = buildAdminTeamDetails({
             submission,
@@ -359,6 +371,12 @@ export function HostEventJudgingWorkspace({
             isFinalShortlisted: submission.final_shortlisted === true,
             finalShortlistedAt: submission.final_shortlisted_at ?? null,
             judgeMarks: marks,
+            finalJudgeMarks,
+            finalAverageScore:
+              validFinalScores.length > 0
+                ? validFinalScores.reduce((total, score) => total + score, 0) / validFinalScores.length
+                : null,
+            finalScoredByCount: validFinalScores.length,
             averageScore:
               validScores.length > 0
                 ? validScores.reduce((total, score) => total + score, 0) / validScores.length
@@ -726,13 +744,24 @@ export function HostEventJudgingWorkspace({
       />
     ),
     finalShortlist: (
-      <AdminFinalShortlistPanel
-        selectedHackathon={hackathon}
-        submissions={adminSubmissionRows}
-        isLoading={isLoadingSubmissions}
-        shortlistingSubmissionId={shortlistingSubmissionId}
-        onSetFinalShortlisted={handleSetFinalShortlisted}
-      />
+      <div className="space-y-6">
+        <AdminFinalShortlistPanel
+          selectedHackathon={hackathon}
+          submissions={adminSubmissionRows}
+          isLoading={isLoadingSubmissions}
+          shortlistingSubmissionId={shortlistingSubmissionId}
+          onSetFinalShortlisted={handleSetFinalShortlisted}
+        />
+        <AdminFinalJudgeScoresPanel
+          selectedHackathon={hackathon}
+          submissions={adminSubmissionRows}
+          judgingCriteria={judgingCriteria}
+          judges={staffJudges
+            .filter((judge) => judge.judgeApprovalStatus === "approved")
+            .map((judge) => ({ id: judge.id, email: judge.email }))}
+          isLoading={isLoadingSubmissions || isLoadingUsers}
+        />
+      </div>
     ),
   };
 

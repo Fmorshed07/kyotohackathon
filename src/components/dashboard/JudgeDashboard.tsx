@@ -55,6 +55,11 @@ export type JudgeDashboardProps = {
     scored: number;
     averageScore: number | null;
   };
+  finalSummary: {
+    total: number;
+    scored: number;
+    averageScore: number | null;
+  };
   statistics: JudgeStatistics | null;
   onCriterionScoreChange: (
     id: string,
@@ -73,6 +78,7 @@ export function JudgeDashboard({
   isLoadingSubmissions,
   judgeMessage,
   summary,
+  finalSummary,
   statistics,
   onCriterionScoreChange,
   onNotesChange,
@@ -216,7 +222,7 @@ export function JudgeDashboard({
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
                     {finalShortlist.length > 0
-                      ? `${finalShortlist.length} finalist${finalShortlist.length === 1 ? "" : "s"} ready for final marks.`
+                      ? `${finalSummary.scored}/${finalShortlist.length} finalist${finalShortlist.length === 1 ? "" : "s"} have saved final marks.`
                       : "Waiting for organizers to select the finalists."}
                   </p>
                 </Link>
@@ -235,7 +241,15 @@ export function JudgeDashboard({
               <p className="dash-stat-value">
                 {isLoadingSubmissions ? "-" : summary.scored}
               </p>
-              <p className="dash-stat-label">Scored</p>
+              <p className="dash-stat-label">Overall scored</p>
+            </div>
+            <div className="dash-stat-tile">
+              <p className="dash-stat-value">
+                {isLoadingSubmissions ? "-" : finalSummary.scored}
+              </p>
+              <p className="dash-stat-label">
+                Final scored{finalSummary.total > 0 ? ` / ${finalSummary.total}` : ""}
+              </p>
             </div>
             <div className="dash-stat-tile">
               <p className="dash-stat-value">
@@ -245,7 +259,7 @@ export function JudgeDashboard({
                     ? summary.averageScore.toFixed(1)
                     : "-"}
               </p>
-              <p className="dash-stat-label">Avg Score</p>
+              <p className="dash-stat-label">Overall avg</p>
             </div>
           </div>
         </div>

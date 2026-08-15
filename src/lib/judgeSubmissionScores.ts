@@ -5,6 +5,7 @@ import {
   DEFAULT_JUDGING_CRITERIA,
 } from "@/components/dashboard/judgingCriteria";
 import type { Submission } from "@/types/portal";
+import type { PortalRole } from "@/types/portal";
 
 /** Legacy single-judge fields only apply when judge_id matches this judge. */
 function legacyBelongsToJudge(submission: Submission, judgeId: string): boolean {
@@ -79,6 +80,49 @@ export function getFinalJudgeTotalScoreForJudge(
   }
   const score = submission.final_judge_scores?.[judgeId];
   return typeof score === "number" ? score : null;
+}
+
+export type HumanFinalJudgeMark = {
+  judgeId: string;
+  judgeEmail: string;
+  score: number | null;
+  notes: string | null;
+  criteriaScores?: Record<string, number | null>;
+};
+
+/**
+ * Reads final-round marks only from judge-owned final fields.
+ * Project-agent/theme scores are intentionally excluded, and every id must resolve
+ * to a real judge or mentor account before it can appear in organizer reports.
+ */
+export function buildHumanFinalJudgeMarks(
+  submission: Submission,
+  criteria: JudgingCriterion[],
+  judgeDirectory: Record<string, { email: string; role: PortalRole } | undefined>,
+): HumanFinalJudgeMark[] {
+  const judgeIds = new Set([
+    ...Object.keys(submission.final_judge_scores ?? {}),
+    ...Object.keys(submission.final_judge_criteria_scores_by_judge ?? {}),
+    ...Object.keys(submission.final_judge_notes_by_judge ?? {}),
+  ]);
+
+  return [...judgeIds]
+    .filter((judgeId) => {
+      const account = judgeDirectory[judgeId];
+      return account?.role === "judge" || account?.role === "mentor";
+    })
+    .map((judgeId) => {
+      const criteriaScores = submission.final_judge_criteria_scores_by_judge?.[judgeId];
+      return {
+        judgeId,
+        judgeEmail: judgeDirectory[judgeId]?.email ?? "Unknown judge",
+        score: getFinalJudgeTotalScoreForJudge(submission, judgeId, criteria),
+        notes: submission.final_judge_notes_by_judge?.[judgeId] ?? null,
+        criteriaScores:
+          criteriaScores && typeof criteriaScores === "object" ? criteriaScores : undefined,
+      };
+    })
+    .sort((left, right) => left.judgeEmail.localeCompare(right.judgeEmail));
 }
 
 /** Flatten this judge's scores/notes onto the submission for the judge UI. */

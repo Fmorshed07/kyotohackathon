@@ -1,5 +1,6 @@
 import {
   Activity,
+  Award,
   LayoutDashboard,
   FileText,
   ClipboardList,
@@ -268,8 +269,13 @@ const buildAdminScoringNav: AdminNavBuilder = (hackathonId) => [
     icon: Star,
   },
   {
-    href: withHackathonQuery("/dashboard/admin/judging#judge-marks", hackathonId),
-    label: "Mark check",
+    href: withHackathonQuery("/dashboard/admin/final-shortlist#final-judge-scores", hackathonId),
+    label: "Final judge scores",
+    icon: Award,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/judge-marks", hackathonId),
+    label: "Judge marks",
     icon: ClipboardCheck,
   },
   {
@@ -321,6 +327,7 @@ const hostScoringNav: NavItem[] = [
   { href: "/dashboard/host#marking-criteria", label: "Criteria", icon: ListChecks },
   { href: "/dashboard/host#submission-marks", label: "Submissions", icon: ClipboardList },
   { href: "/dashboard/host#final-shortlist", label: "Final shortlist", icon: Star },
+  { href: "/dashboard/host#final-judge-scores", label: "Final judge scores", icon: Award },
   { href: "/dashboard/host#judge-marks", label: "Mark check", icon: ClipboardCheck },
   { href: "/dashboard/host#judge-marks-chart", label: "Judge chart", icon: BarChart3 },
   { href: "/dashboard/host#analytics", label: "Analytics", icon: BarChart3 },
@@ -500,6 +507,16 @@ function AdminHashScroll() {
         location.pathname === "/dashboard/admin/judging")
     ) {
       navigate(`/dashboard/admin/final-shortlist${location.search}`, { replace: true });
+      return;
+    }
+
+    if (
+      id === "judge-marks" &&
+      (location.pathname === "/dashboard/admin" ||
+        location.pathname === "/dashboard/admin/" ||
+        location.pathname === "/dashboard/admin/judging")
+    ) {
+      navigate(`/dashboard/admin/judge-marks${location.search}`, { replace: true });
       return;
     }
 

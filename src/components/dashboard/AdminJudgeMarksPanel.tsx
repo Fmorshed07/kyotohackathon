@@ -19,7 +19,7 @@ type AdminJudgeMarksPanelProps = {
 };
 
 type JudgeMark = AdminSubmissionRow["judgeMarks"][number];
-type MarkCheckFilter = "all" | "scored" | "awaiting";
+type MarkCheckFilter = "all" | "saved" | "awaiting";
 
 function hasAnyScore(row: AdminSubmissionRow) {
   return row.judgeMarks.some((mark) => typeof mark.score === "number");
@@ -56,7 +56,7 @@ function JudgeMarkCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-foreground">{mark.judgeEmail}</p>
           <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-            {hasScore ? "Scored" : "Not scored yet"}
+            {hasScore ? "Saved" : "Not saved yet"}
           </p>
         </div>
         <div className="text-right">
@@ -172,7 +172,7 @@ function SubmissionMarksCard({
         ) : (
           <>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Marks by judge
+              Saved marks by judge
             </p>
             <div className="grid gap-3 md:grid-cols-2">
               {submission.judgeMarks.map((mark) => (
@@ -199,7 +199,7 @@ export function AdminJudgeMarksPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<MarkCheckFilter>("all");
 
-  const scoredSubmissions = submissions.filter(hasAnyScore);
+  const savedSubmissions = submissions.filter(hasAnyScore);
   const awaitingSubmissions = submissions.filter((row) => !hasAnyScore(row));
   const totalMarks = submissions.reduce(
     (total, row) => total + row.judgeMarks.filter((m) => typeof m.score === "number").length,
@@ -207,7 +207,7 @@ export function AdminJudgeMarksPanel({
   );
 
   const filteredSubmissions = submissions.filter((row) => {
-    if (filter === "scored" && !hasAnyScore(row)) return false;
+    if (filter === "saved" && !hasAnyScore(row)) return false;
     if (filter === "awaiting" && hasAnyScore(row)) return false;
     return matchesSearchQuery(searchQuery, [
       row.title,
@@ -220,7 +220,7 @@ export function AdminJudgeMarksPanel({
 
   const filterOptions: Array<{ id: MarkCheckFilter; label: string; count: number }> = [
     { id: "all", label: "All", count: submissions.length },
-    { id: "scored", label: "Scored", count: scoredSubmissions.length },
+    { id: "saved", label: "Saved", count: savedSubmissions.length },
     { id: "awaiting", label: "Awaiting", count: awaitingSubmissions.length },
   ];
 
@@ -232,10 +232,10 @@ export function AdminJudgeMarksPanel({
             <ClipboardCheck className="h-4 w-4" />
           </span>
           <div>
-            <p className="dash-eyebrow">Mark check</p>
-            <h2 className="dash-title">Judging mark check</h2>
+            <p className="dash-eyebrow">Saved marks</p>
+            <h2 className="dash-title">Judge marks</h2>
             <p className="dash-subtitle">
-              Verify each judge’s scores and criterion breakdown for {selectedHackathon.name}.
+              Every entry below has been read from saved judge records for {selectedHackathon.name}.
             </p>
           </div>
         </div>
@@ -243,7 +243,7 @@ export function AdminJudgeMarksPanel({
           variant="outline"
           className="border-primary/40 bg-primary/10 font-mono uppercase tracking-[0.14em] text-primary"
         >
-          {isLoading ? "Loading…" : `${totalMarks} marks · ${scoredSubmissions.length} projects`}
+          {isLoading ? "Loading…" : `${totalMarks} saved marks · ${savedSubmissions.length} projects`}
         </Badge>
       </div>
 
@@ -291,9 +291,9 @@ export function AdminJudgeMarksPanel({
             {searchQuery.trim()
               ? "No projects match this search."
               : filter === "awaiting"
-                ? "Every project has at least one judge mark."
-                : filter === "scored"
-                  ? "No judge marks recorded yet. Scores appear here as judges submit them."
+                ? "Every project has at least one saved judge mark."
+                : filter === "saved"
+                  ? "No saved judge marks yet. Scores appear here after judges save them."
                   : "No projects to show."}
           </p>
         ) : (

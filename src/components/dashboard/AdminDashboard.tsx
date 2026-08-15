@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Activity,
   CalendarCheck2,
+  ClipboardCheck,
   ExternalLink,
   Gavel,
   Github,
@@ -48,6 +49,8 @@ import type { AdminGrantRecord } from "@/lib/adminGrants";
 import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { AdminJudgingSection } from "@/components/dashboard/AdminJudgingSection";
 import { AdminFinalShortlistPanel } from "@/components/dashboard/AdminFinalShortlistPanel";
+import { AdminFinalJudgeScoresPanel } from "@/components/dashboard/AdminFinalJudgeScoresPanel";
+import { AdminJudgeMarksPanel } from "@/components/dashboard/AdminJudgeMarksPanel";
 import { type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole";
 import { AiHackathonLauncher } from "@/components/dashboard/AiHackathonLauncher";
 import { ManualHackathonLauncher } from "@/components/dashboard/ManualHackathonLauncher";
@@ -111,6 +114,15 @@ export type AdminSubmissionRow = {
     notes: string | null;
     criteriaScores?: Record<string, number | null>;
   }>;
+  finalJudgeMarks?: Array<{
+    judgeId: string;
+    judgeEmail: string;
+    score: number | null;
+    notes: string | null;
+    criteriaScores?: Record<string, number | null>;
+  }>;
+  finalAverageScore?: number | null;
+  finalScoredByCount?: number;
   averageScore: number | null;
   scoredByCount: number;
   createdAt: string | null;
@@ -128,7 +140,13 @@ export type NewSubmissionInput = {
 
 type AdminAnalytics = AdminJudgingStatistics;
 
-export type AdminWorkspace = "overview" | "create" | "people" | "judging" | "shortlist";
+export type AdminWorkspace =
+  | "overview"
+  | "create"
+  | "people"
+  | "judging"
+  | "shortlist"
+  | "marks";
 
 type AdminDashboardProps = {
   /** Which admin sub-page to render — each stays under /dashboard/admin/*. */
@@ -1052,6 +1070,54 @@ export function AdminDashboard({
           isLoading={isLoadingSubmissions}
           shortlistingSubmissionId={shortlistingSubmissionId}
           onSetFinalShortlisted={onSetFinalShortlisted}
+        />
+        <AdminFinalJudgeScoresPanel
+          selectedHackathon={selectedHackathon}
+          submissions={submissions}
+          judgingCriteria={judgingCriteria}
+          judges={approvedStaff.map((judge) => ({ id: judge.id, email: judge.email }))}
+          isLoading={isLoadingSubmissions || isLoadingUsers}
+        />
+      </div>
+    );
+  }
+
+  if (workspace === "marks") {
+    return (
+      <div className="space-y-6">
+        <section className={sectionClass} aria-label="Saved judge marks workspace">
+          <div className="dash-stack-header flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="dash-icon-chip dash-icon-chip--violet" aria-hidden>
+                <ClipboardCheck className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="dash-eyebrow">Saved judging records</p>
+                <h2 className="dash-title">Judge marks</h2>
+                <p className="dash-subtitle">
+                  Review every judge's saved score, criterion breakdown, and notes for {selectedHackathon.name}.
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link to={withHackathonQuery("/dashboard/admin/judging", eventQuery)}>
+                Back to judging
+              </Link>
+            </Button>
+          </div>
+        </section>
+        <AdminJudgeMarksPanel
+          selectedHackathon={selectedHackathon}
+          submissions={submissions}
+          judgingCriteria={judgingCriteria}
+          isLoading={isLoadingSubmissions}
+        />
+        <AdminFinalJudgeScoresPanel
+          selectedHackathon={selectedHackathon}
+          submissions={submissions}
+          judgingCriteria={judgingCriteria}
+          judges={approvedStaff.map((judge) => ({ id: judge.id, email: judge.email }))}
+          isLoading={isLoadingSubmissions || isLoadingUsers}
         />
       </div>
     );

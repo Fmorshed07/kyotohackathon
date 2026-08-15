@@ -165,6 +165,7 @@ const App = () => (
           <Route path="/dashboard/admin/people" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/judging" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/final-shortlist" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
+          <Route path="/dashboard/admin/judge-marks" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/screening" element={<AdminProtectedRoute><ScreeningAgentPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/project-screening" element={<AdminProtectedRoute><ProjectScreeningPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/operations" element={<AdminProtectedRoute><PlatformOperationsPage /></AdminProtectedRoute>} />

@@ -451,6 +451,20 @@ export default function JudgeDashboardPage() {
     [judgeSubmissions, judgeId, judgingCriteria]
   );
 
+  const finalJudgeSummary = useMemo(() => {
+    const scores = finalRoundSubmissions
+      .map((submission) => submission.judge_score)
+      .filter((score): score is number => typeof score === "number");
+    return {
+      total: finalRoundSubmissions.length,
+      scored: scores.length,
+      averageScore:
+        scores.length > 0
+          ? scores.reduce((total, score) => total + score, 0) / scores.length
+          : null,
+    };
+  }, [finalRoundSubmissions]);
+
   const judgeStatistics = useMemo(
     () =>
       judgeId ? buildJudgeStatistics(filteredJudgeSubmissions, judgeId, judgingCriteria) : null,
@@ -902,6 +916,7 @@ export default function JudgeDashboardPage() {
           isLoadingSubmissions={isLoadingSubmissions || isLoadingCriteria}
           judgeMessage={judgeMessage}
           summary={judgeSummary}
+          finalSummary={finalJudgeSummary}
           statistics={judgeStatistics}
           onCriterionScoreChange={handleCriterionScoreChange}
           onNotesChange={handleJudgeNotesChange}

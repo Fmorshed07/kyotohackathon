@@ -30,7 +30,10 @@ import {
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
 import { saveHackathonCriteria } from "@/lib/hackathonCriteria";
-import { getJudgeTotalScoreForJudge } from "@/lib/judgeSubmissionScores";
+import {
+  buildHumanFinalJudgeMarks,
+  getJudgeTotalScoreForJudge,
+} from "@/lib/judgeSubmissionScores";
 import {
   buildAdminTop3RankingSummary,
   fetchJudgeRankingsForHackathon,
@@ -144,6 +147,8 @@ export default function AdminDashboardPage() {
   const location = useLocation();
   const workspace: AdminWorkspace = location.pathname.includes("/final-shortlist")
     ? "shortlist"
+    : location.pathname.includes("/judge-marks")
+    ? "marks"
     : location.pathname.includes("/create")
     ? "create"
     : location.pathname.includes("/people")
@@ -500,6 +505,14 @@ export default function AdminDashboardPage() {
       const validScores = marks
         .map((mark) => mark.score)
         .filter((value): value is number => typeof value === "number");
+      const finalJudgeMarks = buildHumanFinalJudgeMarks(
+        submission,
+        judgingCriteria,
+        userById,
+      );
+      const validFinalScores = finalJudgeMarks
+        .map((mark) => mark.score)
+        .filter((value): value is number => typeof value === "number");
 
       const team = buildAdminTeamDetails({
         submission,
@@ -531,6 +544,12 @@ export default function AdminDashboardPage() {
         isFinalShortlisted: submission.final_shortlisted === true,
         finalShortlistedAt: submission.final_shortlisted_at ?? null,
         judgeMarks: marks,
+        finalJudgeMarks,
+        finalAverageScore:
+          validFinalScores.length > 0
+            ? validFinalScores.reduce((total, score) => total + score, 0) / validFinalScores.length
+            : null,
+        finalScoredByCount: validFinalScores.length,
         averageScore:
           validScores.length > 0
             ? validScores.reduce((total, score) => total + score, 0) / validScores.length
