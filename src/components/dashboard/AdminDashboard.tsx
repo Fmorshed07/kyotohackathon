@@ -94,6 +94,8 @@ export type AdminSubmissionRow = {
   submissionPdfUrl: string | null;
   demoVideoUrl: string | null;
   isPublic: boolean;
+  isFinalShortlisted: boolean;
+  finalShortlistedAt: string | null;
   judgeMarks: Array<{
     judgeId: string;
     judgeEmail: string;
@@ -163,9 +165,11 @@ type AdminDashboardProps = {
   isCreatingSubmission: boolean;
   deletingSubmissionId: string | null;
   publishingSubmissionId: string | null;
+  shortlistingSubmissionId: string | null;
   onCreateSubmission: (payload: NewSubmissionInput) => Promise<void>;
   onDeleteSubmission: (submissionId: string) => Promise<void>;
   onSetSubmissionPublic: (submissionId: string, makePublic: boolean) => Promise<void>;
+  onSetFinalShortlisted: (submissionId: string, shortlisted: boolean) => Promise<void>;
   top3RankingSummary: AdminTop3RankingSummary;
   isLoadingTop3Rankings: boolean;
   top3SubmissionLookup: Map<
@@ -923,9 +927,11 @@ export function AdminDashboard({
   isCreatingSubmission,
   deletingSubmissionId,
   publishingSubmissionId,
+  shortlistingSubmissionId,
   onCreateSubmission,
   onDeleteSubmission,
   onSetSubmissionPublic,
+  onSetFinalShortlisted,
   top3RankingSummary,
   isLoadingTop3Rankings,
   top3SubmissionLookup,
@@ -1036,11 +1042,13 @@ export function AdminDashboard({
           isCreatingSubmission={isCreatingSubmission}
           deletingSubmissionId={deletingSubmissionId}
           publishingSubmissionId={publishingSubmissionId}
+          shortlistingSubmissionId={shortlistingSubmissionId}
           newSubmission={newSubmission}
           onNewSubmissionChange={setNewSubmission}
           onCreateSubmission={onCreateSubmission}
           onDeleteSubmission={onDeleteSubmission}
           onSetSubmissionPublic={onSetSubmissionPublic}
+          onSetFinalShortlisted={onSetFinalShortlisted}
           top3RankingSummary={top3RankingSummary}
           isLoadingTop3Rankings={isLoadingTop3Rankings}
           top3SubmissionLookup={top3SubmissionLookup}

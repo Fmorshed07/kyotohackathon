@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CalendarDays, ClipboardList, Download, Globe, GlobeLock, MapPin, PlusCircle, Trash2 } from "lucide-react";
+import { CalendarDays, ClipboardList, Download, Globe, GlobeLock, MapPin, PlusCircle, Star, Trash2 } from "lucide-react";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import type { AdminSubmissionRow, AdminUser, NewSubmissionInput } from "@/components/dashboard/AdminDashboard";
 import {
@@ -43,11 +43,13 @@ type AdminSubmissionsPanelProps = {
   isCreatingSubmission: boolean;
   deletingSubmissionId: string | null;
   publishingSubmissionId: string | null;
+  shortlistingSubmissionId: string | null;
   newSubmission: NewSubmissionInput;
   onNewSubmissionChange: (value: NewSubmissionInput) => void;
   onCreateSubmission: (payload: NewSubmissionInput) => Promise<void>;
   onDeleteSubmission: (submissionId: string) => Promise<void>;
   onSetSubmissionPublic: (submissionId: string, makePublic: boolean) => Promise<void>;
+  onSetFinalShortlisted: (submissionId: string, shortlisted: boolean) => Promise<void>;
 };
 
 function toCsvInputs(
@@ -94,14 +96,18 @@ function SubmissionTable({
   submissions,
   deletingSubmissionId,
   publishingSubmissionId,
+  shortlistingSubmissionId,
   onDeleteSubmission,
   onSetSubmissionPublic,
+  onSetFinalShortlisted,
 }: {
   submissions: AdminSubmissionRow[];
   deletingSubmissionId: string | null;
   publishingSubmissionId: string | null;
+  shortlistingSubmissionId: string | null;
   onDeleteSubmission: (submissionId: string) => Promise<void>;
   onSetSubmissionPublic: (submissionId: string, makePublic: boolean) => Promise<void>;
+  onSetFinalShortlisted: (submissionId: string, shortlisted: boolean) => Promise<void>;
 }) {
   return (
     <div className="dash-table-scroll rounded-xl border border-white/10">
@@ -115,13 +121,16 @@ function SubmissionTable({
             <TableHead className="dash-table-head">Links</TableHead>
             <TableHead className="dash-table-head w-[90px] text-right">Avg</TableHead>
             <TableHead className="dash-table-head w-[100px] text-right">Judges</TableHead>
+            <TableHead className="dash-table-head w-[145px] text-right">Final list</TableHead>
             <TableHead className="dash-table-head w-[150px] text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {submissions.map((submission) => {
             const isBusy =
-              deletingSubmissionId === submission.id || publishingSubmissionId === submission.id;
+              deletingSubmissionId === submission.id ||
+              publishingSubmissionId === submission.id ||
+              shortlistingSubmissionId === submission.id;
             return (
             <TableRow
               key={submission.id}
@@ -159,6 +168,11 @@ function SubmissionTable({
                 >
                   {submission.isPublic ? "Public" : "Private"}
                 </Badge>
+                {submission.isFinalShortlisted ? (
+                  <Badge className="ml-2 mt-2 border-amber-400/30 bg-amber-500/10 text-[0.6rem] uppercase tracking-[0.12em] text-amber-200 hover:bg-amber-500/10">
+                    Finalist
+                  </Badge>
+                ) : null}
               </TableCell>
               <TableCell className="align-top">
                 {formatSubmissionDate(submission.createdAt) ? (
@@ -225,6 +239,37 @@ function SubmissionTable({
                   {submission.scoredByCount}/{submission.judgeMarks.length}
                 </p>
                 <p className="text-[0.65rem] text-muted-foreground">scored</p>
+              </TableCell>
+              <TableCell className="align-top text-right">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={submission.isFinalShortlisted ? "outline" : "default"}
+                  className={
+                    submission.isFinalShortlisted
+                      ? "h-8 gap-1.5 border-amber-400/30 px-3 text-[0.65rem] uppercase tracking-[0.16em] text-amber-200"
+                      : "h-8 gap-1.5 px-3 text-[0.65rem] uppercase tracking-[0.16em]"
+                  }
+                  disabled={isBusy}
+                  aria-pressed={submission.isFinalShortlisted}
+                  aria-label={
+                    submission.isFinalShortlisted
+                      ? `Remove ${submission.teamName || submission.title || "this team"} from final shortlist`
+                      : `Add ${submission.teamName || submission.title || "this team"} to final shortlist`
+                  }
+                  onClick={() =>
+                    void onSetFinalShortlisted(submission.id, !submission.isFinalShortlisted)
+                  }
+                >
+                  <Star
+                    className={submission.isFinalShortlisted ? "h-3.5 w-3.5 fill-amber-400 text-amber-400" : "h-3.5 w-3.5"}
+                  />
+                  {shortlistingSubmissionId === submission.id
+                    ? "Saving…"
+                    : submission.isFinalShortlisted
+                      ? "Finalist"
+                      : "Add finalist"}
+                </Button>
               </TableCell>
               <TableCell className="align-top text-right">
                 <div className="flex flex-col items-end gap-2">
@@ -297,11 +342,13 @@ export function AdminSubmissionsPanel({
   isCreatingSubmission,
   deletingSubmissionId,
   publishingSubmissionId,
+  shortlistingSubmissionId,
   newSubmission,
   onNewSubmissionChange,
   onCreateSubmission,
   onDeleteSubmission,
   onSetSubmissionPublic,
+  onSetFinalShortlisted,
 }: AdminSubmissionsPanelProps) {
   const [eventFilter, setEventFilter] = useState<HackathonId | "all">("all");
 
@@ -519,8 +566,10 @@ export function AdminSubmissionsPanel({
                   submissions={group.items}
                   deletingSubmissionId={deletingSubmissionId}
                   publishingSubmissionId={publishingSubmissionId}
+                  shortlistingSubmissionId={shortlistingSubmissionId}
                   onDeleteSubmission={onDeleteSubmission}
                   onSetSubmissionPublic={onSetSubmissionPublic}
+                  onSetFinalShortlisted={onSetFinalShortlisted}
                 />
               </section>
             ))}

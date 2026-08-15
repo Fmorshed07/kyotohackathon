@@ -8,6 +8,8 @@ const PRIVATE_JUDGING_KEYS = [
   "judge_notes_by_judge",
   "judge_criteria_scores",
   "judge_criteria_scores_by_judge",
+  "final_shortlisted",
+  "final_shortlisted_at",
 ] as const;
 
 export type PublicProjectLink = {

@@ -32,6 +32,7 @@ import { buildAdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { queueParticipantEmail } from "@/lib/participantEmail";
 import { buildAdminTeamDetails } from "@/lib/teamRoster";
 import { setSubmissionPublicPreview } from "@/lib/projectSocial";
+import { setSubmissionFinalShortlist } from "@/lib/finalShortlist";
 import type {
   HostApprovalStatus,
   JudgeApprovalStatus,
@@ -136,6 +137,7 @@ export function HostEventJudgingWorkspace({
   const [isCreatingSubmission, setIsCreatingSubmission] = useState(false);
   const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
   const [publishingSubmissionId, setPublishingSubmissionId] = useState<string | null>(null);
+  const [shortlistingSubmissionId, setShortlistingSubmissionId] = useState<string | null>(null);
   const [isSavingCriteria, setIsSavingCriteria] = useState(false);
   const [newSubmission, setNewSubmission] = useState<NewSubmissionInput>(emptyNewSubmission);
   const [judgeRankings, setJudgeRankings] = useState<Awaited<
@@ -352,6 +354,8 @@ export function HostEventJudgingWorkspace({
             submissionPdfUrl: submission.submission_pdf_url,
             demoVideoUrl: submission.demo_video_url,
             isPublic: submission.public_preview_consent === true,
+            isFinalShortlisted: submission.final_shortlisted === true,
+            finalShortlistedAt: submission.final_shortlisted_at ?? null,
             judgeMarks: marks,
             averageScore:
               validScores.length > 0
@@ -618,6 +622,44 @@ export function HostEventJudgingWorkspace({
     }
   };
 
+  const handleSetFinalShortlisted = async (submissionId: string, shortlisted: boolean) => {
+    const submission = submissions.find((item) => item.id === submissionId);
+    if (!submission) {
+      onMessage?.("Submission not found.");
+      return;
+    }
+
+    setShortlistingSubmissionId(submissionId);
+    try {
+      const update = await setSubmissionFinalShortlist(db, submissionId, shortlisted);
+      setSubmissions((current) =>
+        current.map((item) =>
+          item.id === submissionId
+            ? {
+                ...item,
+                final_shortlisted: update.final_shortlisted,
+                final_shortlisted_at: update.final_shortlisted_at,
+                updated_at: update.updated_at,
+              }
+            : item,
+        ),
+      );
+      onMessage?.(
+        shortlisted
+          ? `${submission.team_name?.trim() || submission.title?.trim() || "Team"} added to the final shortlist.`
+          : `${submission.team_name?.trim() || submission.title?.trim() || "Team"} removed from the final shortlist.`,
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to update the final shortlist.";
+      onMessage?.(text);
+    } finally {
+      setShortlistingSubmissionId(null);
+    }
+  };
+
   const handleSaveCriteria = async (criteria: JudgingCriterion[]) => {
     setIsSavingCriteria(true);
     try {
@@ -671,11 +713,13 @@ export function HostEventJudgingWorkspace({
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}
         publishingSubmissionId={publishingSubmissionId}
+        shortlistingSubmissionId={shortlistingSubmissionId}
         newSubmission={newSubmission}
         onNewSubmissionChange={setNewSubmission}
         onCreateSubmission={handleCreateSubmission}
         onDeleteSubmission={handleDeleteSubmission}
         onSetSubmissionPublic={handleSetSubmissionPublic}
+        onSetFinalShortlisted={handleSetFinalShortlisted}
         top3RankingSummary={top3RankingSummary}
         isLoadingTop3Rankings={isLoadingTop3Rankings}
         top3SubmissionLookup={top3SubmissionLookup}

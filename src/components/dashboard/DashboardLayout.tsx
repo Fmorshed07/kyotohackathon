@@ -33,6 +33,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   ListChecks,
+  Star,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -257,6 +258,11 @@ const buildAdminScoringNav: AdminNavBuilder = (hackathonId) => [
     icon: ClipboardList,
   },
   {
+    href: withHackathonQuery("/dashboard/admin/judging#final-shortlist", hackathonId),
+    label: "Final shortlist",
+    icon: Star,
+  },
+  {
     href: withHackathonQuery("/dashboard/admin/judging#judge-marks", hackathonId),
     label: "Mark check",
     icon: ClipboardCheck,
@@ -309,6 +315,7 @@ const hostScoringNav: NavItem[] = [
   { href: "/dashboard/host#judging", label: "Judging", icon: Gavel },
   { href: "/dashboard/host#marking-criteria", label: "Criteria", icon: ListChecks },
   { href: "/dashboard/host#submission-marks", label: "Submissions", icon: ClipboardList },
+  { href: "/dashboard/host#final-shortlist", label: "Final shortlist", icon: Star },
   { href: "/dashboard/host#judge-marks", label: "Mark check", icon: ClipboardCheck },
   { href: "/dashboard/host#judge-marks-chart", label: "Judge chart", icon: BarChart3 },
   { href: "/dashboard/host#analytics", label: "Analytics", icon: BarChart3 },
@@ -332,6 +339,7 @@ const judgeScoringNav: NavItem[] = [
   { href: "#submissions", label: "Submissions", icon: ClipboardList },
   { href: "#judge-marks-chart", label: "My marks", icon: BarChart3 },
   { href: "#project-marks", label: "Theme marks", icon: ScanSearch },
+  { href: "#final-shortlist", label: "Final shortlist", icon: Star },
   { href: "#top-3-ranking", label: "Top 3 Ranking", icon: Trophy },
 ];
 

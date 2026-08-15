@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Gavel,
   ScanSearch,
+  Star,
   Trophy,
   Users,
 } from "lucide-react";
@@ -30,12 +31,14 @@ import type { PortalHackathon } from "@/lib/hackathons";
 import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
 import { collectTeamDisplayNames } from "@/lib/teamRoster";
 import { formatSubmissionDateTime } from "@/lib/datetime";
+import { getFinalShortlist } from "@/lib/finalShortlist";
 
 const JUDGE_JUMP_LINKS = [
   { href: "#teams", label: "1. Teams", icon: Users },
   { href: "#submissions", label: "2. Score", icon: ClipboardList },
   { href: "#project-marks", label: "3. Theme marks", icon: ScanSearch },
-  { href: "#top-3-ranking", label: "4. Top 3", icon: Trophy },
+  { href: "#final-shortlist", label: "4. Final shortlist", icon: Star },
+  { href: "#top-3-ranking", label: "5. Top 3", icon: Trophy },
 ] as const;
 
 type TeamSummary = {
@@ -133,6 +136,7 @@ export function JudgeDashboard({
     if (!searchQuery.trim()) return submissions;
     return submissions.filter((submission) => submissionMatchesSearch(searchQuery, submission));
   }, [searchQuery, submissions]);
+  const finalShortlist = useMemo(() => getFinalShortlist(submissions), [submissions]);
   const activeTeam =
     filteredTeams.find((team) => team.name === selectedTeamName) ?? filteredTeams[0] ?? null;
   const activeTeamAccent = activeTeam ? getTeamAccentStyle(activeTeam.name) : null;
@@ -189,14 +193,14 @@ export function JudgeDashboard({
                 <p className="dash-eyebrow">Judge command center</p>
                 <h2 className="dash-title">Overview</h2>
                 <p className="dash-subtitle max-w-2xl">
-                  Work in order: review teams, score submissions, check theme marks, then lock your
-                  top 3 for {selectedHackathon.name}.
+                  Work in order: review teams, score submissions, check theme marks, score the final
+                  shortlist, then lock your top 3 for {selectedHackathon.name}.
                 </p>
               </div>
             </div>
 
             {!isLoadingSubmissions && submissions.length > 0 ? (
-              <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <a href="#teams" className="dash-workflow-card block transition hover:border-primary/35">
                   <div className="flex items-center gap-2 text-primary">
                     <Users className="h-4 w-4" aria-hidden />
@@ -215,10 +219,21 @@ export function JudgeDashboard({
                     {summary.total - summary.scored} ideas still need a complete score.
                   </p>
                 </a>
+                <a href="#final-shortlist" className="dash-workflow-card block transition hover:border-amber-400/35">
+                  <div className="flex items-center gap-2 text-amber-300">
+                    <Star className="h-4 w-4" aria-hidden />
+                    <p className="text-xs font-semibold uppercase">3. Final shortlist</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {finalShortlist.length > 0
+                      ? `${finalShortlist.length} finalist${finalShortlist.length === 1 ? "" : "s"} ready for final marks.`
+                      : "Waiting for organizers to select the finalists."}
+                  </p>
+                </a>
                 <a href="#top-3-ranking" className="dash-workflow-card block transition hover:border-primary/35">
                   <div className="flex items-center gap-2 text-amber-300">
                     <Trophy className="h-4 w-4" aria-hidden />
-                    <p className="text-xs font-semibold uppercase">3. Rank</p>
+                    <p className="text-xs font-semibold uppercase">4. Rank</p>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
                     After scoring, lock a clean top 3 ballot.
@@ -292,23 +307,6 @@ export function JudgeDashboard({
                 />
               </div>
             </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.56fr)_minmax(0,1fr)] lg:items-center">
-              <SubmissionSearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search teams, projects, or members..."
-              />
-              {hasSearchQuery ? (
-                <p className="text-xs text-muted-foreground">
-                  Showing {filteredTeams.length} of {teams.length} teams and{" "}
-                  {filteredSubmissions.length} of {submissions.length} submissions.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Search filters the roster, scoring queue, and ballot candidate list.
-                </p>
-              )}
-            </div>
           </>
         ) : null}
         {statistics ? (
@@ -358,6 +356,25 @@ export function JudgeDashboard({
             </p>
           </div>
         </div>
+        {!isLoadingSubmissions && teams.length > 0 ? (
+          <div className="mb-5 grid gap-3 lg:grid-cols-[minmax(0,0.56fr)_minmax(0,1fr)] lg:items-center">
+            <SubmissionSearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search teams, projects, or members..."
+            />
+            {hasSearchQuery ? (
+              <p className="text-xs text-muted-foreground">
+                Showing {filteredTeams.length} of {teams.length} teams and{" "}
+                {filteredSubmissions.length} of {submissions.length} submissions.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Search by team name, member, or project title.
+              </p>
+            )}
+          </div>
+        ) : null}
         {isLoadingSubmissions ? (
           <p className="text-sm text-muted-foreground">Loading teams…</p>
         ) : teams.length === 0 ? (
@@ -579,6 +596,25 @@ export function JudgeDashboard({
           </div>
         </div>
         <div className="p-4 sm:p-5 md:p-8">
+          {!isLoadingSubmissions && submissions.length > 0 ? (
+            <div className="mb-6 grid gap-3 lg:grid-cols-[minmax(0,0.56fr)_minmax(0,1fr)] lg:items-center">
+              <SubmissionSearchInput
+                id="judge-submission-search"
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search projects, teams, or members..."
+              />
+              {hasSearchQuery ? (
+                <p className="text-xs text-muted-foreground">
+                  Showing {filteredSubmissions.length} of {submissions.length} projects to score.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Find a project by its title, team, or member.
+                </p>
+              )}
+            </div>
+          ) : null}
           {isLoadingSubmissions ? (
             <p className="text-sm text-muted-foreground">
               Loading submissions…
@@ -618,6 +654,50 @@ export function JudgeDashboard({
         submissions={submissions}
         isLoading={isLoadingSubmissions}
       />
+
+      <section
+        className={`${sectionClass} scroll-mt-24 overflow-hidden border-amber-400/20 bg-gradient-to-b from-amber-500/[0.07] via-card/95 to-card/95 p-0`}
+        id="final-shortlist"
+        aria-labelledby="final-shortlist-heading"
+      >
+        <div className="border-b border-white/10 px-4 py-5 sm:px-6 sm:py-6 md:px-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="dash-icon-chip dash-icon-chip--sunset shrink-0" aria-hidden>
+                <Star className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="dash-eyebrow">Final round</p>
+                <h2 id="final-shortlist-heading" className="dash-title">Final shortlist</h2>
+                <p className="dash-subtitle">
+                  Score the teams selected by the organizers. Your existing criteria and private notes are used here.
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex w-fit rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
+              {finalShortlist.length} finalist{finalShortlist.length === 1 ? "" : "s"}
+            </span>
+          </div>
+        </div>
+        <div className="p-4 sm:p-5 md:p-8">
+          {isLoadingSubmissions ? (
+            <p className="text-sm text-muted-foreground">Loading final shortlist…</p>
+          ) : finalShortlist.length === 0 ? (
+            <div className="dash-empty">
+              The organizers have not selected finalists for {selectedHackathon.name} yet.
+            </div>
+          ) : (
+            <JudgeScoringWorkspace
+              submissions={finalShortlist}
+              judgingCriteria={judgingCriteria}
+              onCriterionScoreChange={onCriterionScoreChange}
+              onNotesChange={onNotesChange}
+              onSave={onSave}
+              savingSubmissionId={savingSubmissionId}
+            />
+          )}
+        </div>
+      </section>
 
       <section
         className={`${sectionClass} scroll-mt-24 overflow-hidden border-violet-500/20 bg-gradient-to-b from-violet-500/5 via-card/95 to-card/95 p-0`}

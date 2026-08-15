@@ -137,10 +137,14 @@ describe("project social links", () => {
       judge_score: 91,
       judge_notes: "private",
       judge_scores: { judge: 91 },
+      final_shortlisted: true,
+      final_shortlisted_at: "2026-08-15T02:30:00.000Z",
     });
     expect(publicProject?.judge_score).toBeNull();
     expect(publicProject?.judge_notes).toBeNull();
     expect(publicProject?.judge_scores).toBeNull();
+    expect(publicProject?.final_shortlisted).toBeUndefined();
+    expect(publicProject?.final_shortlisted_at).toBeUndefined();
     expect(toPublicGallerySubmission("proj-2", { public_preview_consent: false })).toBeNull();
   });
 

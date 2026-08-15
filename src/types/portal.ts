@@ -69,6 +69,9 @@ export type Submission = {
   gallery_urls?: string[] | null;
   /** True when the project appears on hackathon boards and the public gallery. Set by the team, or by a host/admin. */
   public_preview_consent?: boolean | null;
+  /** Organizer-controlled flag for teams advancing to the event's final judging round. */
+  final_shortlisted?: boolean | null;
+  final_shortlisted_at?: string | null;
   created_at: string | null;
   updated_at?: string | null;
   judge_id?: string | null;

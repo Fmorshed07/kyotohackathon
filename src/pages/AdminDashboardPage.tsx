@@ -41,6 +41,7 @@ import { buildInviteUrl } from "@/lib/inviteTokens";
 import { createJudgeInvite } from "@/lib/portalInvites";
 import { buildAdminTeamDetails } from "@/lib/teamRoster";
 import { setSubmissionPublicPreview } from "@/lib/projectSocial";
+import { setSubmissionFinalShortlist } from "@/lib/finalShortlist";
 import {
   fetchNewsletterSubscribers,
   type NewsletterSubscriber,
@@ -166,6 +167,7 @@ export default function AdminDashboardPage() {
   const [isCreatingSubmission, setIsCreatingSubmission] = useState(false);
   const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | null>(null);
   const [publishingSubmissionId, setPublishingSubmissionId] = useState<string | null>(null);
+  const [shortlistingSubmissionId, setShortlistingSubmissionId] = useState<string | null>(null);
   const [isSavingCriteria, setIsSavingCriteria] = useState(false);
   const [adminGrantEmail, setAdminGrantEmail] = useState("");
   const [pendingAdminGrants, setPendingAdminGrants] = useState<AdminGrantRecord[]>([]);
@@ -488,6 +490,8 @@ export default function AdminDashboardPage() {
         submissionPdfUrl: submission.submission_pdf_url,
         demoVideoUrl: submission.demo_video_url,
         isPublic: submission.public_preview_consent === true,
+        isFinalShortlisted: submission.final_shortlisted === true,
+        finalShortlistedAt: submission.final_shortlisted_at ?? null,
         judgeMarks: marks,
         averageScore:
           validScores.length > 0
@@ -1086,6 +1090,45 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleSetFinalShortlisted = async (submissionId: string, shortlisted: boolean) => {
+    const submission = allSubmissions.find((item) => item.id === submissionId);
+    if (!submission) {
+      setMessage("Submission not found.");
+      return;
+    }
+
+    setMessage(null);
+    setShortlistingSubmissionId(submissionId);
+    try {
+      const update = await setSubmissionFinalShortlist(db, submissionId, shortlisted);
+      setAllSubmissions((current) =>
+        current.map((item) =>
+          item.id === submissionId
+            ? {
+                ...item,
+                final_shortlisted: update.final_shortlisted,
+                final_shortlisted_at: update.final_shortlisted_at,
+                updated_at: update.updated_at,
+              }
+            : item,
+        ),
+      );
+      setMessage(
+        shortlisted
+          ? `${submission.team_name?.trim() || submission.title?.trim() || "Team"} added to the final shortlist.`
+          : `${submission.team_name?.trim() || submission.title?.trim() || "Team"} removed from the final shortlist.`,
+      );
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to update the final shortlist.";
+      setMessage(text);
+    } finally {
+      setShortlistingSubmissionId(null);
+    }
+  };
+
   const persistPlatformOps = async (next: PlatformOpsState, note?: string) => {
     const withTime = { ...next, updatedAt: new Date().toISOString() };
     await savePlatformOps(db, selectedHackathonId, withTime);
@@ -1452,9 +1495,11 @@ export default function AdminDashboardPage() {
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}
         publishingSubmissionId={publishingSubmissionId}
+        shortlistingSubmissionId={shortlistingSubmissionId}
         onCreateSubmission={handleCreateSubmission}
         onDeleteSubmission={handleDeleteSubmission}
         onSetSubmissionPublic={handleSetSubmissionPublic}
+        onSetFinalShortlisted={handleSetFinalShortlisted}
         top3RankingSummary={top3RankingSummary}
         isLoadingTop3Rankings={isLoadingTop3Rankings}
         top3SubmissionLookup={top3SubmissionLookup}

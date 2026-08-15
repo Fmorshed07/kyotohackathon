@@ -384,6 +384,13 @@ service cloud.firestore {
           || request.resource.data.team_leader_id == request.auth.uid;
       }
 
+      function finalShortlistFieldsUnchanged() {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          "final_shortlisted",
+          "final_shortlisted_at"
+        ]);
+      }
+
       function teammateEditableKeys() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           "title",
@@ -433,11 +440,12 @@ service cloud.firestore {
         )
         || (
           request.auth.uid == request.resource.data.user_id
+          && !request.resource.data.keys().hasAny(["final_shortlisted", "final_shortlisted_at"])
           && hackathonAllowsParticipantProjectWrites(requestHackathonId())
         )
       );
       allow update: if isSignedIn() && (
-        isApprovedStaff()
+        (isApprovedStaff() && finalShortlistFieldsUnchanged())
         || isAdmin()
         || (
           isApprovedHost()
@@ -447,6 +455,7 @@ service cloud.firestore {
         || isInviteJoinUpdate()
         || (
           isSubmissionOwner()
+          && finalShortlistFieldsUnchanged()
           && hackathonAllowsParticipantProjectWrites(existingHackathonId())
         )
         || (
