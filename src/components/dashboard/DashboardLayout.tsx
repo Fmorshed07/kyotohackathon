@@ -205,6 +205,11 @@ const buildAdminPeopleNav: AdminNavBuilder = (hackathonId) => [
     icon: Users,
   },
   {
+    href: withHackathonQuery("/dashboard/admin/people#audience-analytics", hackathonId),
+    label: "Website analytics",
+    icon: BarChart3,
+  },
+  {
     href: withHackathonQuery("/dashboard/admin/people#newsletter", hackathonId),
     label: "Newsletter",
     icon: Mail,
@@ -258,7 +263,7 @@ const buildAdminScoringNav: AdminNavBuilder = (hackathonId) => [
     icon: ClipboardList,
   },
   {
-    href: withHackathonQuery("/dashboard/admin/judging#final-shortlist", hackathonId),
+    href: withHackathonQuery("/dashboard/admin/final-shortlist", hackathonId),
     label: "Final shortlist",
     icon: Star,
   },
@@ -483,6 +488,16 @@ function AdminHashScroll() {
   useEffect(() => {
     const id = location.hash.replace(/^#/, "").trim();
     if (!id) return;
+
+    if (
+      id === "final-shortlist" &&
+      (location.pathname === "/dashboard/admin" ||
+        location.pathname === "/dashboard/admin/" ||
+        location.pathname === "/dashboard/admin/judging")
+    ) {
+      navigate(`/dashboard/admin/final-shortlist${location.search}`, { replace: true });
+      return;
+    }
 
     // Legacy overview hashes → dedicated admin workspaces.
     if (location.pathname === "/dashboard/admin" || location.pathname === "/dashboard/admin/") {

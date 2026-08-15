@@ -3,6 +3,7 @@ import { addDoc, collection, deleteDoc, deleteField, doc, getDocs, setDoc } from
 import {
   AdminJudgingSection,
 } from "@/components/dashboard/AdminJudgingSection";
+import { AdminFinalShortlistPanel } from "@/components/dashboard/AdminFinalShortlistPanel";
 import { AdminTeamsPanel } from "@/components/dashboard/AdminTeamsPanel";
 import {
   JudgeApprovalPanel,
@@ -108,6 +109,7 @@ type HostEventJudgingSlots = {
   teams: ReactNode;
   approvals: ReactNode;
   judging: ReactNode;
+  finalShortlist: ReactNode;
 };
 
 type HostEventJudgingWorkspaceProps = {
@@ -713,16 +715,23 @@ export function HostEventJudgingWorkspace({
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}
         publishingSubmissionId={publishingSubmissionId}
-        shortlistingSubmissionId={shortlistingSubmissionId}
         newSubmission={newSubmission}
         onNewSubmissionChange={setNewSubmission}
         onCreateSubmission={handleCreateSubmission}
         onDeleteSubmission={handleDeleteSubmission}
         onSetSubmissionPublic={handleSetSubmissionPublic}
-        onSetFinalShortlisted={handleSetFinalShortlisted}
         top3RankingSummary={top3RankingSummary}
         isLoadingTop3Rankings={isLoadingTop3Rankings}
         top3SubmissionLookup={top3SubmissionLookup}
+      />
+    ),
+    finalShortlist: (
+      <AdminFinalShortlistPanel
+        selectedHackathon={hackathon}
+        submissions={adminSubmissionRows}
+        isLoading={isLoadingSubmissions}
+        shortlistingSubmissionId={shortlistingSubmissionId}
+        onSetFinalShortlisted={handleSetFinalShortlisted}
       />
     ),
   };
@@ -734,6 +743,7 @@ export function HostEventJudgingWorkspace({
       {slots.teams}
       {slots.approvals}
       {slots.judging}
+      {slots.finalShortlist}
     </>
   );
 }

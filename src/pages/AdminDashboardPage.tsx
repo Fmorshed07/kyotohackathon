@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { addDoc, collection, deleteDoc, deleteField, doc, getDocs, setDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
@@ -46,6 +46,14 @@ import {
   fetchNewsletterSubscribers,
   type NewsletterSubscriber,
 } from "@/lib/hackathonSubscribe";
+import {
+  buildSiteAnalytics,
+  EMPTY_SITE_ANALYTICS,
+  fetchAudienceEngagementTotals,
+  fetchSitePageViews,
+  type AudienceEngagementTotals,
+  type SiteAnalyticsSnapshot,
+} from "@/lib/siteAnalytics";
 import {
   publishAiHackathon,
   publishManualHackathon,
@@ -134,7 +142,9 @@ const mapUserProfile = (data: Record<string, unknown>): UserProfile => ({
 
 export default function AdminDashboardPage() {
   const location = useLocation();
-  const workspace: AdminWorkspace = location.pathname.includes("/create")
+  const workspace: AdminWorkspace = location.pathname.includes("/final-shortlist")
+    ? "shortlist"
+    : location.pathname.includes("/create")
     ? "create"
     : location.pathname.includes("/people")
       ? "people"
@@ -192,6 +202,33 @@ export default function AdminDashboardPage() {
   const [isCreatingJudgeInvite, setIsCreatingJudgeInvite] = useState(false);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [isLoadingNewsletter, setIsLoadingNewsletter] = useState(false);
+  const [siteAnalytics, setSiteAnalytics] = useState<SiteAnalyticsSnapshot>(EMPTY_SITE_ANALYTICS);
+  const [audienceEngagement, setAudienceEngagement] = useState<AudienceEngagementTotals>({
+    projectStars: 0,
+    projectShares: 0,
+  });
+  const [isLoadingAudienceAnalytics, setIsLoadingAudienceAnalytics] = useState(false);
+
+  const loadAudienceAnalytics = useCallback(async () => {
+    if (!sessionUser || sessionUser.role !== "admin") return;
+    setIsLoadingAudienceAnalytics(true);
+    try {
+      const [pageViews, engagement] = await Promise.all([
+        fetchSitePageViews(db),
+        fetchAudienceEngagementTotals(db),
+      ]);
+      setSiteAnalytics(buildSiteAnalytics(pageViews));
+      setAudienceEngagement(engagement);
+    } catch (error: unknown) {
+      const text =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to load website analytics.";
+      setMessage(text);
+    } finally {
+      setIsLoadingAudienceAnalytics(false);
+    }
+  }, [db, sessionUser]);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -309,7 +346,8 @@ export default function AdminDashboardPage() {
     void loadPendingAdminGrants();
     void loadSubmissions();
     void loadNewsletter();
-  }, [sessionUser, db]);
+    void loadAudienceAnalytics();
+  }, [sessionUser, db, loadAudienceAnalytics]);
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "admin") return;
@@ -1546,6 +1584,10 @@ export default function AdminDashboardPage() {
         onCreateJudgeInvite={handleCreateJudgeInvite}
         newsletterSubscribers={newsletterSubscribers}
         isLoadingNewsletter={isLoadingNewsletter}
+        siteAnalytics={siteAnalytics}
+        audienceEngagement={audienceEngagement}
+        isLoadingAudienceAnalytics={isLoadingAudienceAnalytics}
+        onRefreshAudienceAnalytics={() => void loadAudienceAnalytics()}
       />
     </DashboardLayout>
   );

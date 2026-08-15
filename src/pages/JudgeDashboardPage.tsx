@@ -29,7 +29,12 @@ import { canAccessStaffDashboard, isStaffRole } from "@/lib/portalRoutes";
 import { buildJudgeStatistics } from "@/lib/judgingStatistics";
 import {
   areAllCriteriaScored,
+  buildFinalJudgeScoreFirestoreUpdate,
   buildJudgeScoreFirestoreUpdate,
+  getFinalJudgeCriteriaScoresForJudge,
+  getFinalJudgeNotesForJudge,
+  getFinalJudgeTotalScoreForJudge,
+  mapSubmissionForFinalJudge,
   mapSubmissionForJudge,
   sanitizeCriteriaScores,
 } from "@/lib/judgeSubmissionScores";
@@ -58,21 +63,34 @@ type JudgeWorkspaceDraft = {
       criteria: CriteriaScores;
     }
   >;
+  finalScoresBySubmission: Record<
+    string,
+    {
+      notes: string;
+      criteria: CriteriaScores;
+    }
+  >;
   top3Ranks: JudgeTop3Ranks;
 };
 
 function buildJudgeWorkspaceDraft(
   submissions: Submission[],
-  top3Ranks: JudgeTop3Ranks
+  top3Ranks: JudgeTop3Ranks,
+  judgeId: string
 ): JudgeWorkspaceDraft {
   const scoresBySubmission: JudgeWorkspaceDraft["scoresBySubmission"] = {};
+  const finalScoresBySubmission: JudgeWorkspaceDraft["finalScoresBySubmission"] = {};
   for (const submission of submissions) {
     scoresBySubmission[submission.id] = {
       notes: submission.judge_notes ?? "",
       criteria: submission.judge_criteria_scores ?? null,
     };
+    finalScoresBySubmission[submission.id] = {
+      notes: getFinalJudgeNotesForJudge(submission, judgeId),
+      criteria: getFinalJudgeCriteriaScoresForJudge(submission, judgeId),
+    };
   }
-  return { scoresBySubmission, top3Ranks };
+  return { scoresBySubmission, finalScoresBySubmission, top3Ranks };
 }
 
 function applyJudgeWorkspaceDraft(
@@ -83,24 +101,42 @@ function applyJudgeWorkspaceDraft(
 ): Submission[] {
   return submissions.map((submission) => {
     const entry = draft.scoresBySubmission[submission.id];
-    if (!entry) return submission;
-    const totalScore = calculateTotalFromCriteria(entry.criteria, criteria);
+    const finalEntry = draft.finalScoresBySubmission?.[submission.id];
+    if (!entry && !finalEntry) return submission;
+    const totalScore = entry ? calculateTotalFromCriteria(entry.criteria, criteria) : submission.judge_score;
+    const finalScore = finalEntry
+      ? Object.keys(finalEntry.criteria ?? {}).length > 0
+        ? calculateTotalFromCriteria(finalEntry.criteria, criteria)
+        : null
+      : getFinalJudgeTotalScoreForJudge(submission, judgeId, criteria);
     return {
       ...submission,
-      judge_notes: entry.notes,
-      judge_criteria_scores: entry.criteria,
+      judge_notes: entry?.notes ?? submission.judge_notes,
+      judge_criteria_scores: entry?.criteria ?? submission.judge_criteria_scores,
       judge_score: totalScore,
       judge_notes_by_judge: {
         ...(submission.judge_notes_by_judge ?? {}),
-        [judgeId]: entry.notes,
+        ...(entry ? { [judgeId]: entry.notes } : {}),
       },
       judge_criteria_scores_by_judge: {
         ...(submission.judge_criteria_scores_by_judge ?? {}),
-        [judgeId]: entry.criteria,
+        ...(entry ? { [judgeId]: entry.criteria } : {}),
       },
       judge_scores: {
         ...(submission.judge_scores ?? {}),
-        [judgeId]: totalScore,
+        ...(entry ? { [judgeId]: totalScore } : {}),
+      },
+      final_judge_notes_by_judge: {
+        ...(submission.final_judge_notes_by_judge ?? {}),
+        ...(finalEntry ? { [judgeId]: finalEntry.notes } : {}),
+      },
+      final_judge_criteria_scores_by_judge: {
+        ...(submission.final_judge_criteria_scores_by_judge ?? {}),
+        ...(finalEntry ? { [judgeId]: finalEntry.criteria } : {}),
+      },
+      final_judge_scores: {
+        ...(submission.final_judge_scores ?? {}),
+        ...(finalEntry ? { [judgeId]: finalScore } : {}),
       },
     };
   });
@@ -170,6 +206,7 @@ export default function JudgeDashboardPage() {
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [judgeMessage, setJudgeMessage] = useState<string | null>(null);
   const [savingSubmissionId, setSavingSubmissionId] = useState<string | null>(null);
+  const [savingFinalSubmissionId, setSavingFinalSubmissionId] = useState<string | null>(null);
   const [top3Ranks, setTop3Ranks] = useState<JudgeTop3Ranks>(createEmptyTop3Ranks);
   const [top3RanksBaseline, setTop3RanksBaseline] = useState<JudgeTop3Ranks>(createEmptyTop3Ranks);
   const [top3SavedAt, setTop3SavedAt] = useState<string | null>(null);
@@ -183,13 +220,13 @@ export default function JudgeDashboardPage() {
   const judgeId = sessionUser?.id ?? "";
 
   const judgeDraftValue = useMemo(
-    () => buildJudgeWorkspaceDraft(judgeSubmissions, top3Ranks),
-    [judgeSubmissions, top3Ranks]
+    () => buildJudgeWorkspaceDraft(judgeSubmissions, top3Ranks, judgeId),
+    [judgeSubmissions, top3Ranks, judgeId]
   );
 
   const judgeDraftBaseline = useMemo(
-    () => buildJudgeWorkspaceDraft(judgeSubmissionsBaseline, top3RanksBaseline),
-    [judgeSubmissionsBaseline, top3RanksBaseline]
+    () => buildJudgeWorkspaceDraft(judgeSubmissionsBaseline, top3RanksBaseline, judgeId),
+    [judgeSubmissionsBaseline, top3RanksBaseline, judgeId]
   );
 
   const judgeDraftKey = formDraftStorageKey([
@@ -325,22 +362,52 @@ export default function JudgeDashboardPage() {
             const baseline = judgeSubmissionsBaseline.find((item) => item.id === submission.id);
             const notes = submission.judge_notes ?? "";
             const criteriaScores = submission.judge_criteria_scores ?? {};
+            const finalNotes = getFinalJudgeNotesForJudge(submission, sessionUser.id);
+            const finalCriteriaScores = getFinalJudgeCriteriaScoresForJudge(
+              submission,
+              sessionUser.id
+            ) ?? {};
             const baselineNotes = baseline?.judge_notes ?? "";
             const baselineCriteria = baseline?.judge_criteria_scores ?? {};
+            const baselineFinalNotes = baseline
+              ? getFinalJudgeNotesForJudge(baseline, sessionUser.id)
+              : "";
+            const baselineFinalCriteria = baseline
+              ? getFinalJudgeCriteriaScoresForJudge(baseline, sessionUser.id) ?? {}
+              : {};
             const notesChanged = notes !== baselineNotes;
             const criteriaChanged =
               JSON.stringify(criteriaScores) !== JSON.stringify(baselineCriteria);
-            if (!notesChanged && !criteriaChanged) return;
+            const finalNotesChanged = finalNotes !== baselineFinalNotes;
+            const finalCriteriaChanged =
+              JSON.stringify(finalCriteriaScores) !== JSON.stringify(baselineFinalCriteria);
+            if (!notesChanged && !criteriaChanged && !finalNotesChanged && !finalCriteriaChanged) return;
 
             const cleaned = sanitizeCriteriaScores(criteriaScores);
             const score = Object.keys(cleaned).length
               ? calculateTotalFromCriteria(cleaned, judgingCriteria)
               : null;
+            const cleanedFinalCriteria = sanitizeCriteriaScores(finalCriteriaScores);
+            const finalScore = Object.keys(cleanedFinalCriteria).length
+              ? calculateTotalFromCriteria(cleanedFinalCriteria, judgingCriteria)
+              : null;
 
             try {
               await updateDoc(
                 doc(db, "submissions", submission.id),
-                buildJudgeScoreFirestoreUpdate(sessionUser.id, score, notes, cleaned)
+                {
+                  ...(notesChanged || criteriaChanged
+                    ? buildJudgeScoreFirestoreUpdate(sessionUser.id, score, notes, cleaned)
+                    : {}),
+                  ...(finalNotesChanged || finalCriteriaChanged
+                    ? buildFinalJudgeScoreFirestoreUpdate(
+                        sessionUser.id,
+                        finalScore,
+                        finalNotes,
+                        cleanedFinalCriteria
+                      )
+                    : {}),
+                }
               );
               wroteAnything = true;
             } catch {
@@ -371,6 +438,14 @@ export default function JudgeDashboardPage() {
   ]);
 
   const filteredJudgeSubmissions = judgeSubmissions;
+
+  const finalRoundSubmissions = useMemo(
+    () =>
+      judgeSubmissions
+        .filter((submission) => submission.final_shortlisted === true)
+        .map((submission) => mapSubmissionForFinalJudge(submission, judgeId, judgingCriteria)),
+    [judgeSubmissions, judgeId, judgingCriteria]
+  );
 
   const judgeStatistics = useMemo(
     () =>
@@ -441,6 +516,65 @@ export default function JudgeDashboardPage() {
           },
           judge_criteria_scores_by_judge: {
             ...(submission.judge_criteria_scores_by_judge ?? {}),
+            [sessionUser.id]: hasNumericScores ? currentCriteria : null,
+          },
+        };
+      })
+    );
+  };
+
+  const handleFinalJudgeNotesChange = (id: string, value: string) => {
+    if (!sessionUser || !canAccessSelectedHackathon) return;
+    setJudgeSubmissions((current) =>
+      current.map((submission) =>
+        submission.id === id
+          ? {
+              ...submission,
+              final_judge_notes_by_judge: {
+                ...(submission.final_judge_notes_by_judge ?? {}),
+                [sessionUser.id]: value,
+              },
+            }
+          : submission
+      )
+    );
+  };
+
+  const handleFinalCriterionScoreChange = (
+    id: string,
+    criterionId: JudgingCriterionId,
+    value: number | null
+  ) => {
+    if (!sessionUser || !canAccessSelectedHackathon) return;
+    setJudgeSubmissions((current) =>
+      current.map((submission) => {
+        if (submission.id !== id) return submission;
+
+        const currentCriteria = {
+          ...(getFinalJudgeCriteriaScoresForJudge(submission, sessionUser.id) ?? {}),
+        };
+        if (value === null) {
+          delete currentCriteria[criterionId];
+        } else {
+          const criterionMax =
+            judgingCriteria.find((criterion) => criterion.id === criterionId)?.weight ?? 20;
+          currentCriteria[criterionId] = clampCriterionScore(value, criterionMax);
+        }
+        const hasNumericScores = Object.values(currentCriteria).some(
+          (score) => typeof score === "number"
+        );
+        const totalScore = hasNumericScores
+          ? calculateTotalFromCriteria(currentCriteria, judgingCriteria)
+          : null;
+
+        return {
+          ...submission,
+          final_judge_scores: {
+            ...(submission.final_judge_scores ?? {}),
+            [sessionUser.id]: totalScore,
+          },
+          final_judge_criteria_scores_by_judge: {
+            ...(submission.final_judge_criteria_scores_by_judge ?? {}),
             [sessionUser.id]: hasNumericScores ? currentCriteria : null,
           },
         };
@@ -561,6 +695,73 @@ export default function JudgeDashboardPage() {
     [sessionUser, db, judgingCriteria, canAccessSelectedHackathon, clearJudgeDraft]
   );
 
+  const handleFinalJudgeSave = useCallback(
+    async (submissionId: string) => {
+      if (!sessionUser || !canAccessSelectedHackathon) return;
+
+      const submission = judgeSubmissionsRef.current.find((item) => item.id === submissionId);
+      if (!submission) {
+        setJudgeMessage("Could not find this finalist. Please refresh and try again.");
+        return;
+      }
+
+      const criteriaScores = getFinalJudgeCriteriaScoresForJudge(submission, sessionUser.id) ?? {};
+      if (!areAllCriteriaScored(criteriaScores, judgingCriteria)) {
+        setJudgeMessage("Score every final-round criterion before saving.");
+        return;
+      }
+
+      const cleanedCriteriaScores = sanitizeCriteriaScores(criteriaScores);
+      const score = calculateTotalFromCriteria(cleanedCriteriaScores, judgingCriteria);
+      const notes = getFinalJudgeNotesForJudge(submission, sessionUser.id);
+      const applySavedFinalMark = (item: Submission): Submission =>
+        item.id === submissionId
+          ? {
+              ...item,
+              final_judge_scores: {
+                ...(item.final_judge_scores ?? {}),
+                [sessionUser.id]: score,
+              },
+              final_judge_notes_by_judge: {
+                ...(item.final_judge_notes_by_judge ?? {}),
+                [sessionUser.id]: notes,
+              },
+              final_judge_criteria_scores_by_judge: {
+                ...(item.final_judge_criteria_scores_by_judge ?? {}),
+                [sessionUser.id]: cleanedCriteriaScores,
+              },
+            }
+          : item;
+
+      setJudgeMessage(null);
+      setSavingFinalSubmissionId(submissionId);
+      try {
+        await updateDoc(
+          doc(db, "submissions", submission.id),
+          buildFinalJudgeScoreFirestoreUpdate(
+            sessionUser.id,
+            score,
+            notes,
+            cleanedCriteriaScores
+          )
+        );
+        setJudgeSubmissions((current) => current.map(applySavedFinalMark));
+        setJudgeSubmissionsBaseline((current) => current.map(applySavedFinalMark));
+        clearJudgeDraft();
+        setJudgeMessage("Final-round marks saved separately from the overall score.");
+      } catch (error: unknown) {
+        const message =
+          typeof error === "object" && error && "message" in error
+            ? String((error as { message?: string }).message)
+            : "An error occurred while saving final-round marks.";
+        setJudgeMessage(message);
+      } finally {
+        setSavingFinalSubmissionId(null);
+      }
+    },
+    [sessionUser, db, judgingCriteria, canAccessSelectedHackathon, clearJudgeDraft]
+  );
+
   const handleTop3RankChange = (slot: Top3RankSlot, submissionId: string | null) => {
     if (!canAccessSelectedHackathon) return;
     setTop3Ranks((current) => ({
@@ -670,6 +871,11 @@ export default function JudgeDashboardPage() {
           onNotesChange={handleJudgeNotesChange}
           onSave={handleJudgeSave}
           savingSubmissionId={savingSubmissionId}
+          finalRoundSubmissions={finalRoundSubmissions}
+          onFinalCriterionScoreChange={handleFinalCriterionScoreChange}
+          onFinalNotesChange={handleFinalJudgeNotesChange}
+          onSaveFinal={handleFinalJudgeSave}
+          savingFinalSubmissionId={savingFinalSubmissionId}
           top3Ranks={top3Ranks}
           top3SavedAt={top3SavedAt}
           isSavingTop3={isSavingTop3}

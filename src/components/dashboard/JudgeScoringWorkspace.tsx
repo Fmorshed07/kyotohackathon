@@ -29,6 +29,7 @@ type JudgeScoringWorkspaceProps = {
   onNotesChange: (id: string, value: string) => void;
   onSave: (submissionId: string) => Promise<void>;
   savingSubmissionId?: string | null;
+  round?: "overall" | "final";
 };
 
 function getSubmissionTotal(submission: Submission, criteria: JudgingCriterion[]) {
@@ -53,6 +54,7 @@ export function JudgeScoringWorkspace({
   onNotesChange,
   onSave,
   savingSubmissionId,
+  round = "overall",
 }: JudgeScoringWorkspaceProps) {
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [criterionStep, setCriterionStep] = useState(0);
@@ -60,6 +62,7 @@ export function JudgeScoringWorkspace({
   const reviewStepIndex = judgingCriteria.length;
   const totalSteps = reviewStepIndex + 1;
   const isReviewStep = criterionStep >= reviewStepIndex;
+  const isFinalRound = round === "final";
 
   useEffect(() => {
     if (submissions.length === 0) {
@@ -121,7 +124,7 @@ export function JudgeScoringWorkspace({
     <div className="space-y-6">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <p className="dash-eyebrow">Ideas to score</p>
+          <p className="dash-eyebrow">{isFinalRound ? "Finalists to score" : "Ideas to score"}</p>
           <p className="text-xs text-muted-foreground">
             {submissions.length} {submissions.length === 1 ? "project" : "projects"}
           </p>
@@ -328,7 +331,9 @@ export function JudgeScoringWorkspace({
             </div>
 
             <div className="flex items-center justify-between rounded-lg border border-primary/35 bg-gradient-to-r from-primary/15 to-secondary/10 px-4 py-3">
-              <p className="font-display text-sm font-semibold text-primary/90">Total score</p>
+              <p className="font-display text-sm font-semibold text-primary/90">
+                {isFinalRound ? "Final-round score" : "Total score"}
+              </p>
               <p className="font-mono text-2xl font-bold tabular-nums text-primary">
                 {totalScore}/100
               </p>
@@ -336,14 +341,18 @@ export function JudgeScoringWorkspace({
 
             <div className="space-y-2">
               <p className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Judge notes
+                {isFinalRound ? "Final-round notes" : "Judge notes"}
               </p>
               <Textarea
                 rows={4}
                 value={activeSubmission.judge_notes ?? ""}
                 onChange={(e) => onNotesChange(activeSubmission.id, e.target.value)}
                 className="resize-y text-base"
-                placeholder="Add feedback for this team..."
+                placeholder={
+                  isFinalRound
+                    ? "Add final-round feedback for this team..."
+                    : "Add feedback for this team..."
+                }
               />
             </div>
 
@@ -363,8 +372,12 @@ export function JudgeScoringWorkspace({
                 {savingSubmissionId === activeSubmission.id
                   ? "Saving..."
                   : isComplete
-                    ? "Update scores for this idea"
-                    : "Save scores for this idea"}
+                    ? isFinalRound
+                      ? "Update final-round marks"
+                      : "Update scores for this idea"
+                    : isFinalRound
+                      ? "Save final-round marks"
+                      : "Save scores for this idea"}
               </Button>
               <Button
                 type="button"
@@ -375,11 +388,13 @@ export function JudgeScoringWorkspace({
                 onClick={redoScoring}
               >
                 <RotateCcw className="h-4 w-4" />
-                Redo scoring
+                {isFinalRound ? "Redo final marks" : "Redo scoring"}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Saving does not lock marks. Edit any criterion or redo this idea whenever you need.
+              {isFinalRound
+                ? "Final-round marks stay separate from the overall score and remain editable."
+                : "Saving does not lock marks. Edit any criterion or redo this idea whenever you need."}
             </p>
           </div>
         )}

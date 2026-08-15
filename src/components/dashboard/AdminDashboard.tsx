@@ -13,6 +13,7 @@ import {
   Radar,
   ScanSearch,
   ShieldCheck,
+  Star,
   Users,
   Wand2,
 } from "lucide-react";
@@ -46,13 +47,20 @@ import {
 import type { AdminGrantRecord } from "@/lib/adminGrants";
 import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
 import { AdminJudgingSection } from "@/components/dashboard/AdminJudgingSection";
+import { AdminFinalShortlistPanel } from "@/components/dashboard/AdminFinalShortlistPanel";
 import { type PlatformOpsLive } from "@/components/dashboard/PlatformOpsConsole";
 import { AiHackathonLauncher } from "@/components/dashboard/AiHackathonLauncher";
 import { ManualHackathonLauncher } from "@/components/dashboard/ManualHackathonLauncher";
 import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
 import { AdminTeamsPanel } from "@/components/dashboard/AdminTeamsPanel";
 import { AdminNewsletterPanel } from "@/components/dashboard/AdminNewsletterPanel";
+import { AdminAudienceAnalyticsPanel } from "@/components/dashboard/AdminAudienceAnalyticsPanel";
 import type { NewsletterSubscriber } from "@/lib/hackathonSubscribe";
+import {
+  EMPTY_SITE_ANALYTICS,
+  type AudienceEngagementTotals,
+  type SiteAnalyticsSnapshot,
+} from "@/lib/siteAnalytics";
 import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { AdminTop3RankingSummary } from "@/lib/judgeTop3Rankings";
 import type { HostApprovalStatus, JudgeApprovalStatus, PortalRole, UserProfile } from "@/types/portal";
@@ -120,7 +128,7 @@ export type NewSubmissionInput = {
 
 type AdminAnalytics = AdminJudgingStatistics;
 
-export type AdminWorkspace = "overview" | "create" | "people" | "judging";
+export type AdminWorkspace = "overview" | "create" | "people" | "judging" | "shortlist";
 
 type AdminDashboardProps = {
   /** Which admin sub-page to render — each stays under /dashboard/admin/*. */
@@ -195,6 +203,10 @@ type AdminDashboardProps = {
   onCreateJudgeInvite?: () => Promise<void>;
   newsletterSubscribers?: NewsletterSubscriber[];
   isLoadingNewsletter?: boolean;
+  siteAnalytics?: SiteAnalyticsSnapshot;
+  audienceEngagement?: AudienceEngagementTotals;
+  isLoadingAudienceAnalytics?: boolean;
+  onRefreshAudienceAnalytics?: () => void;
 };
 
 const roleBadgeVariant: Record<PortalRole, "default" | "secondary" | "outline"> = {
@@ -948,6 +960,10 @@ export function AdminDashboard({
   onCreateJudgeInvite,
   newsletterSubscribers = [],
   isLoadingNewsletter = false,
+  siteAnalytics = EMPTY_SITE_ANALYTICS,
+  audienceEngagement = { projectStars: 0, projectShares: 0 },
+  isLoadingAudienceAnalytics = false,
+  onRefreshAudienceAnalytics = () => undefined,
 }: AdminDashboardProps) {
   const [newSubmission, setNewSubmission] = useState<NewSubmissionInput>({
     participantId: "",
@@ -964,6 +980,10 @@ export function AdminDashboard({
   const approvedStaff = staff.filter((user) => user.judgeApprovalStatus === "approved");
   const hostAnalytics = buildHostAnalytics(users);
   const eventQuery = selectedHackathon.id;
+  const newsletterSubscribersLast7Days = newsletterSubscribers.filter((item) => {
+    const created = Date.parse(item.createdAt);
+    return Number.isFinite(created) && created >= Date.now() - 7 * 24 * 60 * 60 * 1000;
+  }).length;
 
   useEffect(() => {
     setNewSubmission({
@@ -1000,6 +1020,39 @@ export function AdminDashboard({
         </section>
         <AiHackathonLauncher onCreate={onCreateAiHackathon} />
         <ManualHackathonLauncher onCreate={onCreateManualHackathon} />
+      </div>
+    );
+  }
+
+  if (workspace === "shortlist") {
+    return (
+      <div className="space-y-6">
+        <section className={sectionClass} aria-label="Final shortlist workspace">
+          <div className="dash-stack-header flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="dash-icon-chip dash-icon-chip--sunset" aria-hidden>
+                <Star className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="dash-eyebrow">Final round</p>
+                <h2 className="dash-title">{selectedHackathon.name}</h2>
+                <p className="dash-subtitle">
+                  Select the teams that advance to final judging in this dedicated workspace.
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link to={withHackathonQuery("/dashboard/admin/judging", eventQuery)}>Back to judging</Link>
+            </Button>
+          </div>
+        </section>
+        <AdminFinalShortlistPanel
+          selectedHackathon={selectedHackathon}
+          submissions={submissions}
+          isLoading={isLoadingSubmissions}
+          shortlistingSubmissionId={shortlistingSubmissionId}
+          onSetFinalShortlisted={onSetFinalShortlisted}
+        />
       </div>
     );
   }
@@ -1042,13 +1095,11 @@ export function AdminDashboard({
           isCreatingSubmission={isCreatingSubmission}
           deletingSubmissionId={deletingSubmissionId}
           publishingSubmissionId={publishingSubmissionId}
-          shortlistingSubmissionId={shortlistingSubmissionId}
           newSubmission={newSubmission}
           onNewSubmissionChange={setNewSubmission}
           onCreateSubmission={onCreateSubmission}
           onDeleteSubmission={onDeleteSubmission}
           onSetSubmissionPublic={onSetSubmissionPublic}
-          onSetFinalShortlisted={onSetFinalShortlisted}
           top3RankingSummary={top3RankingSummary}
           isLoadingTop3Rankings={isLoadingTop3Rankings}
           top3SubmissionLookup={top3SubmissionLookup}
@@ -1081,6 +1132,14 @@ export function AdminDashboard({
         </section>
 
         <HostAnalyticsPanel analytics={hostAnalytics} isLoading={isLoadingUsers} />
+
+        <AdminAudienceAnalyticsPanel
+          analytics={siteAnalytics}
+          engagement={audienceEngagement}
+          subscriberCount={newsletterSubscribersLast7Days}
+          isLoading={isLoadingAudienceAnalytics}
+          onRefresh={onRefreshAudienceAnalytics}
+        />
 
         <AdminNewsletterPanel
           subscribers={newsletterSubscribers}
@@ -1353,6 +1412,12 @@ export function AdminDashboard({
       title: "Judging",
       description: "Criteria, marks, analytics, and top 3.",
       icon: Gavel,
+    },
+    {
+      to: withHackathonQuery("/dashboard/admin/final-shortlist", eventQuery),
+      title: "Final shortlist",
+      description: "Choose teams that advance to final judging.",
+      icon: Star,
     },
   ];
 

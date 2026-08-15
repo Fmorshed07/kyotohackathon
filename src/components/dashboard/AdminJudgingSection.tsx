@@ -1,11 +1,10 @@
-import { BarChart3, ClipboardCheck, ClipboardList, Gavel, ListChecks, Medal, ScanSearch, Star, Trophy } from "lucide-react";
+import { BarChart3, ClipboardCheck, ClipboardList, Gavel, ListChecks, Medal, ScanSearch, Trophy } from "lucide-react";
 import { MarkingCriteriaSection } from "@/components/dashboard/MarkingCriteriaSection";
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { AdminJudgeMarksPanel } from "@/components/dashboard/AdminJudgeMarksPanel";
 import { AdminTop3MarksPanel } from "@/components/dashboard/AdminTop3MarksPanel";
 import { AdminTop3RankingPanel } from "@/components/dashboard/AdminTop3RankingPanel";
 import { AdminSubmissionsPanel } from "@/components/dashboard/AdminSubmissionsPanel";
-import { AdminFinalShortlistPanel } from "@/components/dashboard/AdminFinalShortlistPanel";
 import { JudgeMarksChartPanel } from "@/components/dashboard/JudgeMarksChartPanel";
 import { ProjectThemeMarksPanel } from "@/components/dashboard/ProjectThemeMarksPanel";
 import { dashJumpLinkClass, sectionClass } from "@/components/dashboard/DashboardLayout";
@@ -18,13 +17,12 @@ import type { PortalHackathon } from "@/lib/hackathons";
 const JUDGING_JUMP_LINKS = [
   { href: "#marking-criteria", label: "1. Criteria", icon: ListChecks },
   { href: "#submission-marks", label: "2. Submissions", icon: ClipboardList },
-  { href: "#final-shortlist", label: "3. Final shortlist", icon: Star },
-  { href: "#judge-marks", label: "4. Mark check", icon: ClipboardCheck },
-  { href: "#judge-marks-chart", label: "5. Judge chart", icon: Gavel },
-  { href: "#analytics", label: "6. Analytics", icon: BarChart3 },
-  { href: "#project-marks", label: "7. Agent marks", icon: ScanSearch },
-  { href: "#top-3-marks", label: "8. Top 3 by score", icon: Medal },
-  { href: "#top-3-ranking", label: "9. Top 3 ballots", icon: Trophy },
+  { href: "#judge-marks", label: "3. Mark check", icon: ClipboardCheck },
+  { href: "#judge-marks-chart", label: "4. Judge chart", icon: Gavel },
+  { href: "#analytics", label: "5. Analytics", icon: BarChart3 },
+  { href: "#project-marks", label: "6. Agent marks", icon: ScanSearch },
+  { href: "#top-3-marks", label: "7. Top 3 by score", icon: Medal },
+  { href: "#top-3-ranking", label: "8. Top 3 ballots", icon: Trophy },
 ] as const;
 
 type AdminJudgingSectionProps = {
@@ -43,13 +41,11 @@ type AdminJudgingSectionProps = {
   isCreatingSubmission: boolean;
   deletingSubmissionId: string | null;
   publishingSubmissionId: string | null;
-  shortlistingSubmissionId: string | null;
   newSubmission: NewSubmissionInput;
   onNewSubmissionChange: (value: NewSubmissionInput) => void;
   onCreateSubmission: (payload: NewSubmissionInput) => Promise<void>;
   onDeleteSubmission: (submissionId: string) => Promise<void>;
   onSetSubmissionPublic: (submissionId: string, makePublic: boolean) => Promise<void>;
-  onSetFinalShortlisted: (submissionId: string, shortlisted: boolean) => Promise<void>;
   top3RankingSummary: AdminTop3RankingSummary;
   isLoadingTop3Rankings: boolean;
   top3SubmissionLookup: Map<
@@ -74,13 +70,11 @@ export function AdminJudgingSection({
   isCreatingSubmission,
   deletingSubmissionId,
   publishingSubmissionId,
-  shortlistingSubmissionId,
   newSubmission,
   onNewSubmissionChange,
   onCreateSubmission,
   onDeleteSubmission,
   onSetSubmissionPublic,
-  onSetFinalShortlisted,
   top3RankingSummary,
   isLoadingTop3Rankings,
   top3SubmissionLookup,
@@ -138,21 +132,11 @@ export function AdminJudgingSection({
         isCreatingSubmission={isCreatingSubmission}
         deletingSubmissionId={deletingSubmissionId}
         publishingSubmissionId={publishingSubmissionId}
-        shortlistingSubmissionId={shortlistingSubmissionId}
         newSubmission={newSubmission}
         onNewSubmissionChange={onNewSubmissionChange}
         onCreateSubmission={onCreateSubmission}
         onDeleteSubmission={onDeleteSubmission}
         onSetSubmissionPublic={onSetSubmissionPublic}
-        onSetFinalShortlisted={onSetFinalShortlisted}
-      />
-
-      <AdminFinalShortlistPanel
-        selectedHackathon={selectedHackathon}
-        submissions={submissions}
-        isLoading={isLoadingSubmissions}
-        shortlistingSubmissionId={shortlistingSubmissionId}
-        onSetFinalShortlisted={onSetFinalShortlisted}
       />
 
       <AdminJudgeMarksPanel

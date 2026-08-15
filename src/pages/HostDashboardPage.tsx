@@ -1363,11 +1363,12 @@ export default function HostDashboardPage() {
             hackathon={selectedPortalHackathon}
             onMessage={setMessage}
           >
-            {({ teams, approvals, judging }) => (
+            {({ teams, approvals, judging, finalShortlist }) => (
               <>
                 {teamsAnchor ? createPortal(teams, teamsAnchor) : null}
                 {approvals}
                 {judging}
+                {finalShortlist}
               </>
             )}
           </HostEventJudgingWorkspace>

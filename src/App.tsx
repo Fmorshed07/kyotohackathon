@@ -35,6 +35,7 @@ import InviteAcceptPage from "./pages/InviteAcceptPage";
 import NotFound from "./pages/NotFound";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { AiIdeathonStarNotice } from "./components/AiIdeathonStarNotice";
+import { WebsiteAnalyticsTracker } from "./components/WebsiteAnalyticsTracker";
 
 const queryClient = new QueryClient();
 
@@ -140,6 +141,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <WebsiteAnalyticsTracker />
         <AiIdeathonStarNotice />
         <RouteErrorBoundary>
         <Routes>
@@ -161,6 +163,7 @@ const App = () => (
           <Route path="/dashboard/admin/create" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/people" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/judging" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
+          <Route path="/dashboard/admin/final-shortlist" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/screening" element={<AdminProtectedRoute><ScreeningAgentPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/project-screening" element={<AdminProtectedRoute><ProjectScreeningPage /></AdminProtectedRoute>} />
           <Route path="/dashboard/admin/operations" element={<AdminProtectedRoute><PlatformOperationsPage /></AdminProtectedRoute>} />

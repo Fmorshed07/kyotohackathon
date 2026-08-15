@@ -55,6 +55,32 @@ export function getJudgeTotalScoreForJudge(
   return null;
 }
 
+export function getFinalJudgeCriteriaScoresForJudge(
+  submission: Submission,
+  judgeId: string
+): CriteriaScores {
+  const scores = submission.final_judge_criteria_scores_by_judge?.[judgeId];
+  return scores && typeof scores === "object" ? scores : null;
+}
+
+export function getFinalJudgeNotesForJudge(submission: Submission, judgeId: string): string {
+  const notes = submission.final_judge_notes_by_judge?.[judgeId];
+  return typeof notes === "string" ? notes : "";
+}
+
+export function getFinalJudgeTotalScoreForJudge(
+  submission: Submission,
+  judgeId: string,
+  criteria: JudgingCriterion[] = DEFAULT_JUDGING_CRITERIA
+): number | null {
+  const criteriaScores = getFinalJudgeCriteriaScoresForJudge(submission, judgeId);
+  if (criteriaScores && Object.keys(criteriaScores).length > 0) {
+    return calculateTotalFromCriteria(criteriaScores, criteria);
+  }
+  const score = submission.final_judge_scores?.[judgeId];
+  return typeof score === "number" ? score : null;
+}
+
 /** Flatten this judge's scores/notes onto the submission for the judge UI. */
 export function mapSubmissionForJudge(
   submission: Submission,
@@ -70,6 +96,20 @@ export function mapSubmissionForJudge(
     judge_criteria_scores: criteriaScores,
     judge_notes: notes,
     judge_score: totalScore,
+  };
+}
+
+/** Flatten this judge's final-round marks without replacing their preliminary marks. */
+export function mapSubmissionForFinalJudge(
+  submission: Submission,
+  judgeId: string,
+  criteria: JudgingCriterion[] = DEFAULT_JUDGING_CRITERIA
+): Submission {
+  return {
+    ...submission,
+    judge_criteria_scores: getFinalJudgeCriteriaScoresForJudge(submission, judgeId),
+    judge_notes: getFinalJudgeNotesForJudge(submission, judgeId),
+    judge_score: getFinalJudgeTotalScoreForJudge(submission, judgeId, criteria),
   };
 }
 
@@ -102,5 +142,20 @@ export function buildJudgeScoreFirestoreUpdate(
     [`judge_scores.${judgeId}`]: score,
     [`judge_notes_by_judge.${judgeId}`]: notes,
     [`judge_criteria_scores_by_judge.${judgeId}`]: cleanedCriteriaScores,
+  };
+}
+
+export function buildFinalJudgeScoreFirestoreUpdate(
+  judgeId: string,
+  score: number | null,
+  notes: string,
+  criteriaScores: Record<string, number | null | undefined>
+): Record<string, unknown> {
+  const cleanedCriteriaScores = sanitizeCriteriaScores(criteriaScores);
+
+  return {
+    [`final_judge_scores.${judgeId}`]: score,
+    [`final_judge_notes_by_judge.${judgeId}`]: notes,
+    [`final_judge_criteria_scores_by_judge.${judgeId}`]: cleanedCriteriaScores,
   };
 }

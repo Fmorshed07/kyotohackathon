@@ -391,6 +391,16 @@ service cloud.firestore {
         ]);
       }
 
+      function finalRoundFieldsUnchanged() {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          "final_shortlisted",
+          "final_shortlisted_at",
+          "final_judge_scores",
+          "final_judge_notes_by_judge",
+          "final_judge_criteria_scores_by_judge"
+        ]);
+      }
+
       function teammateEditableKeys() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           "title",
@@ -440,7 +450,13 @@ service cloud.firestore {
         )
         || (
           request.auth.uid == request.resource.data.user_id
-          && !request.resource.data.keys().hasAny(["final_shortlisted", "final_shortlisted_at"])
+          && !request.resource.data.keys().hasAny([
+            "final_shortlisted",
+            "final_shortlisted_at",
+            "final_judge_scores",
+            "final_judge_notes_by_judge",
+            "final_judge_criteria_scores_by_judge"
+          ])
           && hackathonAllowsParticipantProjectWrites(requestHackathonId())
         )
       );
@@ -455,7 +471,7 @@ service cloud.firestore {
         || isInviteJoinUpdate()
         || (
           isSubmissionOwner()
-          && finalShortlistFieldsUnchanged()
+          && finalRoundFieldsUnchanged()
           && hackathonAllowsParticipantProjectWrites(existingHackathonId())
         )
         || (
@@ -791,6 +807,41 @@ service cloud.firestore {
         && request.resource.data.source.size() <= 80
         && request.resource.data.created_at is string;
       allow read, update, delete: if isAdmin();
+    }
+
+    // Anonymous, first-party page-view events for the admin audience dashboard.
+    // No IP address, email, query string, or authenticated user id is stored.
+    match /site_page_views/{viewId} {
+      function validAnalyticsId(value) {
+        return value is string
+          && value.size() >= 16
+          && value.size() <= 64
+          && value.matches('^[A-Za-z0-9_-]+$');
+      }
+
+      allow create: if request.resource.data.keys().hasOnly([
+          "visitor_id",
+          "session_id",
+          "path",
+          "page_group",
+          "source",
+          "created_at"
+        ])
+        && validAnalyticsId(request.resource.data.visitor_id)
+        && validAnalyticsId(request.resource.data.session_id)
+        && request.resource.data.path is string
+        && request.resource.data.path.size() > 0
+        && request.resource.data.path.size() <= 200
+        && request.resource.data.path.matches('^/.*')
+        && request.resource.data.page_group is string
+        && request.resource.data.page_group.size() > 0
+        && request.resource.data.page_group.size() <= 40
+        && request.resource.data.source is string
+        && request.resource.data.source.size() > 0
+        && request.resource.data.source.size() <= 40
+        && request.resource.data.created_at is string;
+      allow read, delete: if isAdmin();
+      allow update: if false;
     }
 
     match /hackathon_criteria/{hackathonId} {

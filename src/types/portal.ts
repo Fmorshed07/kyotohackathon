@@ -81,6 +81,13 @@ export type Submission = {
   judge_notes_by_judge?: Record<string, string> | null;
   judge_criteria_scores?: Record<string, number | null> | null;
   judge_criteria_scores_by_judge?: Record<string, Record<string, number | null>> | null;
+  /** Final-round marks are isolated from preliminary/overall judging marks. */
+  final_judge_scores?: Record<string, number | null> | null;
+  final_judge_notes_by_judge?: Record<string, string> | null;
+  final_judge_criteria_scores_by_judge?: Record<
+    string,
+    Record<string, number | null> | null
+  > | null;
 };
 
 /** Public “looking for teammates” post visible on every participant dashboard. */

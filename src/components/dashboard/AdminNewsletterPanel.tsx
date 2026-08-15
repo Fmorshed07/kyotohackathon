@@ -1,4 +1,4 @@
-import { Mail } from "lucide-react";
+import { Download, Mail, Sparkles, Star, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { sectionClass } from "@/components/dashboard/DashboardLayout";
 import {
@@ -23,6 +23,13 @@ export function AdminNewsletterPanel({
   subscribers: NewsletterSubscriber[];
   isLoading: boolean;
 }) {
+  const projectStarEmails = subscribers.filter((item) => /project star/i.test(item.source)).length;
+  const directSubscribers = subscribers.length - projectStarEmails;
+  const last7Days = subscribers.filter((item) => {
+    const created = Date.parse(item.createdAt);
+    return Number.isFinite(created) && created >= Date.now() - 7 * 24 * 60 * 60 * 1000;
+  }).length;
+
   const copyEmails = async () => {
     const emails = subscribers.map((item) => item.email).join("\n");
     try {
@@ -59,11 +66,27 @@ export function AdminNewsletterPanel({
             disabled={subscribers.length === 0}
             onClick={() => downloadCsv("cognisor-newsletter.csv", buildNewsletterCsv(subscribers))}
           >
+            <Download className="mr-2 h-3.5 w-3.5" />
             Download CSV
           </Button>
         </div>
       </div>
       <div className="p-4 sm:p-6">
+        <div className="mb-5 grid gap-3 sm:grid-cols-3">
+          {[
+            { label: "Total emails", value: subscribers.length, icon: Users },
+            { label: "From project stars", value: projectStarEmails, icon: Star },
+            { label: "New this week", value: last7Days, icon: Sparkles },
+          ].map(({ label, value, icon: Icon }) => (
+            <div key={label} className="rounded-xl border border-white/10 bg-white/[0.025] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+                <Icon className="h-4 w-4 text-primary" aria-hidden />
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+            </div>
+          ))}
+        </div>
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading newsletter emails...</p>
         ) : subscribers.length === 0 ? (
@@ -94,7 +117,9 @@ export function AdminNewsletterPanel({
             </Table>
           </div>
         )}
-        <p className="mt-3 text-xs text-muted-foreground">{subscribers.length} email{subscribers.length === 1 ? "" : "s"}</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {subscribers.length} email{subscribers.length === 1 ? "" : "s"} · {directSubscribers} newsletter signup{directSubscribers === 1 ? "" : "s"}
+        </p>
       </div>
     </section>
   );

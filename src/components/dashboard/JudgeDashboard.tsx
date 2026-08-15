@@ -67,6 +67,16 @@ export type JudgeDashboardProps = {
   onNotesChange: (id: string, value: string) => void;
   onSave: (submissionId: string) => Promise<void>;
   savingSubmissionId?: string | null;
+  /** Final-round marks use a separate Firestore field from the overall score. */
+  finalRoundSubmissions?: Submission[];
+  onFinalCriterionScoreChange?: (
+    id: string,
+    criterionId: JudgingCriterionId,
+    value: number | null
+  ) => void;
+  onFinalNotesChange?: (id: string, value: string) => void;
+  onSaveFinal?: (submissionId: string) => Promise<void>;
+  savingFinalSubmissionId?: string | null;
   top3Ranks: JudgeTop3Ranks;
   top3SavedAt: string | null;
   isSavingTop3: boolean;
@@ -86,6 +96,11 @@ export function JudgeDashboard({
   onNotesChange,
   onSave,
   savingSubmissionId,
+  finalRoundSubmissions,
+  onFinalCriterionScoreChange,
+  onFinalNotesChange,
+  onSaveFinal,
+  savingFinalSubmissionId,
   top3Ranks,
   top3SavedAt,
   isSavingTop3,
@@ -136,7 +151,14 @@ export function JudgeDashboard({
     if (!searchQuery.trim()) return submissions;
     return submissions.filter((submission) => submissionMatchesSearch(searchQuery, submission));
   }, [searchQuery, submissions]);
-  const finalShortlist = useMemo(() => getFinalShortlist(submissions), [submissions]);
+  const finalShortlist = useMemo(
+    () => finalRoundSubmissions ?? getFinalShortlist(submissions),
+    [finalRoundSubmissions, submissions]
+  );
+  const finalScoreChange = onFinalCriterionScoreChange ?? onCriterionScoreChange;
+  const finalNotesChange = onFinalNotesChange ?? onNotesChange;
+  const saveFinal = onSaveFinal ?? onSave;
+  const finalSavingSubmissionId = savingFinalSubmissionId ?? savingSubmissionId;
   const activeTeam =
     filteredTeams.find((team) => team.name === selectedTeamName) ?? filteredTeams[0] ?? null;
   const activeTeamAccent = activeTeam ? getTeamAccentStyle(activeTeam.name) : null;
@@ -670,7 +692,7 @@ export function JudgeDashboard({
                 <p className="dash-eyebrow">Final round</p>
                 <h2 id="final-shortlist-heading" className="dash-title">Final shortlist</h2>
                 <p className="dash-subtitle">
-                  Score the teams selected by the organizers. Your existing criteria and private notes are used here.
+                  Final-round marks are stored separately and do not change the overall score.
                 </p>
               </div>
             </div>
@@ -690,10 +712,11 @@ export function JudgeDashboard({
             <JudgeScoringWorkspace
               submissions={finalShortlist}
               judgingCriteria={judgingCriteria}
-              onCriterionScoreChange={onCriterionScoreChange}
-              onNotesChange={onNotesChange}
-              onSave={onSave}
-              savingSubmissionId={savingSubmissionId}
+              onCriterionScoreChange={finalScoreChange}
+              onNotesChange={finalNotesChange}
+              onSave={saveFinal}
+              savingSubmissionId={finalSavingSubmissionId}
+              round="final"
             />
           )}
         </div>
