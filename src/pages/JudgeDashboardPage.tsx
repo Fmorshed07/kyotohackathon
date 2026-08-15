@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
@@ -10,6 +10,7 @@ import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { formDraftStorageKey } from "@/lib/formDrafts";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { JudgeDashboard } from "@/components/dashboard/JudgeDashboard";
+import { JudgeFinalShortlistPanel } from "@/components/dashboard/JudgeFinalShortlistPanel";
 import {
   clearJudgeWorkspaceBootstrap,
   readJudgeWorkspaceBootstrap,
@@ -21,6 +22,7 @@ import {
   HACKATHON_STORAGE_KEYS,
   isHackathonId,
   PORTAL_HACKATHONS,
+  withHackathonQuery,
   type HackathonId,
   type PortalHackathon,
 } from "@/lib/hackathons";
@@ -145,6 +147,8 @@ function applyJudgeWorkspaceDraft(
 export default function JudgeDashboardPage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
   const db = getFirestoreDb();
+  const location = useLocation();
+  const isFinalShortlistPage = location.pathname === "/dashboard/judge/final-shortlist";
 
   const allowedHackathonIds = useMemo<HackathonId[]>(() => {
     if (!sessionUser) return [];
@@ -858,6 +862,27 @@ export default function JudgeDashboardPage() {
             Ask an admin to assign you to an event.
           </p>
         </section>
+      ) : isFinalShortlistPage ? (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <Link
+              to={withHackathonQuery("/dashboard/judge", selectedHackathon.id)}
+              className="inline-flex min-h-10 items-center rounded-md border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-primary transition hover:bg-primary/20"
+            >
+              Back to overall scoring
+            </Link>
+          </div>
+          <JudgeFinalShortlistPanel
+            selectedHackathon={selectedHackathon}
+            judgingCriteria={judgingCriteria}
+            submissions={finalRoundSubmissions}
+            isLoading={isLoadingSubmissions || isLoadingCriteria}
+            onCriterionScoreChange={handleFinalCriterionScoreChange}
+            onNotesChange={handleFinalJudgeNotesChange}
+            onSave={handleFinalJudgeSave}
+            savingSubmissionId={savingFinalSubmissionId}
+          />
+        </div>
       ) : (
         <JudgeDashboard
           selectedHackathon={selectedHackathon}
@@ -871,11 +896,6 @@ export default function JudgeDashboardPage() {
           onNotesChange={handleJudgeNotesChange}
           onSave={handleJudgeSave}
           savingSubmissionId={savingSubmissionId}
-          finalRoundSubmissions={finalRoundSubmissions}
-          onFinalCriterionScoreChange={handleFinalCriterionScoreChange}
-          onFinalNotesChange={handleFinalJudgeNotesChange}
-          onSaveFinal={handleFinalJudgeSave}
-          savingFinalSubmissionId={savingFinalSubmissionId}
           top3Ranks={top3Ranks}
           top3SavedAt={top3SavedAt}
           isSavingTop3={isSavingTop3}

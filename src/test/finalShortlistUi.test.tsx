@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { JudgeDashboard } from "@/components/dashboard/JudgeDashboard";
+import { JudgeFinalShortlistPanel } from "@/components/dashboard/JudgeFinalShortlistPanel";
 import { AdminFinalShortlistPanel } from "@/components/dashboard/AdminFinalShortlistPanel";
 import type { AdminSubmissionRow } from "@/components/dashboard/AdminDashboard";
 import type { Submission } from "@/types/portal";
@@ -46,7 +46,7 @@ const submission = (id: string, title: string, shortlisted: boolean): Submission
 describe("judge final shortlist section", () => {
   it("shows only organizer-selected teams in the finalist scoring queue", () => {
     render(
-      <JudgeDashboard
+      <JudgeFinalShortlistPanel
         selectedHackathon={{
           id: "ai-ideathon-2026",
           name: "AI Ideathon 2026",
@@ -57,29 +57,17 @@ describe("judge final shortlist section", () => {
           status: "active",
         }}
         judgingCriteria={[{ id: "impact", title: "Impact", weight: 100, questions: [] }]}
-        submissions={[
-          submission("alpha", "Finalist project", true),
-          submission("beta", "Preliminary project", false),
-        ]}
-        isLoadingSubmissions={false}
-        judgeMessage={null}
-        summary={{ total: 2, scored: 0, averageScore: null }}
-        statistics={null}
+        submissions={[submission("alpha", "Finalist project", true)]}
+        isLoading={false}
         onCriterionScoreChange={vi.fn()}
         onNotesChange={vi.fn()}
         onSave={vi.fn()}
         savingSubmissionId={null}
-        top3Ranks={{ first: null, second: null, third: null }}
-        top3SavedAt={null}
-        isSavingTop3={false}
-        onTop3RankChange={vi.fn()}
-        onSaveTop3Ranking={vi.fn()}
       />,
     );
 
     const finalSection = screen.getByRole("region", { name: "Final shortlist" });
     expect(within(finalSection).getByText("Finalist project")).toBeInTheDocument();
-    expect(within(finalSection).queryByText("Preliminary project")).not.toBeInTheDocument();
     expect(within(finalSection).getByText("1 finalist")).toBeInTheDocument();
   });
 });

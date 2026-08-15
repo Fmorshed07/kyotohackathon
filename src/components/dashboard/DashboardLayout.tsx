@@ -344,7 +344,7 @@ const judgeScoringNav: NavItem[] = [
   { href: "#submissions", label: "Submissions", icon: ClipboardList },
   { href: "#judge-marks-chart", label: "My marks", icon: BarChart3 },
   { href: "#project-marks", label: "Theme marks", icon: ScanSearch },
-  { href: "#final-shortlist", label: "Final shortlist", icon: Star },
+  { href: "/dashboard/judge/final-shortlist", label: "Final shortlist", icon: Star },
   { href: "#top-3-ranking", label: "Top 3 Ranking", icon: Trophy },
 ];
 
@@ -496,6 +496,11 @@ function AdminHashScroll() {
         location.pathname === "/dashboard/admin/judging")
     ) {
       navigate(`/dashboard/admin/final-shortlist${location.search}`, { replace: true });
+      return;
+    }
+
+    if (id === "final-shortlist" && location.pathname === "/dashboard/judge") {
+      navigate(`/dashboard/judge/final-shortlist${location.search}`, { replace: true });
       return;
     }
 

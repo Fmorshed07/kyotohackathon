@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   CheckCircle2,
   ClipboardList,
@@ -27,7 +28,7 @@ import {
 } from "@/components/dashboard/judgingCriteria";
 import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import type { JudgeStatistics } from "@/lib/judgingStatistics";
-import type { PortalHackathon } from "@/lib/hackathons";
+import { withHackathonQuery, type PortalHackathon } from "@/lib/hackathons";
 import type { JudgeTop3Ranks, Submission, Top3RankSlot } from "@/types/portal";
 import { collectTeamDisplayNames } from "@/lib/teamRoster";
 import { formatSubmissionDateTime } from "@/lib/datetime";
@@ -37,8 +38,7 @@ const JUDGE_JUMP_LINKS = [
   { href: "#teams", label: "1. Teams", icon: Users },
   { href: "#submissions", label: "2. Score", icon: ClipboardList },
   { href: "#project-marks", label: "3. Theme marks", icon: ScanSearch },
-  { href: "#final-shortlist", label: "4. Final shortlist", icon: Star },
-  { href: "#top-3-ranking", label: "5. Top 3", icon: Trophy },
+  { href: "#top-3-ranking", label: "4. Top 3", icon: Trophy },
 ] as const;
 
 type TeamSummary = {
@@ -67,16 +67,6 @@ export type JudgeDashboardProps = {
   onNotesChange: (id: string, value: string) => void;
   onSave: (submissionId: string) => Promise<void>;
   savingSubmissionId?: string | null;
-  /** Final-round marks use a separate Firestore field from the overall score. */
-  finalRoundSubmissions?: Submission[];
-  onFinalCriterionScoreChange?: (
-    id: string,
-    criterionId: JudgingCriterionId,
-    value: number | null
-  ) => void;
-  onFinalNotesChange?: (id: string, value: string) => void;
-  onSaveFinal?: (submissionId: string) => Promise<void>;
-  savingFinalSubmissionId?: string | null;
   top3Ranks: JudgeTop3Ranks;
   top3SavedAt: string | null;
   isSavingTop3: boolean;
@@ -96,11 +86,6 @@ export function JudgeDashboard({
   onNotesChange,
   onSave,
   savingSubmissionId,
-  finalRoundSubmissions,
-  onFinalCriterionScoreChange,
-  onFinalNotesChange,
-  onSaveFinal,
-  savingFinalSubmissionId,
   top3Ranks,
   top3SavedAt,
   isSavingTop3,
@@ -151,14 +136,7 @@ export function JudgeDashboard({
     if (!searchQuery.trim()) return submissions;
     return submissions.filter((submission) => submissionMatchesSearch(searchQuery, submission));
   }, [searchQuery, submissions]);
-  const finalShortlist = useMemo(
-    () => finalRoundSubmissions ?? getFinalShortlist(submissions),
-    [finalRoundSubmissions, submissions]
-  );
-  const finalScoreChange = onFinalCriterionScoreChange ?? onCriterionScoreChange;
-  const finalNotesChange = onFinalNotesChange ?? onNotesChange;
-  const saveFinal = onSaveFinal ?? onSave;
-  const finalSavingSubmissionId = savingFinalSubmissionId ?? savingSubmissionId;
+  const finalShortlist = useMemo(() => getFinalShortlist(submissions), [submissions]);
   const activeTeam =
     filteredTeams.find((team) => team.name === selectedTeamName) ?? filteredTeams[0] ?? null;
   const activeTeamAccent = activeTeam ? getTeamAccentStyle(activeTeam.name) : null;
@@ -241,7 +219,10 @@ export function JudgeDashboard({
                     {summary.total - summary.scored} ideas still need a complete score.
                   </p>
                 </a>
-                <a href="#final-shortlist" className="dash-workflow-card block transition hover:border-amber-400/35">
+                <Link
+                  to={withHackathonQuery("/dashboard/judge/final-shortlist", selectedHackathon.id)}
+                  className="dash-workflow-card block transition hover:border-amber-400/35"
+                >
                   <div className="flex items-center gap-2 text-amber-300">
                     <Star className="h-4 w-4" aria-hidden />
                     <p className="text-xs font-semibold uppercase">3. Final shortlist</p>
@@ -251,7 +232,7 @@ export function JudgeDashboard({
                       ? `${finalShortlist.length} finalist${finalShortlist.length === 1 ? "" : "s"} ready for final marks.`
                       : "Waiting for organizers to select the finalists."}
                   </p>
-                </a>
+                </Link>
                 <a href="#top-3-ranking" className="dash-workflow-card block transition hover:border-primary/35">
                   <div className="flex items-center gap-2 text-amber-300">
                     <Trophy className="h-4 w-4" aria-hidden />
@@ -676,51 +657,6 @@ export function JudgeDashboard({
         submissions={submissions}
         isLoading={isLoadingSubmissions}
       />
-
-      <section
-        className={`${sectionClass} scroll-mt-24 overflow-hidden border-amber-400/20 bg-gradient-to-b from-amber-500/[0.07] via-card/95 to-card/95 p-0`}
-        id="final-shortlist"
-        aria-labelledby="final-shortlist-heading"
-      >
-        <div className="border-b border-white/10 px-4 py-5 sm:px-6 sm:py-6 md:px-8">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-3">
-              <span className="dash-icon-chip dash-icon-chip--sunset shrink-0" aria-hidden>
-                <Star className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="dash-eyebrow">Final round</p>
-                <h2 id="final-shortlist-heading" className="dash-title">Final shortlist</h2>
-                <p className="dash-subtitle">
-                  Final-round marks are stored separately and do not change the overall score.
-                </p>
-              </div>
-            </div>
-            <span className="inline-flex w-fit rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
-              {finalShortlist.length} finalist{finalShortlist.length === 1 ? "" : "s"}
-            </span>
-          </div>
-        </div>
-        <div className="p-4 sm:p-5 md:p-8">
-          {isLoadingSubmissions ? (
-            <p className="text-sm text-muted-foreground">Loading final shortlist…</p>
-          ) : finalShortlist.length === 0 ? (
-            <div className="dash-empty">
-              The organizers have not selected finalists for {selectedHackathon.name} yet.
-            </div>
-          ) : (
-            <JudgeScoringWorkspace
-              submissions={finalShortlist}
-              judgingCriteria={judgingCriteria}
-              onCriterionScoreChange={finalScoreChange}
-              onNotesChange={finalNotesChange}
-              onSave={saveFinal}
-              savingSubmissionId={finalSavingSubmissionId}
-              round="final"
-            />
-          )}
-        </div>
-      </section>
 
       <section
         className={`${sectionClass} scroll-mt-24 overflow-hidden border-violet-500/20 bg-gradient-to-b from-violet-500/5 via-card/95 to-card/95 p-0`}
