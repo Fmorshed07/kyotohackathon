@@ -687,7 +687,15 @@ export const filterUsersForHackathon = <T extends HackathonUserRef>(
     hackathonSubmissions.map((submission) => submission.user_id).filter(Boolean)
   );
   const judgeIds = new Set(
-    hackathonSubmissions.flatMap((submission) => Object.keys(submission.judge_scores ?? {}))
+    hackathonSubmissions.flatMap((submission) => [
+      ...Object.keys(submission.judge_scores ?? {}),
+      ...Object.keys(submission.judge_notes_by_judge ?? {}),
+      ...Object.keys(submission.judge_criteria_scores_by_judge ?? {}),
+      ...Object.keys(submission.final_judge_scores ?? {}),
+      ...Object.keys(submission.final_judge_notes_by_judge ?? {}),
+      ...Object.keys(submission.final_judge_criteria_scores_by_judge ?? {}),
+      ...(submission.judge_id ? [submission.judge_id] : []),
+    ])
   );
 
   return users.filter((user) => {

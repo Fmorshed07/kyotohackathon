@@ -27,6 +27,7 @@ describe("finalist judge scores organizer section", () => {
       judgeMarks: [{ judgeId: "judge-1", judgeEmail: "judge@example.com", score: 70, notes: null }],
       finalJudgeMarks: [
         { judgeId: "judge-1", judgeEmail: "judge@example.com", score: 94, notes: "Strong final demo", criteriaScores: { impact: 94 } },
+        { judgeId: "judge-2", judgeEmail: "second@example.com", score: 86, notes: "Clear delivery", criteriaScores: { impact: 86 } },
         { judgeId: "project-agent", judgeEmail: "agent@system.local", score: 99, notes: "Agent score", criteriaScores: { impact: 99 } },
       ],
       averageScore: 70,
@@ -50,13 +51,19 @@ describe("finalist judge scores organizer section", () => {
         }}
         submissions={[finalist]}
         judgingCriteria={[{ id: "impact", title: "Impact", weight: 100, questions: [] }]}
-        judges={[{ id: "judge-1", email: "judge@example.com" }]}
+        judges={[
+          { id: "judge-1", email: "judge@example.com" },
+          { id: "judge-2", email: "second@example.com" },
+        ]}
         isLoading={false}
       />,
     );
 
     expect(screen.getByRole("heading", { name: "Finalist judge scores" })).toBeInTheDocument();
-    expect(screen.getAllByText("94.0")).toHaveLength(2);
+    expect(screen.getByText("94.0")).toBeInTheDocument();
+    expect(screen.getByText("86.0")).toBeInTheDocument();
+    expect(screen.getByText("second@example.com")).toBeInTheDocument();
+    expect(screen.getByText("90.0")).toBeInTheDocument();
     expect(screen.getByText("Strong final demo")).toBeInTheDocument();
     expect(screen.queryByText("agent@system.local")).not.toBeInTheDocument();
     expect(screen.queryByText("Agent score")).not.toBeInTheDocument();

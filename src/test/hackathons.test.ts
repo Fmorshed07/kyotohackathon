@@ -3,6 +3,7 @@ import {
   buildAdminHackathonCatalog,
   collectAccessibleHackathonIds,
   filterCurrentHackathons,
+  filterUsersForHackathon,
   groupByHackathon,
   getAdminEventWorkspacePath,
   getEventBoardPath,
@@ -17,6 +18,7 @@ import {
   withHackathonQuery,
 } from "@/lib/hackathons";
 import { getEventBoardPathAfterTeamInvite } from "@/lib/inviteTokens";
+import type { Submission } from "@/types/portal";
 
 /** Dynamic hosted event id — not part of the static Impact catalog. */
 const hostedIdeathonId = "ai-ideathon-2026-q9pxii";
@@ -200,5 +202,26 @@ describe("collectAccessibleHackathonIds", () => {
         submissions: [{ hackathon_id: hostedIdeathonId }],
       })
     ).toEqual([hostedIdeathonId]);
+  });
+});
+
+describe("filterUsersForHackathon", () => {
+  it("keeps human judges discoverable when they only saved final-round marks", () => {
+    const users = [
+      { id: "final-judge", hackathonIds: [] },
+      { id: "unrelated-user", hackathonIds: [] },
+    ];
+    const submissions = [
+      {
+        id: "finalist-1",
+        user_id: "participant-1",
+        hackathon_id: hostedIdeathonId,
+        final_judge_scores: { "final-judge": 92 },
+      } as Submission,
+    ];
+
+    expect(
+      filterUsersForHackathon(users, hostedIdeathonId, submissions).map((user) => user.id),
+    ).toEqual(["final-judge"]);
   });
 });

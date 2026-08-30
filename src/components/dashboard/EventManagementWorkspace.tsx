@@ -227,13 +227,13 @@ export function EventManagementWorkspace({
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
           {onRefresh ? (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="gap-1.5"
+              className="self-start gap-1.5 sm:self-end"
               disabled={isBusy || isLoading}
               onClick={() => void onRefresh()}
             >
@@ -241,7 +241,7 @@ export function EventManagementWorkspace({
               Refresh
             </Button>
           ) : null}
-          <div className="dash-stat-grid grid gap-2 sm:grid-cols-4 sm:gap-3">
+          <div className="dash-stat-grid grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4 sm:gap-3">
             <div className="dash-stat-tile dash-stat-tile--highlight">
               <p className="dash-stat-value">{isLoading ? "—" : counts.live}</p>
               <p className="dash-stat-label">Live</p>
@@ -291,7 +291,7 @@ export function EventManagementWorkspace({
           Host ops events
           <span className="ml-1.5 opacity-70">{hostEvents.length}</span>
         </button>
-        <div className="relative ml-auto min-w-[200px] flex-1 sm:max-w-xs">
+        <div className="relative w-full min-w-0 sm:ml-auto sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
@@ -368,8 +368,8 @@ export function EventManagementWorkspace({
 
                 return (
                   <li key={event.id} className="bg-white/[0.02] px-4 py-4 sm:px-5">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0 space-y-2">
+                    <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-6">
+                      <div className="min-w-0 space-y-2 lg:pr-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-display text-base font-semibold text-foreground sm:text-lg">
                             {event.name}
@@ -468,7 +468,7 @@ export function EventManagementWorkspace({
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 flex-col gap-2 sm:min-w-[240px]">
+                      <div className="flex min-w-0 flex-col gap-2 lg:w-72">
                         <p className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                           Access
                         </p>
@@ -477,7 +477,7 @@ export function EventManagementWorkspace({
                             Portal edition — first save publishes a manageable listing for this id.
                           </p>
                         ) : null}
-                        <div className="flex flex-wrap gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                           <Button
                             type="button"
                             size="sm"
@@ -547,7 +547,7 @@ export function EventManagementWorkspace({
                         <p className="text-[11px] text-muted-foreground">
                           Switch freely — past events remain editable and can be published or hidden.
                         </p>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                           <Button
                             type="button"
                             size="sm"
@@ -737,8 +737,8 @@ export function EventManagementWorkspace({
 
                 return (
                   <li key={event.id} className="bg-white/[0.02] px-4 py-4 sm:px-5">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0 space-y-2">
+                    <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start lg:gap-6">
+                      <div className="min-w-0 space-y-2 lg:pr-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-display text-base font-semibold text-foreground sm:text-lg">
                             {event.name || "Untitled host event"}
@@ -794,7 +794,7 @@ export function EventManagementWorkspace({
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 flex-wrap gap-2 sm:min-w-[220px]">
+                      <div className="flex min-w-0 flex-wrap gap-2 lg:w-56 lg:justify-end">
                         {!isLive ? (
                           <Button
                             type="button"

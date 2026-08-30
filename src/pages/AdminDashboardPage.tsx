@@ -88,6 +88,7 @@ import type {
   Submission,
   UserProfile,
 } from "@/types/portal";
+import { parseHostApplication } from "@/lib/hostApplication";
 
 const normalizePortalRole = (value: unknown): PortalRole | undefined => {
   if (typeof value !== "string") return undefined;
@@ -273,6 +274,7 @@ export default function AdminDashboardPage() {
               hackathonId: hackathonIds[0] ?? getUserHackathonId({ hackathon_id: data.hackathon_id }),
               hackathonIds,
               profile: mapUserProfile(data),
+              hostApplication: parseHostApplication(data.hostApplication),
             };
           })
           .filter((user): user is AdminUser => user !== null);

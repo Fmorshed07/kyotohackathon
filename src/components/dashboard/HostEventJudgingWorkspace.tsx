@@ -5,6 +5,7 @@ import {
 } from "@/components/dashboard/AdminJudgingSection";
 import { AdminFinalShortlistPanel } from "@/components/dashboard/AdminFinalShortlistPanel";
 import { AdminFinalJudgeScoresPanel } from "@/components/dashboard/AdminFinalJudgeScoresPanel";
+import { HostJudgeMarksSection } from "@/components/dashboard/HostJudgeMarksSection";
 import { AdminTeamsPanel } from "@/components/dashboard/AdminTeamsPanel";
 import {
   JudgeApprovalPanel,
@@ -718,30 +719,38 @@ export function HostEventJudgingWorkspace({
       />
     ),
     judging: (
-      <AdminJudgingSection
-        selectedHackathon={hackathon}
-        hackathons={[hackathon]}
-        judgingCriteria={judgingCriteria}
-        isLoadingCriteria={isLoadingCriteria}
-        isSavingCriteria={isSavingCriteria}
-        onSaveCriteria={handleSaveCriteria}
-        participants={participants}
-        submissions={adminSubmissionRows}
-        isLoadingSubmissions={isLoadingSubmissions}
-        isLoadingUsers={isLoadingUsers}
-        analytics={analytics}
-        isCreatingSubmission={isCreatingSubmission}
-        deletingSubmissionId={deletingSubmissionId}
-        publishingSubmissionId={publishingSubmissionId}
-        newSubmission={newSubmission}
-        onNewSubmissionChange={setNewSubmission}
-        onCreateSubmission={handleCreateSubmission}
-        onDeleteSubmission={handleDeleteSubmission}
-        onSetSubmissionPublic={handleSetSubmissionPublic}
-        top3RankingSummary={top3RankingSummary}
-        isLoadingTop3Rankings={isLoadingTop3Rankings}
-        top3SubmissionLookup={top3SubmissionLookup}
-      />
+      <div className="space-y-6 sm:space-y-8 md:space-y-10">
+        <AdminJudgingSection
+          selectedHackathon={hackathon}
+          hackathons={[hackathon]}
+          judgingCriteria={judgingCriteria}
+          isLoadingCriteria={isLoadingCriteria}
+          isSavingCriteria={isSavingCriteria}
+          onSaveCriteria={handleSaveCriteria}
+          participants={participants}
+          submissions={adminSubmissionRows}
+          isLoadingSubmissions={isLoadingSubmissions}
+          isLoadingUsers={isLoadingUsers}
+          analytics={analytics}
+          isCreatingSubmission={isCreatingSubmission}
+          deletingSubmissionId={deletingSubmissionId}
+          publishingSubmissionId={publishingSubmissionId}
+          newSubmission={newSubmission}
+          onNewSubmissionChange={setNewSubmission}
+          onCreateSubmission={handleCreateSubmission}
+          onDeleteSubmission={handleDeleteSubmission}
+          onSetSubmissionPublic={handleSetSubmissionPublic}
+          top3RankingSummary={top3RankingSummary}
+          isLoadingTop3Rankings={isLoadingTop3Rankings}
+          top3SubmissionLookup={top3SubmissionLookup}
+        />
+        <HostJudgeMarksSection
+          selectedHackathon={hackathon}
+          submissions={adminSubmissionRows}
+          judgingCriteria={judgingCriteria}
+          isLoading={isLoadingSubmissions}
+        />
+      </div>
     ),
     finalShortlist: (
       <div className="space-y-6">

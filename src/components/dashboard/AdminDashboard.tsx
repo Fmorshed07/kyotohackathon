@@ -68,6 +68,7 @@ import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { AdminTop3RankingSummary } from "@/lib/judgeTop3Rankings";
 import type { HostApprovalStatus, JudgeApprovalStatus, PortalRole, UserProfile } from "@/types/portal";
 import type { AiHackathonDraft, HostedHackathon, ManualHackathonDraft } from "@/lib/aiHackathons";
+import type { HostApplication } from "@/lib/hostApplication";
 
 export type AdminUser = {
   id: string;
@@ -78,6 +79,7 @@ export type AdminUser = {
   hackathonId?: HackathonId | null;
   hackathonIds?: HackathonId[];
   profile?: UserProfile;
+  hostApplication?: HostApplication;
 };
 
 export type AdminSubmissionRow = {
@@ -801,6 +803,63 @@ function HostApprovalPanel({
                     {isPending ? "Pending" : "Approved"}
                   </Badge>
                 </div>
+                {host.hostApplication ? (
+                  <div className="mt-4 space-y-3 rounded-xl border border-primary/15 bg-primary/[0.035] p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary">Proposed event</p>
+                        <h3 className="mt-1 text-sm font-semibold text-foreground">{host.hostApplication.eventName}</h3>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge variant="outline" className="text-[9px] uppercase tracking-wider">{host.hostApplication.eventType}</Badge>
+                        <Badge variant="outline" className="text-[9px] uppercase tracking-wider">{host.hostApplication.format}</Badge>
+                      </div>
+                    </div>
+                    <dl className="grid gap-2 text-xs sm:grid-cols-2">
+                      <div><dt className="text-muted-foreground">Host role</dt><dd className="mt-0.5 text-foreground">{host.hostApplication.organizerTitle || "Not specified"}</dd></div>
+                      <div><dt className="text-muted-foreground">Audience</dt><dd className="mt-0.5 text-foreground">{host.hostApplication.audience || "—"}</dd></div>
+                      <div><dt className="text-muted-foreground">Target date</dt><dd className="mt-0.5 text-foreground">{host.hostApplication.targetDate || "—"}</dd></div>
+                      <div><dt className="text-muted-foreground">Duration</dt><dd className="mt-0.5 text-foreground">{host.hostApplication.duration || "Not specified"}</dd></div>
+                      <div><dt className="text-muted-foreground">Expected size</dt><dd className="mt-0.5 text-foreground">{host.hostApplication.expectedAttendees || "Not specified"}</dd></div>
+                      <div><dt className="text-muted-foreground">Place & time</dt><dd className="mt-0.5 text-foreground">{[host.hostApplication.location, host.hostApplication.timezone].filter(Boolean).join(" · ") || "Not specified"}</dd></div>
+                    </dl>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Theme</p>
+                      <p className="mt-1 text-xs leading-relaxed text-foreground">{host.hostApplication.theme}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Goals</p>
+                      <p className="mt-1 text-xs leading-relaxed text-foreground">{host.hostApplication.goals}</p>
+                    </div>
+                    {host.hostApplication.successDefinition ? (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Success definition</p>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground">{host.hostApplication.successDefinition}</p>
+                      </div>
+                    ) : null}
+                    {host.hostApplication.supportNeeded ? (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Support requested</p>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground">{host.hostApplication.supportNeeded}</p>
+                      </div>
+                    ) : null}
+                    {host.hostApplication.experience ? (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Previous experience</p>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground">{host.hostApplication.experience}</p>
+                      </div>
+                    ) : null}
+                    {host.hostApplication.website ? (
+                      <a href={host.hostApplication.website} target="_blank" rel="noreferrer" className="inline-flex text-xs font-semibold text-primary hover:underline">
+                        Host website ↗
+                      </a>
+                    ) : null}
+                  </div>
+                ) : isPending ? (
+                  <p className="mt-3 rounded-lg border border-dashed border-amber-400/25 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
+                    This request was created before detailed host onboarding was added.
+                  </p>
+                ) : null}
                 {isPending ? (
                   <Button size="sm" className="mt-4" disabled={savingUserId === host.id} onClick={() => void onApproveHost(host)}>
                     {savingUserId === host.id ? "Approving..." : "Approve host"}
