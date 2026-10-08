@@ -10,19 +10,6 @@ const CommunitySection = () => {
 
   return (
     <section className="relative overflow-hidden px-6 py-24 md:py-32" id="community">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
-        <motion.div
-          className="absolute right-1/4 top-1/3 h-72 w-72 rounded-full bg-secondary/15 blur-[120px]"
-          animate={{ opacity: [0.2, 0.45, 0.2], scale: [1, 1.05, 1] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute bottom-1/4 left-1/4 h-64 w-64 rounded-full bg-primary/10 blur-[110px]"
-          animate={{ opacity: [0.15, 0.4, 0.15] }}
-          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
 
       <div ref={ref} className="mx-auto max-w-5xl">
         <motion.div
@@ -32,7 +19,7 @@ const CommunitySection = () => {
           transition={{ duration: 0.6 }}
         >
           <span className="font-display text-xs tracking-[0.3em] text-primary sm:text-sm sm:tracking-[0.4em]">
-            STAY CONNECTED
+            Stay connected
           </span>
           <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-foreground md:text-5xl">
             Join the Community
@@ -45,7 +32,7 @@ const CommunitySection = () => {
 
         <div className="grid gap-6 md:grid-cols-2">
           <motion.div
-            className="flex flex-col rounded-2xl border border-border/80 bg-card/30 p-8 backdrop-blur-md md:p-10"
+            className="flex flex-col rounded-lg border border-border bg-card p-6 md:p-10"
             initial={{ opacity: 0, y: 24 }}
             animate={isVisible ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.15 }}
@@ -72,7 +59,7 @@ const CommunitySection = () => {
           </motion.div>
 
           <motion.div
-            className="flex flex-col rounded-2xl border border-border/80 bg-card/30 p-8 backdrop-blur-md md:p-10"
+            className="flex flex-col rounded-lg border border-border bg-card p-6 md:p-10"
             initial={{ opacity: 0, y: 24 }}
             animate={isVisible ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.25 }}
@@ -89,7 +76,7 @@ const CommunitySection = () => {
               href={CREATORS_CIRCUIT_URL}
               target="_blank"
               rel="noreferrer"
-              className="mt-8 inline-flex min-w-[200px] items-center justify-center gap-2 self-start rounded-md border border-primary/50 bg-primary/15 px-6 py-3 font-display text-sm font-medium tracking-[0.15em] text-primary transition-colors hover:bg-primary/25"
+              className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-lg border border-input px-6 py-3 font-display text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-secondary"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >

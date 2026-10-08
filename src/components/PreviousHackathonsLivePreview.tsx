@@ -170,16 +170,7 @@ const PreviousHackathonsLivePreview = ({
   eventIds,
 }: PreviousHackathonsLivePreviewProps) => (
   <div id="previous-hackathons" className="relative mb-20 scroll-mt-24 text-left">
-    <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
-      <img
-        src="/cognisor-horizon.png"
-        alt=""
-        className="h-full w-full object-cover opacity-[0.18]"
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
-    </div>
-
-    <div className="relative rounded-3xl border border-white/[0.08] p-6 md:p-8">
+    <div className="relative rounded-lg border border-border bg-card p-4 sm:p-6 md:p-8">
       <span className="poster-pill text-[0.6rem] tracking-[0.35em] text-primary">
         PAST EVENTS
       </span>

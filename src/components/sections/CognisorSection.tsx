@@ -47,14 +47,6 @@ const CognisorSection = () => {
             target="_blank"
             rel="noreferrer"
             className="text-gradient-cyan transition-colors hover:text-primary"
-            animate={isVisible ? {
-              textShadow: [
-                "0 0 20px hsl(199 100% 50% / 0.3)",
-                "0 0 40px hsl(185 100% 50% / 0.45)",
-                "0 0 20px hsl(199 100% 50% / 0.3)",
-              ],
-            } : {}}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
           >
             Cognisor AI
           </motion.a>
@@ -168,7 +160,7 @@ const CognisorSection = () => {
 
         {/* Mission Statement */}
         <motion.div
-          className="mt-16 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-card/50 via-card/30 to-transparent p-8 text-left shadow-[0_0_40px_hsl(199_100%_50%_/_0.12)] backdrop-blur md:p-12"
+          className="mt-16 overflow-hidden rounded-lg border border-border bg-card p-6 text-left md:p-12"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={isVisible ? { opacity: 1, scale: 1 } : {}}
           transition={{ duration: 0.8, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}

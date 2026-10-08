@@ -12,15 +12,6 @@ const FinalCTASection = () => {
       id="cta"
     >
       <div ref={ref} className="absolute inset-0" />
-      <div className="absolute inset-0 -z-10">
-        <img
-          src="/cognisor-horizon.png"
-          alt=""
-          className="h-full w-full object-cover object-[center_60%] opacity-40"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-black/75 to-black" />
-        <div className="starfield absolute inset-0 opacity-30" />
-      </div>
 
       <div className="relative max-w-3xl text-center">
         <motion.div
@@ -87,7 +78,7 @@ const FinalCTASection = () => {
         </motion.div>
 
         <motion.p
-          className="mt-16 font-body text-xs tracking-[0.18em] text-white/35"
+          className="mt-16 font-body text-xs leading-relaxed tracking-normal text-muted-foreground"
           initial={{ opacity: 0 }}
           animate={isVisible ? { opacity: 1 } : {}}
           transition={{ duration: 0.5, delay: 0.45 }}

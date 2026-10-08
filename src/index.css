@@ -4,9 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Cognisor Horizon — void black + electric cyan
-   Theme from cosmic arc: #000 void, #00A3FF / #00FBFF accents, thin flares.
-*/
+/* Cognisor — quiet ink surfaces, editorial typography, purposeful blue accents. */
 
 @layer utilities {
   .text-balance {
@@ -59,46 +57,46 @@
     --glow-cyan: 0 0 40px hsl(185 100% 50% / 0.3);
     --surface-elevated: 0 1px 2px hsl(210 40% 6% / 0.04), 0 16px 40px -20px hsl(210 40% 6% / 0.1);
     --flare: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.7), hsl(185 100% 70% / 0.9), hsl(0 0% 100% / 0.7), transparent);
-    --event-display: "Space Grotesk", system-ui, sans-serif;
+    --event-display: "Manrope", system-ui, sans-serif;
     --event-body: "Manrope", system-ui, sans-serif;
   }
 
   .dark {
-    --background: 0 0% 0%;
-    --foreground: 210 40% 98%;
-    --card: 210 20% 4%;
+    --background: 218 25% 5%;
+    --foreground: 210 20% 94%;
+    --card: 218 18% 8%;
     --card-foreground: 210 40% 98%;
-    --popover: 210 25% 5%;
+    --popover: 218 18% 10%;
     --popover-foreground: 210 40% 98%;
     /* Electric blue #00A3FF */
     --primary: 199 100% 50%;
     --primary-foreground: 0 0% 0%;
-    --secondary: 210 16% 8%;
+    --secondary: 218 14% 12%;
     --secondary-foreground: 210 30% 96%;
-    --muted: 210 14% 8%;
-    --muted-foreground: 210 12% 58%;
-    --accent: 199 60% 10%;
-    --accent-foreground: 185 100% 70%;
+    --muted: 218 14% 12%;
+    --muted-foreground: 216 10% 65%;
+    --accent: 210 25% 15%;
+    --accent-foreground: 205 90% 76%;
     --community: 162 55% 42%;
     --community-foreground: 210 40% 98%;
     --destructive: 0 62% 42%;
     --destructive-foreground: 210 40% 98%;
-    --border: 210 16% 12%;
-    --input: 210 16% 10%;
-    --ring: 185 100% 50%;
+    --border: 216 12% 18%;
+    --input: 216 12% 24%;
+    --ring: 199 100% 50%;
     --chart-1: 199 100% 50%;
     --chart-2: 185 100% 50%;
     --chart-3: 210 40% 70%;
     --chart-4: 300 50% 55%;
     --chart-5: 45 80% 55%;
-    --sidebar-background: 0 0% 1%;
+    --sidebar-background: 218 22% 6%;
     --sidebar-foreground: 210 20% 92%;
     --sidebar-primary: 199 100% 50%;
     --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 210 20% 7%;
+    --sidebar-accent: 218 16% 12%;
     --sidebar-accent-foreground: 210 30% 96%;
-    --sidebar-border: 210 16% 10%;
-    --sidebar-ring: 185 100% 50%;
+    --sidebar-border: 216 12% 18%;
+    --sidebar-ring: 199 100% 50%;
     --cyan: 185 100% 50%;
     --horizon: 199 100% 50%;
     --gradient-hero: linear-gradient(
@@ -107,12 +105,9 @@
       hsl(210 40% 3%) 55%,
       hsl(199 50% 5%) 100%
     );
-    --glow-primary: 0 0 48px hsl(199 100% 50% / 0.35);
-    --glow-cyan: 0 0 56px hsl(185 100% 50% / 0.4);
-    --surface-elevated:
-      inset 0 1px 0 hsl(0 0% 100% / 0.04),
-      0 0 0 1px hsl(199 100% 50% / 0.06),
-      0 28px 60px -36px hsl(0 0% 0% / 0.9);
+    --glow-primary: none;
+    --glow-cyan: none;
+    --surface-elevated: none;
     --flare: linear-gradient(
       90deg,
       transparent 0%,
@@ -214,18 +209,12 @@
 
 @layer components {
   .dash-ambient {
-    background:
-      linear-gradient(hsl(199 100% 50% / 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(185 100% 50% / 0.025) 1px, transparent 1px),
-      radial-gradient(ellipse 70% 42% at 48% -16%, hsl(199 100% 50% / 0.14), transparent 60%),
-      radial-gradient(ellipse 36% 28% at 94% 16%, hsl(45 90% 52% / 0.055), transparent 58%),
-      hsl(0 0% 0%);
-    background-size: 56px 56px, 56px 56px, auto, auto, auto;
+    background: hsl(var(--background));
   }
 
   .dash-content {
     font-family: 'Manrope', system-ui, sans-serif;
-    @apply text-[15px] leading-relaxed sm:text-base md:text-[17px];
+    @apply text-sm leading-relaxed sm:text-[15px];
   }
 
   .dash-content [id] {
@@ -244,17 +233,13 @@
   }
 
   .dash-sidebar {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-family: 'Manrope', system-ui, sans-serif;
     @apply text-[15px] md:text-base;
-    background:
-      radial-gradient(ellipse 90% 42% at 0% 0%, hsl(199 100% 50% / 0.12), transparent 55%),
-      radial-gradient(ellipse 60% 28% at 100% 18%, hsl(185 100% 50% / 0.06), transparent 60%),
-      linear-gradient(180deg, hsl(210 28% 5%), hsl(0 0% 0%) 42%, hsl(0 0% 0%)),
-      hsl(0 0% 0%);
+    background: hsl(var(--sidebar-background));
   }
 
   .dash-sidebar [data-sidebar="sidebar"] {
-    border-right-color: hsl(199 100% 50% / 0.12);
+    border-right-color: hsl(var(--border));
   }
 
   .dash-sidebar-scroll {
@@ -272,8 +257,8 @@
   }
 
   .dash-nav-label {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    @apply mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-primary/70 sm:text-[11px];
+    font-family: 'Manrope', system-ui, sans-serif;
+    @apply mb-2 px-2.5 text-xs font-medium tracking-normal text-muted-foreground;
   }
 
   .dash-nav-item {
@@ -285,7 +270,7 @@
   }
 
   .dash-nav-item:active {
-    transform: scale(0.985);
+    background: hsl(var(--primary) / .12);
   }
 
   .dash-nav-item[data-active="true"] {
@@ -296,17 +281,12 @@
   }
 
   .dash-nav-item[data-active="true"]::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background: linear-gradient(90deg, hsl(199 100% 50% / 0.14), transparent 58%);
+    content: none;
   }
 
   .dash-nav-meta {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    @apply truncate text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground/80 sm:text-xs;
+    font-family: 'Manrope', system-ui, sans-serif;
+    @apply truncate text-xs font-normal text-muted-foreground;
   }
 
   .dash-nav-icon {
@@ -319,12 +299,11 @@
   }
 
   .dash-profile-chip {
-    @apply relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-transparent px-3.5 py-3.5 text-left outline-none transition-colors;
-    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04);
+    @apply relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-border bg-card px-3.5 py-3.5 text-left outline-none transition-colors;
   }
 
   .dash-profile-chip:hover {
-    @apply border-primary/30 from-primary/10;
+    @apply border-primary/30 bg-secondary;
   }
 
   .dash-profile-chip:focus-visible {
@@ -332,39 +311,26 @@
   }
 
   .dash-topbar {
-    box-shadow:
-      inset 0 -1px 0 hsl(199 100% 50% / 0.06),
-      0 18px 42px -36px hsl(199 100% 50% / 0.6);
+    box-shadow: none;
+    border-bottom: 1px solid hsl(var(--border));
   }
 
   .dash-card {
-    @apply relative overflow-hidden rounded-lg border border-white/[0.08] bg-card/80 backdrop-blur-md;
-    box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.05),
-      0 0 0 1px hsl(199 100% 50% / 0.025),
-      0 28px 70px -45px hsl(0 0% 0% / 0.95);
+    @apply relative overflow-hidden rounded-lg border border-border bg-card;
   }
 
   .dash-card::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 10%;
-    right: 10%;
-    height: 1px;
-    pointer-events: none;
-    background: var(--flare);
-    opacity: 0.55;
+    content: none;
   }
 
   .dash-eyebrow {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    @apply text-[11px] font-semibold uppercase tracking-[0.28em] text-primary sm:text-xs;
+    font-family: 'Manrope', system-ui, sans-serif;
+    @apply text-xs font-medium tracking-normal text-primary;
   }
 
   .dash-title {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    @apply text-2xl font-semibold tracking-normal text-foreground sm:text-3xl md:text-4xl;
+    font-family: 'Manrope', system-ui, sans-serif;
+    @apply text-2xl font-medium tracking-tight text-foreground sm:text-3xl md:text-4xl;
   }
 
   .dash-subtitle {
@@ -372,8 +338,7 @@
   }
 
   .dash-icon-chip {
-    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary sm:h-11 sm:w-11;
-    box-shadow: 0 0 20px hsl(199 100% 50% / 0.15);
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-secondary text-primary sm:h-11 sm:w-11;
   }
 
   .dash-icon-chip svg {
@@ -386,34 +351,28 @@
   }
 
   .dash-stat-tile {
-    @apply relative overflow-hidden rounded-lg border border-white/[0.08] bg-black/35 px-5 py-4 text-center backdrop-blur-sm transition-colors duration-200 sm:px-6 sm:py-5;
+    @apply relative overflow-hidden rounded-lg border border-border bg-card px-5 py-4 text-left transition-colors duration-200 sm:px-6 sm:py-5;
   }
 
   .dash-stat-tile::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(135deg, hsl(0 0% 100% / 0.055), transparent 42%);
+    content: none;
   }
 
   .dash-stat-tile:hover {
     @apply border-primary/40;
-    box-shadow: 0 0 28px -12px hsl(199 100% 50% / 0.45);
   }
 
   .dash-stat-tile--highlight {
     @apply border-primary/40 bg-primary/10;
-    box-shadow: inset 0 0 0 1px hsl(199 100% 50% / 0.08), 0 20px 60px -38px hsl(199 100% 50% / 0.8);
   }
 
   .dash-stat-value {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    @apply text-2xl font-semibold tabular-nums leading-none text-primary sm:text-3xl;
+    font-family: 'Manrope', system-ui, sans-serif;
+    @apply text-2xl font-medium tabular-nums leading-none text-foreground sm:text-3xl;
   }
 
   .dash-stat-label {
-    @apply mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground sm:text-xs;
+    @apply mt-2 text-xs font-normal tracking-normal text-muted-foreground;
   }
 
   .dash-message {
@@ -425,13 +384,13 @@
   }
 
   .dash-field-label {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/80 sm:text-xs;
+    font-family: 'Manrope', system-ui, sans-serif;
+    @apply text-sm font-medium tracking-normal text-foreground/80;
   }
 
   .dash-table-head {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-primary/70 sm:text-xs;
+    font-family: 'Manrope', system-ui, sans-serif;
+    @apply text-xs font-medium tracking-normal text-muted-foreground;
   }
 
   .dash-body {
@@ -439,8 +398,8 @@
   }
 
   .dash-section-title {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    @apply text-xl font-semibold tracking-tight text-foreground sm:text-2xl;
+    font-family: 'Manrope', system-ui, sans-serif;
+    @apply text-xl font-medium tracking-tight text-foreground sm:text-2xl;
   }
 
   .dash-progress-track {
@@ -449,8 +408,7 @@
 
   .dash-progress-fill {
     @apply h-full rounded-full transition-all duration-500;
-    background: linear-gradient(90deg, hsl(199 100% 50%), hsl(185 100% 55%));
-    box-shadow: 0 0 12px hsl(185 100% 50% / 0.55);
+    background: hsl(var(--primary));
   }
 
   .dash-mobile-header {
@@ -458,15 +416,11 @@
   }
 
   .dash-event-card {
-    box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.08),
-      0 34px 80px -54px hsl(199 100% 50% / 0.6);
+    box-shadow: none;
   }
 
   .dash-command-panel {
-    background:
-      linear-gradient(120deg, hsl(199 100% 50% / 0.08), transparent 32%),
-      linear-gradient(180deg, hsl(210 22% 5% / 0.96), hsl(210 22% 3% / 0.94));
+    background: hsl(var(--card));
   }
 
   .dash-progress-card {
@@ -527,7 +481,7 @@
   }
 
   .font-display {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-family: var(--event-display, 'Manrope'), system-ui, sans-serif;
   }
 
   .font-mono {
@@ -556,61 +510,54 @@
   .text-gradient-cyan,
   .text-gradient-navy,
   .text-gradient-sunset {
-    background: linear-gradient(120deg, hsl(0 0% 100%) 10%, hsl(185 100% 70%) 55%, hsl(199 100% 55%) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(var(--foreground));
   }
 
   .glow-impact,
   .glow-cyan {
-    text-shadow: 0 0 28px hsl(185 100% 50% / 0.35);
+    text-shadow: none;
   }
 
   .glow-violet {
-    text-shadow: 0 0 24px hsl(199 100% 50% / 0.3);
+    text-shadow: none;
   }
 
   .poster-pill {
-    @apply rounded-full border border-white/15 bg-black/40 px-5 py-2 font-display text-xs font-medium tracking-[0.2em] text-white backdrop-blur-md;
+    @apply rounded-full border border-border bg-secondary px-4 py-2 font-display text-xs font-medium text-foreground;
   }
 
   .btn-poster-cta {
-    @apply inline-flex items-center justify-center rounded-md bg-primary px-8 py-3.5 font-display text-sm font-semibold tracking-[0.12em] text-primary-foreground transition-all duration-300;
-    box-shadow: 0 0 0 1px hsl(185 100% 70% / 0.35), var(--glow-primary);
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 py-3 font-display text-sm font-medium tracking-normal text-primary-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   .btn-poster-cta:hover {
-    @apply brightness-110;
-    box-shadow: 0 0 0 1px hsl(185 100% 80% / 0.5), var(--glow-cyan);
+    @apply bg-primary/90;
   }
 
   .section-glow-top {
-    background: radial-gradient(ellipse 70% 45% at 50% 0%, hsl(199 100% 50% / 0.12), transparent);
+    background: transparent;
   }
 
   .neon-border-cyan,
   .neon-border-violet {
-    border: 1px solid hsl(199 100% 50% / 0.35);
-    box-shadow: 0 0 18px hsl(199 100% 50% / 0.12);
+    border: 1px solid hsl(var(--border));
   }
 
   .poster-section-bg {
-    background: var(--gradient-hero);
+    background: hsl(var(--background));
   }
 
   .poster-card {
-    @apply overflow-hidden rounded-2xl border border-white/[0.08] bg-card/75 backdrop-blur-md;
+    @apply overflow-hidden rounded-lg border border-border bg-card;
     box-shadow: var(--surface-elevated);
   }
 
   .poster-detail-tile {
-    @apply rounded-xl border border-white/[0.08] bg-black/40 p-4 backdrop-blur-sm;
+    @apply rounded-lg border border-border bg-card p-4;
   }
 
   .poster-preview-frame {
-    @apply overflow-hidden rounded-xl border border-primary/25 bg-black;
-    box-shadow: 0 0 28px hsl(199 100% 50% / 0.12);
+    @apply overflow-hidden rounded-lg border border-border bg-card;
   }
 
   .poster-preview-chrome {
@@ -625,8 +572,7 @@
   /* Horizon motif utilities */
   .horizon-flare {
     height: 1px;
-    background: var(--flare);
-    box-shadow: 0 0 18px hsl(185 100% 50% / 0.45);
+    background: hsl(var(--border));
   }
 
   .horizon-arc {
@@ -876,13 +822,5 @@
   100% {
     transform: translateY(min(72vh, 820px));
     opacity: 0.2;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .event-hero-poster,
-  .event-hero-dock,
-  .event-hero-scan {
-    animation: none !important;
   }
 }

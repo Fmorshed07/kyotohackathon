@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   LayoutGrid,
+  Play,
   ExternalLink,
   MessageCircle,
   Settings,
@@ -160,7 +161,7 @@ const formatNavEventDate = (eventDate: string) => {
   return start;
 };
 
-const groupLabelClass = "dash-nav-label !text-primary/70";
+const groupLabelClass = "dash-nav-label !text-muted-foreground";
 
 const ADMIN_HOME = "/dashboard/admin";
 
@@ -886,6 +887,22 @@ function DashboardLayoutContent({
                   <DashboardNavLink href="/projects" onNavigate={closeMobileNav}>
                     <LayoutGrid className={navIconClass} />
                     <span>Projects & demos</span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className={menuButtonClass}>
+                  <DashboardNavLink href="/feed" onNavigate={closeMobileNav}>
+                    <Sparkles className={navIconClass} />
+                    <span>Project feed</span>
+                  </DashboardNavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className={menuButtonClass}>
+                  <DashboardNavLink href="/videos" onNavigate={closeMobileNav}>
+                    <Play className={navIconClass} />
+                    <span>Video previews</span>
                   </DashboardNavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

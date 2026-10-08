@@ -1,6 +1,7 @@
 import type { Plugin } from "vite";
 import { handleAiHackathonRequest } from "./handler";
 import { handleProjectScreeningAiRequest } from "./screeningHandler";
+import { handleLumaEventImportRequest } from "../luma/handler";
 
 async function readJsonBody(req: import("http").IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -23,11 +24,17 @@ export function aiHackathonApiPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const path = req.url?.split("?")[0];
-        if (path !== "/api/hackathon-ai" && path !== "/api/project-screening-ai") return next();
+        if (path !== "/api/hackathon-ai" && path !== "/api/project-screening-ai" && path !== "/api/luma-event-import") return next();
         try {
           const authorization =
             typeof req.headers.authorization === "string" ? req.headers.authorization : undefined;
           const body = req.method === "POST" ? await readJsonBody(req) : {};
+          if (path === "/api/luma-event-import") {
+            const result = await handleLumaEventImportRequest({ method: req.method, authorization, body });
+            res.setHeader("Cache-Control", "no-store");
+            sendJson(res, result.ok ? 200 : result.status, result.ok ? { event: result.event } : { error: result.error });
+            return;
+          }
           if (path === "/api/project-screening-ai") {
             const result = await handleProjectScreeningAiRequest({
               method: req.method,

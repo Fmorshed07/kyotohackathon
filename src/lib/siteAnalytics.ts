@@ -85,6 +85,8 @@ export function isPublicAnalyticsPath(pathname: string) {
     pathname.startsWith("/events/") ||
     pathname === "/projects" ||
     pathname.startsWith("/projects/") ||
+    pathname === "/feed" ||
+    pathname === "/videos" ||
     pathname === "/resources" ||
     pathname === "/signin" ||
     pathname === "/signup" ||
@@ -98,6 +100,8 @@ export function getAnalyticsPageGroup(pathname: string) {
   if (pathname.startsWith("/events/")) return "Event detail";
   if (pathname === "/projects") return "Projects gallery";
   if (pathname.startsWith("/projects/")) return "Project detail";
+  if (pathname === "/feed") return "Project feed";
+  if (pathname === "/videos") return "Video previews";
   if (pathname === "/resources") return "Resources";
   if (pathname.includes("signin") || pathname === "/signup") return "Sign in";
   return "Other";

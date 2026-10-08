@@ -25,6 +25,9 @@ describe("site analytics", () => {
   it("tracks public pages but excludes private dashboards", () => {
     expect(isPublicAnalyticsPath("/projects/demo-project")).toBe(true);
     expect(isPublicAnalyticsPath("/events/ai-ideathon-2026")).toBe(true);
+    expect(isPublicAnalyticsPath("/feed")).toBe(true);
+    expect(isPublicAnalyticsPath("/videos")).toBe(true);
+    expect(analyticsPageLabel("/videos")).toBe("Video previews");
     expect(isPublicAnalyticsPath("/dashboard/admin/people")).toBe(false);
     expect(isPublicAnalyticsPath("/invite/judge/private-token")).toBe(false);
   });

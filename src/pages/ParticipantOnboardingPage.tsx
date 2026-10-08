@@ -52,6 +52,7 @@ import {
 } from "@/lib/hackathons";
 import { getDashboardPathForUser, participantNeedsOnboarding } from "@/lib/portalRoutes";
 import { queueParticipantEmail } from "@/lib/participantEmail";
+import { checkParticipantEventEnrollment } from "@/lib/participantEventEnrollment";
 import { cn } from "@/lib/utils";
 
 type OnboardingStep = 1 | 2 | 3;
@@ -180,7 +181,7 @@ const parseSkillList = (value: string) =>
 const stepMeta: Record<OnboardingStep, { title: string; subtitle: string }> = {
   1: {
     title: "Confirm your event",
-    subtitle: "Join AI Ideathon — the open event available for signup right now.",
+    subtitle: "Choose an event currently accepting registrations.",
   },
   2: {
     title: "Who are you on the team?",
@@ -478,6 +479,7 @@ export default function ParticipantOnboardingPage() {
     setIsSaving(true);
     setError(null);
     try {
+      await checkParticipantEventEnrollment(db, hackathonId, sessionUser.hackathonIds, sessionUser.hackathonId);
       const githubUsername = normalizeGithubUsername(form.githubUsername);
       const role = resolvedRole();
       const now = new Date().toISOString();
@@ -504,7 +506,11 @@ export default function ParticipantOnboardingPage() {
           xUrl: normalizeHandleOrUrl(form.xUrl, "x.com"),
           discordHandle: form.discordHandle.trim().replace(/^@/, ""),
           hackathon_id: hackathonId,
-          hackathon_ids: [hackathonId],
+          hackathon_ids: Array.from(new Set([
+            hackathonId,
+            ...(sessionUser.hackathonIds ?? []),
+            ...(sessionUser.hackathonId ? [sessionUser.hackathonId] : []),
+          ])),
           profileUpdatedAt: now,
           onboardingCompletedAt: now,
         },
@@ -651,8 +657,8 @@ export default function ParticipantOnboardingPage() {
                 </div>
                 {joinableHackathons.length === 0 ? (
                   <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                    AI Ideathon is not open for signup yet. Check the public event page, or try again
-                    shortly.
+                    There are no events open for registration right now. Registration for ended
+                    events is closed. Explore the public event pages for upcoming events.
                   </p>
                 ) : (
                   <p className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">

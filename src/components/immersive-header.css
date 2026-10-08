@@ -1,0 +1,193 @@
+.immersive-header.immersive-header {
+  color: #f4f8ff;
+  border-bottom-color: transparent;
+  background: linear-gradient(180deg, rgba(2, 8, 22, 0.62), rgba(2, 8, 22, 0));
+  backdrop-filter: none;
+  transition: background-color 240ms ease, border-color 240ms ease, backdrop-filter 240ms ease;
+}
+
+.immersive-header.immersive-header--scrolled {
+  border-bottom-color: rgba(151, 190, 240, 0.12);
+  background: rgba(4, 12, 28, 0.93);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+.immersive-header .immersive-header__inner {
+  height: 76px;
+  max-width: 1680px;
+  padding-inline: clamp(24px, 3.2vw, 60px);
+  gap: 18px;
+}
+
+.immersive-header .immersive-header__brand {
+  filter: drop-shadow(0 3px 16px rgba(37, 133, 255, 0.12));
+}
+
+.immersive-header .immersive-header__nav {
+  overflow: visible;
+}
+
+.immersive-header .immersive-header__nav a {
+  padding: 10px 8px;
+  color: rgba(230, 240, 255, 0.76);
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 999px;
+  letter-spacing: -0.08px;
+}
+
+.immersive-header .immersive-header__nav a:hover,
+.immersive-header .immersive-header__nav a[aria-current="page"] {
+  color: white;
+  background: rgba(162, 202, 255, 0.09);
+}
+
+.immersive-header .immersive-header__auth {
+  min-height: 36px;
+  padding-inline: 17px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(126, 174, 237, 0.09);
+  border: 1px solid rgba(160, 203, 255, 0.18);
+  color: #f4f8ff;
+}
+
+.immersive-header .immersive-header__auth:hover {
+  background: rgba(126, 174, 237, 0.2);
+}
+
+.immersive-header .immersive-header__login {
+  background: #eff6ff;
+  color: #07172f;
+  border-color: #eff6ff;
+}
+
+.immersive-header .immersive-header__login:hover {
+  background: #ffffff;
+}
+
+.immersive-header .immersive-header__language button {
+  border-radius: 999px;
+  border-color: rgba(160, 203, 255, 0.15);
+  background: rgba(7, 22, 45, 0.42);
+  color: #e4efff;
+}
+
+.immersive-header .immersive-header__language button[aria-pressed="true"] {
+  border-color: rgba(114, 187, 255, 0.55);
+  color: #8ccdff;
+}
+
+.immersive-header :is(a, button):focus-visible,
+.immersive-menu :is(a, button, select):focus-visible {
+  outline: 2px solid #84c8ff;
+  outline-offset: 4px;
+}
+
+@media (min-width: 1161px) and (max-width: 1280px) {
+  .immersive-header .immersive-header__inner {
+    padding-inline: 24px;
+    gap: 12px;
+  }
+
+  .immersive-header .immersive-header__nav a {
+    padding-inline: 7px;
+  }
+
+  .immersive-header .immersive-header__actions {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 1160px) {
+  .immersive-header .immersive-header__inner {
+    height: 68px;
+  }
+
+  .immersive-header .immersive-header__nav,
+  .immersive-header .immersive-header__auth,
+  .immersive-header .immersive-header__language {
+    display: none;
+  }
+
+  .immersive-header .immersive-header__burger {
+    display: block;
+  }
+
+  .immersive-header .immersive-header__burger button {
+    width: 46px;
+    height: 38px;
+    border: 1px solid rgba(160, 203, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(20, 38, 65, 0.65);
+    color: #eaf3ff;
+  }
+
+  .immersive-menu .immersive-menu__backdrop {
+    background: rgba(1, 6, 17, 0.4);
+  }
+
+  .immersive-menu .immersive-menu__panel {
+    top: 64px;
+    right: 24px;
+    width: min(360px, calc(100vw - 48px));
+    height: auto;
+    max-height: calc(100dvh - 88px);
+    padding: 16px;
+    border: 1px solid rgba(151, 190, 240, 0.18);
+    border-radius: 22px;
+    background: rgba(5, 16, 35, 0.96);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 24px 70px rgba(0, 4, 16, 0.48);
+    animation: immersive-menu-in 180ms ease-out both;
+    overscroll-behavior: contain;
+  }
+
+  .immersive-menu .immersive-menu__content {
+    gap: 12px;
+    padding-block: 12px 0;
+  }
+
+  .immersive-menu .immersive-menu__links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .immersive-menu .immersive-menu__links button,
+  .immersive-menu .immersive-menu__content > button {
+    min-height: 44px;
+    border-radius: 10px;
+    padding: 10px;
+    color: #dceaff;
+    font-size: 13px;
+    background: rgba(115, 164, 227, 0.035);
+  }
+
+  .immersive-menu .immersive-menu__links button:hover,
+  .immersive-menu .immersive-menu__content > button:hover {
+    color: white;
+    background: rgba(115, 164, 227, 0.12);
+  }
+}
+
+@media (max-width: 552px) {
+  .immersive-header .immersive-header__inner {
+    height: 64px;
+    padding-inline: 20px;
+  }
+
+  .immersive-menu .immersive-menu__panel {
+    top: 60px;
+    right: 16px;
+    width: calc(100vw - 32px);
+    max-height: calc(100dvh - 76px);
+  }
+}
+
+@keyframes immersive-menu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}

@@ -208,14 +208,22 @@ describe("collectAccessibleHackathonIds", () => {
 describe("filterUsersForHackathon", () => {
   it("keeps human judges discoverable when they only saved final-round marks", () => {
     const users = [
-      { id: "final-judge", hackathonIds: [] },
-      { id: "unrelated-user", hackathonIds: [] },
+      { id: "final-judge", role: "judge", hackathonIds: [] },
+      { id: "unrelated-user", role: "participant", hackathonIds: [] },
     ];
     const submissions = [
       {
         id: "finalist-1",
         user_id: "participant-1",
         hackathon_id: hostedIdeathonId,
+        title: "Finalist project",
+        short_description: null,
+        project_url: null,
+        submission_pdf_url: null,
+        demo_video_url: null,
+        created_at: null,
+        judge_score: null,
+        judge_notes: null,
         final_judge_scores: { "final-judge": 92 },
       } as Submission,
     ];

@@ -10,6 +10,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import PeerPortalLivePreview from "@/components/PeerPortalLivePreview";
 
 const PEER_PORTAL_URL = "https://peerportal.app";
 const COGNISOR_URL = "https://www.cognisorai.com";
@@ -92,7 +93,7 @@ const partnershipSignals = [
 ];
 
 const LookingForJobsSection = () => {
-  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.12 });
+  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold: 0.06 });
 
   return (
     <section
@@ -153,6 +154,8 @@ const LookingForJobsSection = () => {
             from hackathons to Tokyo careers, nationwide 求人, internships, and signed offers.
           </p>
         </motion.div>
+
+        <PeerPortalLivePreview className="mb-12" />
 
         <motion.aside
           className="mb-12 rounded-2xl border border-primary/30 bg-primary/5 px-6 py-5 text-center backdrop-blur-md md:px-8"

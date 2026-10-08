@@ -17,6 +17,8 @@ import AnimatedBackground from "@/components/AnimatedBackground";
 import { EventRichText } from "@/components/EventRichText";
 import SiteHeader from "@/components/SiteHeader";
 import { HackathonSubscribeForm } from "@/components/hackathons/HackathonSubscribeForm";
+import ImportedEventDetails from "@/components/hackathons/ImportedEventDetails";
+import { eventRegistrationClosedMessage, eventRegistrationLabel, isEventRegistrationClosed } from "@/lib/eventRegistration";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fetchAiHackathon, type HostedHackathon } from "@/lib/aiHackathons";
@@ -27,12 +29,15 @@ import {
 } from "@/lib/eventBranding";
 import { getHackathonSubmissionMode } from "@/lib/hackathons";
 import { getFirestoreDb } from "@/lib/firebaseClient";
+import { getBundledHackathon } from "@/lib/elevenLabsMeetup";
 import { cn } from "@/lib/utils";
 
 type PublicCriterion = { id: string; title: string; weight: number; questions: string[] };
 
 const participantSignupHref = (eventId: string) =>
   `/signup?role=participant&hackathon=${encodeURIComponent(eventId)}`;
+
+const eventProjectsHref = (eventId: string) => `/projects?event=${encodeURIComponent(eventId)}`;
 
 const normalizeCriteria = (value: unknown): PublicCriterion[] => {
   if (!Array.isArray(value)) return [];
@@ -82,7 +87,7 @@ function EventHeroMeta({
         ) : null}
         <div className="flex max-w-full flex-wrap gap-2">
           <Badge className="uppercase tracking-[0.16em]">
-            {event.status === "active" ? "Live now" : event.status}
+            {event.status === "past" ? "Finished" : event.status === "active" ? "Live now" : event.status}
           </Badge>
           <Badge
             variant="outline"
@@ -212,6 +217,7 @@ function EventHeroActions({
 }) {
   const isStage = tone === "stage";
   const btn = "w-full gap-2 sm:w-auto";
+  const registrationClosed = isEventRegistrationClosed(event);
 
   return (
     <div
@@ -220,15 +226,20 @@ function EventHeroActions({
         className,
       )}
     >
-      {event.lumaUrl ? (
+      {registrationClosed ? (
+        <div className="w-full">
+          <p className={cn("mb-3 text-sm", isStage ? "text-white/70" : "text-muted-foreground")}>{eventRegistrationClosedMessage(event)}</p>
+          <Button asChild size="lg" className={btn}><Link to={eventProjectsHref(event.id)}>Browse event projects<ExternalLink className="h-4 w-4" /></Link></Button>
+        </div>
+      ) : event.lumaUrl ? (
         <Button asChild size="lg" className={btn}>
           <a href={event.lumaUrl} target="_blank" rel="noreferrer">
-            Register now
+            {eventRegistrationLabel(event)}
             <ExternalLink className="h-4 w-4" />
           </a>
         </Button>
       ) : null}
-      <Button
+      {!registrationClosed && !event.sourceUrl ? <Button
         asChild
         size="lg"
         variant={event.lumaUrl ? "outline" : "default"}
@@ -238,7 +249,7 @@ function EventHeroActions({
           Join on Cognisor
           <Users className="h-4 w-4" />
         </Link>
-      </Button>
+      </Button> : null}
       {event.rulebookUrl ? (
         <Button
           asChild
@@ -286,39 +297,23 @@ function EventHero({
   const heroImage = event.bannerImageUrl || event.coverImageUrl;
   const isHosted = Boolean(event.hostEventId);
   const displayStyle = { fontFamily: "var(--event-display)" };
+  const archivedPoster = event.status === "past" && heroImage ? (
+    <details className="relative mt-4 overflow-hidden rounded-xl border border-white/10 bg-black/20">
+      <summary className="cursor-pointer px-4 py-3 text-sm text-muted-foreground">Archived event poster · Registration closed</summary>
+      <img src={heroImage} alt={`${event.name} archived poster`} loading="lazy" className="block h-auto w-full" />
+    </details>
+  ) : null;
 
   if (layout === "stage") {
     return (
       <section className="relative isolate overflow-hidden border-b border-white/10">
-        {/* Ambient stage field — keeps letterboxing intentional, not empty */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,hsl(var(--primary)/0.16),transparent_52%),linear-gradient(180deg,#030507_0%,#05070b_48%,hsl(var(--background))_100%)]"
-        />
-        <div
-          aria-hidden
-          className="event-hero-grid pointer-events-none absolute inset-0 opacity-[0.35]"
-        />
 
         <div className="relative mx-auto w-full max-w-[1400px] px-3 pt-3 sm:px-5 sm:pt-4 lg:px-6 lg:pt-5">
           {/* Poster showcase — artwork stays fully readable, no overlay card */}
-          <div className="event-hero-poster group relative overflow-hidden rounded-2xl border border-white/12 bg-[#05070b] shadow-[0_40px_120px_-48px_hsl(var(--primary)/0.55),0_24px_80px_-40px_rgba(0,0,0,0.85)] sm:rounded-[1.35rem]">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit] shadow-[inset_0_0_0_1px_hsla(0,0%,100%,0.06),inset_0_1px_0_hsla(0,0%,100%,0.08)]"
-            />
-            {/* Corner brackets */}
-            <span aria-hidden className="event-hero-corner event-hero-corner-tl" />
-            <span aria-hidden className="event-hero-corner event-hero-corner-tr" />
-            <span aria-hidden className="event-hero-corner event-hero-corner-bl" />
-            <span aria-hidden className="event-hero-corner event-hero-corner-br" />
-            <span
-              aria-hidden
-              className="event-hero-scan pointer-events-none absolute inset-x-0 top-0 z-[2] h-px opacity-70"
-            />
+          {event.status !== "past" ? <div className="event-hero-poster group relative overflow-hidden rounded-lg border border-border bg-card">
 
             {heroImage ? (
-              <div className="relative z-0 w-full min-w-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.08),transparent_65%)]">
+              <div className="relative z-0 w-full min-w-0 bg-card">
                 <img
                   src={heroImage}
                   alt={`${event.name} banner`}
@@ -326,22 +321,17 @@ function EventHero({
                 />
               </div>
             ) : (
-              <div className="relative flex min-h-[min(48vh,420px)] items-end bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.28),transparent_55%),linear-gradient(180deg,#05070b_0%,#000_100%)] px-6 py-10 sm:px-10 sm:py-14">
+              <div className="relative flex min-h-[min(48vh,420px)] items-end bg-card px-6 py-10 sm:px-10 sm:py-14">
                 <div className="max-w-3xl">
                   <EventHeroMeta event={event} isHosted={isHosted} tone="stage" />
                 </div>
               </div>
             )}
-          </div>
+          </div> : null}
 
           {/* Launch dock — fully below the poster so banner art stays unobstructed */}
           <div className="event-hero-dock relative z-10 mt-4 w-full sm:mt-5">
-            <div className="overflow-hidden rounded-2xl border border-primary/25 bg-[linear-gradient(135deg,hsl(var(--card)/0.96)_0%,hsl(210_24%_6%/0.94)_100%)] shadow-[0_28px_80px_-36px_hsl(var(--primary)/0.45),var(--surface-elevated)] backdrop-blur-xl">
-              <div className="flex h-1.5 w-full overflow-hidden">
-                <span className="w-1/5 bg-primary/30" />
-                <span className="w-3/5 bg-gradient-to-r from-primary/80 via-primary to-primary/80" />
-                <span className="w-1/5 bg-primary/30" />
-              </div>
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
               <div className="grid gap-5 p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(240px,0.75fr)] lg:items-center lg:gap-10 lg:p-7">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2.5">
@@ -353,7 +343,7 @@ function EventHero({
                       />
                     ) : null}
                     <Badge className="uppercase tracking-[0.16em]">
-                      {event.status === "active" ? "Live now" : event.status}
+                      {event.status === "past" ? "Finished" : event.status === "active" ? "Live now" : event.status}
                     </Badge>
                     <Badge variant="outline" className="border-primary/35 text-primary">
                       {event.format}
@@ -401,7 +391,7 @@ function EventHero({
 
                 <div className="flex w-full flex-col border-t border-white/10 pt-4 sm:min-w-[220px] lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
                   <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Enter the event
+                    {isEventRegistrationClosed(event) ? event.status === "past" ? "Event finished" : "Registration closed" : "Enter the event"}
                   </p>
                   <EventHeroActions
                     event={event}
@@ -414,6 +404,7 @@ function EventHero({
               </div>
             </div>
           </div>
+          {archivedPoster}
         </div>
 
         <div className="h-6 sm:h-8" />
@@ -428,7 +419,7 @@ function EventHero({
         layout === "folio" ? "rounded-[1.5rem] sm:rounded-[2rem]" : "rounded-2xl",
       )}
     >
-      {heroImage ? (
+      {heroImage && event.status !== "past" ? (
         <div className="relative w-full overflow-hidden border-b border-white/10 bg-black">
           <img
             src={heroImage}
@@ -438,7 +429,6 @@ function EventHero({
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-card to-transparent" />
         </div>
       ) : null}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.18),transparent_40%)]" />
       <div
         className={cn(
           "relative max-w-4xl px-4 py-7 sm:px-8 sm:py-10",
@@ -448,6 +438,7 @@ function EventHero({
       >
         <EventHeroMeta event={event} isHosted={isHosted} tone="card" />
         <EventHeroActions event={event} onCopy={onCopy} copied={copied} tone="card" />
+        {archivedPoster}
       </div>
     </section>
   );
@@ -455,9 +446,9 @@ function EventHero({
 
 export default function GeneratedHackathonPage() {
   const { hackathonId } = useParams<{ hackathonId: string }>();
-  const [event, setEvent] = useState<HostedHackathon | null>(null);
+  const [event, setEvent] = useState<HostedHackathon | null>(() => getBundledHackathon(hackathonId ?? ""));
   const [criteria, setCriteria] = useState<PublicCriterion[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !getBundledHackathon(hackathonId ?? ""));
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -466,18 +457,24 @@ export default function GeneratedHackathonPage() {
       return;
     }
     let isCurrent = true;
-    const db = getFirestoreDb();
-    void Promise.all([
-      fetchAiHackathon(db, hackathonId),
-      getDoc(doc(db, "hackathon_criteria", hackathonId)),
-    ])
-      .then(([result, criteriaSnapshot]) => {
+    const bundled = getBundledHackathon(hackathonId);
+    setEvent(bundled);
+    setCriteria([]);
+    setIsLoading(!bundled);
+    void (async () => {
+      const db = getFirestoreDb();
+      return Promise.allSettled([
+        fetchAiHackathon(db, hackathonId),
+        getDoc(doc(db, "hackathon_criteria", hackathonId)),
+      ]);
+    })()
+      .then(([result, criteriaResult]) => {
         if (!isCurrent) return;
-        setEvent(result);
-        setCriteria(normalizeCriteria(criteriaSnapshot.data()?.criteria));
+        if (result.status === "fulfilled") setEvent(result.value);
+        if (criteriaResult.status === "fulfilled") setCriteria(normalizeCriteria(criteriaResult.value.data()?.criteria));
       })
       .catch(() => {
-        if (isCurrent) setEvent(null);
+        if (isCurrent) setEvent(bundled);
       })
       .finally(() => {
         if (isCurrent) setIsLoading(false);
@@ -587,6 +584,7 @@ export default function GeneratedHackathonPage() {
               </nav>
 
               <div>
+                <ImportedEventDetails event={event} />
                 {event.summary ? (
                   <section
                     id="about"
@@ -637,7 +635,7 @@ export default function GeneratedHackathonPage() {
                     </p>
                     <p className="mt-2 text-sm font-medium text-foreground">{event.format}</p>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      Follow the programme and rulebook for the latest joining details.
+                      {event.status === "past" ? "View the programme and rulebook from this completed event." : "Follow the programme and rulebook for the latest joining details."}
                     </p>
                   </article>
                 </section>
@@ -744,7 +742,7 @@ export default function GeneratedHackathonPage() {
                     )}
                   </article>
                   <article id="requirements" className="rounded-2xl border border-white/10 bg-card/70 p-4 backdrop-blur sm:p-8">
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Before you apply</p>
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">{isEventRegistrationClosed(event) ? "Event requirements" : "Before you apply"}</p>
                     <h2 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl" style={displayStyle}>
                       Requirements
                     </h2>
@@ -783,7 +781,7 @@ export default function GeneratedHackathonPage() {
                         How projects are judged
                       </h2>
                       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                        The judging rubric is published with the event so teams can build with clear expectations.
+                        {event.judgingCriteriaNames?.length ? "Projects are evaluated on the following criteria from the official event brief." : "The judging rubric is published with the event so teams can build with clear expectations."}
                       </p>
                     </div>
                     <FileText className="h-7 w-7 text-primary" />
@@ -808,6 +806,10 @@ export default function GeneratedHackathonPage() {
                         </article>
                       ))}
                     </div>
+                  ) : event.judgingCriteriaNames?.length ? (
+                    <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+                      {event.judgingCriteriaNames.map((criterion) => <li key={criterion} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/15 p-4 text-sm font-medium"><CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />{criterion}</li>)}
+                    </ul>
                   ) : (
                     <p className="mt-6 text-sm text-muted-foreground">
                       The organiser will publish the final judging criteria before submissions open.
@@ -817,31 +819,33 @@ export default function GeneratedHackathonPage() {
 
                 <section className="mt-6 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/15 via-card/80 to-card/60 px-4 py-8 text-center sm:mt-8 sm:px-10 sm:py-10">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-                    {event.lumaUrl ? "Ready to take part?" : "Ready to build?"}
+                    {isEventRegistrationClosed(event) ? event.status === "past" ? "Event finished" : "Registration closed" : event.registrationStatus === "waitlist" ? "Stay in the loop" : event.lumaUrl ? "Ready to take part?" : "Ready to build?"}
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl" style={displayStyle}>
-                    {event.organizerName
+                    {isEventRegistrationClosed(event) ? "Explore what the community built" : event.organizerName
                       ? `Join ${event.organizerName}'s event`
                       : "Join this event community"}
                   </h2>
                   <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                    {event.lumaUrl
+                    {isEventRegistrationClosed(event) ? `${eventRegistrationClosedMessage(event)} You can still explore the projects and demos shared by participants.` : event.sourceUrl ? "Use the official Luma page for current availability and registration updates. Subscribe below for more community events." : event.lumaUrl
                       ? "Register through the organiser link, or subscribe for more hackathons — no account needed."
                       : "Subscribe for more hackathons, or create a portal account later if you want to submit a project."}
                   </p>
                   <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-3">
-                    {event.lumaUrl ? (
+                    {isEventRegistrationClosed(event) ? (
+                      <Button asChild className="w-full gap-2 sm:w-auto"><Link to={eventProjectsHref(event.id)}>Browse event projects <ExternalLink className="h-4 w-4" /></Link></Button>
+                    ) : event.lumaUrl ? (
                       <Button asChild className="w-full gap-2 sm:w-auto">
                         <a href={event.lumaUrl} target="_blank" rel="noreferrer">
-                          Open registration <ExternalLink className="h-4 w-4" />
+                          {eventRegistrationLabel(event)} <ExternalLink className="h-4 w-4" />
                         </a>
                       </Button>
                     ) : null}
-                    <Button asChild variant="outline" className="w-full gap-2 sm:w-auto">
+                    {!isEventRegistrationClosed(event) && !event.sourceUrl ? <Button asChild variant="outline" className="w-full gap-2 sm:w-auto">
                       <Link to={participantSignupHref(event.id)}>
                         Create participant account <ArrowLeft className="h-4 w-4 rotate-180" />
                       </Link>
-                    </Button>
+                    </Button> : null}
                   </div>
                   <div className="mx-auto mt-6 max-w-md text-left">
                     <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">

@@ -1,0 +1,65 @@
+/* Shared visual language for public pages, auth, and every portal role.
+   Event-specific inline font/color variables remain the source of truth. */
+.site-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  background: hsl(var(--background));
+}
+
+:is(h1, h2, h3).font-display {
+  font-weight: 500;
+  letter-spacing: -.035em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+:is(p, span, label).font-display {
+  letter-spacing: .015em;
+}
+:is(p, label).font-display.uppercase,
+.dash-content .font-display.uppercase {
+  text-transform: none;
+}
+
+.cognisor-grid,
+.starfield { display: none; }
+
+.minimal-home > section:not(.editorial-hero):not(.ecosystem-hero):not(.event-experience) {
+  border-top: 1px solid hsl(var(--border) / .65);
+  padding-inline: clamp(1.25rem, 5vw, 5rem);
+  padding-block: clamp(4.5rem, 9vw, 8rem);
+}
+.minimal-home > section > .mx-auto { max-width: 88rem; }
+.minimal-home > section { scroll-margin-top: 80px; }
+.minimal-home :is(h2, h3).font-display { font-weight: 400; }
+.minimal-home h2.font-display { font-size: clamp(2rem, 4vw, 4rem); }
+
+/* Retire the old cosmic ornament layer without touching photos, event artwork,
+   embedded previews, focus rings, or functional loading indicators. */
+.minimal-home > section > .pointer-events-none.absolute.inset-0,
+.minimal-home .poster-card > .pointer-events-none { display: none; }
+
+.feature-overview { display: grid; gap: 3.5rem; }
+.feature-overview-heading { display: grid; gap: 1rem; max-width: 45rem; }
+.feature-overview-heading > p:first-child { color: hsl(var(--primary)); font-size: .8rem; }
+.feature-overview-heading h2 { font-size: clamp(2rem, 4vw, 4rem); line-height: 1.1; letter-spacing: -.045em; font-weight: 400; }
+.feature-overview-heading > p:last-child { color: hsl(var(--muted-foreground)); line-height: 1.8; max-width: 36rem; }
+.feature-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.feature-link { display: flex; flex-direction: column; gap: 1.5rem; padding: 2rem; border-top: 1px solid hsl(var(--border)); transition: background-color .2s; min-width: 0; }
+.feature-link + .feature-link { border-left: 1px solid hsl(var(--border)); }
+.feature-link:hover { background: hsl(var(--card)); }
+.feature-link:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: -2px; }
+.feature-link-top { display: flex; align-items: center; justify-content: space-between; color: hsl(var(--muted-foreground)); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.feature-link-top svg { width: 1.25rem; height: 1.25rem; stroke-width: 1.4; color: hsl(var(--primary)); }
+.feature-link h3 { font-size: 1.35rem; font-weight: 500; letter-spacing: -.025em; }
+.feature-link p { font-size: .9rem; line-height: 1.8; color: hsl(var(--muted-foreground)); }
+.feature-link-action { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; font-size: .85rem; }
+.feature-link-action svg { width: 1rem; height: 1rem; transition: transform .2s; }
+.feature-link:hover .feature-link-action svg { transform: translate(2px, -2px); }
+
+@media (max-width: 700px) {
+  .feature-links { grid-template-columns: minmax(0, 1fr); }
+  .feature-link { padding: 1.5rem 0; }
+  .feature-link + .feature-link { border-left: 0; }
+}

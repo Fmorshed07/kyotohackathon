@@ -1,5 +1,5 @@
 import { Menu, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
@@ -7,29 +7,48 @@ import GoogleTranslate from "@/components/GoogleTranslate";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { getDashboardPathForUser } from "@/lib/portalRoutes";
 import { cn } from "@/lib/utils";
+import "./immersive-header.css";
 
 type NavLink = { label: string; href: string };
 
 const navLinks: NavLink[] = [
   { label: "Hackathons", href: "/hackathons" },
   { label: "Projects & demos", href: "/projects" },
+  { label: "Feed", href: "/feed" },
+  { label: "Videos", href: "/videos" },
   { label: "Resources", href: "/resources" },
   { label: "Get Hired", href: "#get-hired" },
   { label: "Host", href: "#host" },
-  { label: "About", href: "#about" },
+  { label: "Our work", href: "/work" },
 ];
 
 const authButtonClass =
-  "font-nav inline-flex h-9 items-center whitespace-nowrap rounded-lg px-3.5 text-[13px] font-medium tracking-wide transition-colors";
+  "font-nav inline-flex min-h-10 items-center whitespace-nowrap rounded-lg px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const SiteHeader = () => {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobilePanelRef = useRef<HTMLElement>(null);
   const location = useLocation();
+  const isHome = location.pathname === "/";
   const navigate = useNavigate();
   const { sessionUser, signOut } = usePortalAuth();
   const openMobileNav = useCallback(() => setIsMobileNavOpen(true), []);
   const closeMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
+
+  useEffect(() => {
+    if (!isHome) return;
+    const updateScroll = () => setHasScrolled(window.scrollY > 24);
+    updateScroll();
+    window.addEventListener("scroll", updateScroll, { passive: true });
+    return () => window.removeEventListener("scroll", updateScroll);
+  }, [isHome]);
+
+  useEffect(() => {
+    closeMobileNav();
+  }, [location.pathname, location.hash, closeMobileNav]);
 
   const handleLogout = useCallback(async () => {
     setIsSigningOut(true);
@@ -49,11 +68,45 @@ const SiteHeader = () => {
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const trigger = menuButtonRef.current;
+    const panel = mobilePanelRef.current;
+    const focusableSelector = 'a[href], button:not([disabled]), select:not([disabled]), [tabindex="0"]';
+    panel?.querySelector<HTMLElement>(focusableSelector)?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMobileNav();
+        return;
+      }
+      if (event.key !== "Tab" || !panel) return;
+      const controls = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
+        .filter((element) => element.getClientRects().length > 0 && !element.closest('[aria-hidden="true"]'));
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const desktopQuery = window.matchMedia("(min-width: 1161px)");
+    const closeOnDesktop = () => {
+      if (desktopQuery.matches) closeMobileNav();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    desktopQuery.addEventListener("change", closeOnDesktop);
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      desktopQuery.removeEventListener("change", closeOnDesktop);
+      trigger?.focus();
     };
-  }, [isMobileNavOpen]);
+  }, [isMobileNavOpen, closeMobileNav]);
 
   const handleMobileNavClick = useCallback(
     (href: string) => {
@@ -100,29 +153,33 @@ const SiteHeader = () => {
 
   return (
     <>
-      <header className="fixed top-0 z-40 w-full border-b border-white/[0.06] bg-black/55 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 lg:gap-3 lg:px-8">
-          <div className="flex min-w-0 shrink-0 items-center">
+      <header className={cn(
+        "fixed top-0 z-40 w-full border-b border-border/70 bg-background/90 backdrop-blur-md",
+        isHome && "immersive-header",
+        isHome && hasScrolled && "immersive-header--scrolled",
+      )}>
+        <div className="immersive-header__inner mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-2 px-4 sm:px-6 lg:gap-3 lg:px-10">
+          <div className="immersive-header__brand flex min-w-0 shrink-0 items-center">
             <BrandLogo size="sm" showWordmark priority className="-ml-0.5" />
           </div>
 
           <nav
-            className="hidden min-w-0 flex-1 items-center justify-center overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="immersive-header__nav hidden min-w-0 flex-1 items-center overflow-x-auto min-[1161px]:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             aria-label="Primary"
           >
-            <div className="flex items-center gap-0.5">
+            <div className="mx-auto flex min-w-max items-center gap-0.5">
               {navLinks.map((link) => {
                 const isRoute = !link.href.startsWith("#");
                 const isActive = isRoute && location.pathname === link.href;
                 const className = cn(
                   "font-nav inline-flex items-center whitespace-nowrap rounded-md px-3 py-2 text-[13px] font-medium",
-                  "transition-colors hover:bg-white/5 hover:text-white",
-                  isActive ? "bg-white/5 text-white" : "text-white/55",
+                  "transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isActive ? "bg-secondary text-foreground" : "text-muted-foreground",
                 );
 
                 if (isRoute) {
                   return (
-                    <Link key={link.href} to={link.href} className={className}>
+                    <Link key={link.href} to={link.href} className={className} aria-current={isActive ? "page" : undefined}>
                       {link.label}
                     </Link>
                   );
@@ -139,13 +196,14 @@ const SiteHeader = () => {
             </div>
           </nav>
 
-          <div className="flex shrink-0 items-center justify-end gap-1.5 sm:gap-2 md:gap-3">
+          <div className="immersive-header__actions flex shrink-0 items-center justify-end gap-1.5 sm:gap-2 md:gap-3">
             {sessionUser ? (
               <>
                 <Link
                   to={profilePath}
                   className={cn(
                     authButtonClass,
+                    "immersive-header__auth",
                     "border border-white/15 text-white hover:bg-white/5",
                   )}
                 >
@@ -157,6 +215,7 @@ const SiteHeader = () => {
                   disabled={isSigningOut}
                   className={cn(
                     authButtonClass,
+                    "immersive-header__auth",
                     "border border-white/15 text-white hover:bg-white/5 disabled:opacity-60",
                   )}
                 >
@@ -168,26 +227,27 @@ const SiteHeader = () => {
                 to="/signin"
                 className={cn(
                   authButtonClass,
-                  "bg-primary text-primary-foreground shadow-[0_0_24px_hsl(199_100%_50%/0.35)] hover:brightness-110",
+                  "immersive-header__auth immersive-header__login",
+                  "bg-primary text-primary-foreground hover:bg-primary/90",
                 )}
               >
                 Log in
               </Link>
             )}
-            <div className="hidden sm:flex">
+            <div className="immersive-header__language hidden sm:flex">
               <GoogleTranslate />
             </div>
-            <div className="md:hidden">
+            <div className="immersive-header__burger min-[1161px]:hidden">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
+                ref={menuButtonRef}
                 className="relative z-[71]"
                 aria-label="Open navigation menu"
                 aria-expanded={isMobileNavOpen}
                 aria-controls="mobile-nav-drawer"
                 onClick={openMobileNav}
-                onTouchStart={openMobileNav}
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -197,17 +257,24 @@ const SiteHeader = () => {
       </header>
 
       {isMobileNavOpen ? (
-        <div className="fixed inset-0 z-[80] md:hidden" role="dialog" aria-modal="true">
+        <div
+          className={cn("fixed inset-0 z-[80]", isHome ? "immersive-menu" : "min-[1161px]:hidden")}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation menu"
+        >
           <button
             type="button"
             aria-label="Close navigation menu"
-            className="absolute inset-0 bg-background/70"
+            className="immersive-menu__backdrop absolute inset-0 bg-background/70"
+            tabIndex={-1}
             onClick={closeMobileNav}
           />
 
           <aside
+            ref={mobilePanelRef}
             id="mobile-nav-drawer"
-            className="absolute right-0 top-0 h-full w-[82vw] max-w-sm overflow-hidden border-l border-border bg-background p-6"
+            className="immersive-menu__panel absolute right-0 top-0 h-full w-[82vw] max-w-sm overflow-y-auto border-l border-border bg-background p-6"
           >
             <div className="relative flex items-center justify-between">
               <BrandLogo size="xs" showWordmark href={null} className="pointer-events-none" />
@@ -222,7 +289,7 @@ const SiteHeader = () => {
               </Button>
             </div>
 
-            <div className="relative flex flex-col gap-6 pt-6 pb-6" aria-label="Mobile navigation">
+            <div className="immersive-menu__content relative flex flex-col gap-6 pt-6 pb-6" aria-label="Mobile navigation">
               <button
                 type="button"
                 onClick={() => handleMobileNavClick("/")}
@@ -234,7 +301,7 @@ const SiteHeader = () => {
                 Home
               </button>
 
-              <nav className="flex flex-col gap-0.5" aria-label="Sections">
+              <nav className="immersive-menu__links flex flex-col gap-0.5" aria-label="Sections">
                 {navLinks.map((link) => (
                   <button
                     key={link.href}

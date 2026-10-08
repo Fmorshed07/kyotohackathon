@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import {
   ArrowUpRight,
@@ -237,7 +237,7 @@ export default function ProjectGalleryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [eventFilter, setEventFilter] = useState("all");
+  const [eventFilter, setEventFilter] = useState(() => searchParams.get("event") || "all");
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
   const [sortMode, setSortMode] = useState<GallerySort>("newest");
   const [previewSubmission, setPreviewSubmission] = useState<Submission | null>(null);
@@ -279,6 +279,11 @@ export default function ProjectGalleryPage() {
     .sort((left, right) => left.event.name.localeCompare(right.event.name)), [eventById, submissions]);
 
   useEffect(() => {
+    const requestedEvent = searchParams.get("event");
+    if (requestedEvent) {
+      setEventFilter(requestedEvent);
+      return;
+    }
     if (searchParams.get("spotlight") !== "ai-ideathon-2026") return;
     const ideathon = hostedEvents.find(isAiIdeathonEvent);
     if (ideathon) setEventFilter(ideathon.id);
@@ -354,6 +359,11 @@ export default function ProjectGalleryPage() {
             <div className="max-w-2xl">
               <p className="dash-eyebrow">Public hackathon showcase</p>
               <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Projects & demos</h1>
+              <nav aria-label="Project views" className="mt-4 flex flex-wrap gap-2">
+                <Button asChild variant="secondary" size="sm"><Link to="/projects" aria-current="page"><LayoutGrid className="mr-2 h-4 w-4" />Gallery</Link></Button>
+                <Button asChild variant="outline" size="sm"><Link to="/feed"><Sparkles className="mr-2 h-4 w-4" />Feed</Link></Button>
+                <Button asChild variant="outline" size="sm"><Link to="/videos"><Play className="mr-2 h-4 w-4" />Video previews</Link></Button>
+              </nav>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
                 Explore projects participants chose to share. Star a project with your email — no account needed. Subscribe for more hackathons, send a link to friends, and open the live demo, repo, or document.
               </p>

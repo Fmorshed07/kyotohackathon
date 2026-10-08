@@ -11,6 +11,7 @@ import {
   safeInternalPath,
 } from "./lib/portalRoutes";
 import Index from "./pages/Index";
+import CommunityWorkPage from "./pages/CommunityWorkPage";
 import SignIn from "./pages/SignIn";
 import AdminSignIn from "./pages/AdminSignIn";
 import HostSignIn from "./pages/HostSignIn";
@@ -30,6 +31,7 @@ import HackathonsPage from "./pages/HackathonsPage";
 import GeneratedHackathonPage from "./pages/GeneratedHackathonPage";
 import HackathonBoardsPage from "./pages/HackathonBoardsPage";
 import ProjectGalleryPage from "./pages/ProjectGalleryPage";
+import ProjectFeedPage from "./pages/ProjectFeedPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
 import NotFound from "./pages/NotFound";
@@ -146,6 +148,7 @@ const App = () => (
         <RouteErrorBoundary>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/work" element={<CommunityWorkPage />} />
           <Route path="/hackathons" element={<HackathonsPage />} />
           <Route path="/events/:hackathonId" element={<GeneratedHackathonPage />} />
           <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
@@ -178,6 +181,8 @@ const App = () => (
           <Route path="/boards/:hackathonId" element={<ProtectedRoute><HackathonBoardsPage /></ProtectedRoute>} />
           <Route path="/projects" element={<ProjectGalleryPage />} />
           <Route path="/projects/:projectId" element={<ProjectGalleryPage />} />
+          <Route path="/feed" element={<ProjectFeedPage key="feed" />} />
+          <Route path="/videos" element={<ProjectFeedPage key="videos" videoOnly />} />
           <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/invite/:kind/:token" element={<InviteAcceptPage />} />
           <Route path="*" element={<NotFound />} />

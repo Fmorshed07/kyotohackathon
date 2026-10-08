@@ -56,6 +56,24 @@ This project is built with:
 
 You can deploy this project using any static hosting service such as Vercel, Netlify, or GitHub Pages.
 
+## Import a hosted event from Luma
+
+In the host dashboard, choose **Import from Luma**, paste a `https://luma.com/<event>` or `https://lu.ma/<event>` link, and select **Extract details**. Review the preview and select **Use details in new draft**. The brief stays editable and uses the site's blue theme; the imported Luma link becomes the registration link. Create the draft and publish it using the existing host controls.
+
+The importer reads public page data for the description, dates, location, cover, organizer, gallery, and any explicitly provided programme, participation rules, prizes, and performers. Hidden locations, private guest details, and unpublished fields cannot be imported; missing fields are left empty for the host to fill. Dates are converted to the host browser's local time without changing the event's actual start/end time.
+
+The authenticated `/api/luma-event-import` endpoint runs both in the Vite dev server and as a Vercel function. No Luma API key or AI configuration is required. Static-only deployments need a server for this API endpoint.
+
+## Homepage event previews
+
+The homepage previews up to three published events whose exact `startAt` and `endAt` timestamps include the current time. The selected event fills the available width, stacks on mobile, and keeps its complete poster visible. Previews update automatically at the start and end, display the event timezone when available, and link to the event details. If nothing is live, the next dated events appear as **Upcoming**.
+
+Finished events appear in a separate **Past events** card section with registration closed and archive links. Published events explicitly marked **Past** remain eligible even without exact timestamps; their original display dates are shown. The public catalog controls visibility, cloud records take priority, and legacy Tokyo/Dhaka cards use their existing official archive URLs.
+
+Host publishing saves exact timestamps. Older host listings need to be saved or republished once with both dates to enter the live/upcoming previews. Manually setting **Live** does not override the homepage's date check.
+
+The **Get Hired** section includes one responsive Peer Portal website embed and a direct link to the full site. Peer Portal's deployed website currently sends `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`, which block cross-origin embedding. The inline preview depends on deployment of Peer Portal's approved homepage framing policy; until then, use **Open live preview** to open the official website in a new tab.
+
 ## AI event builder
 
 Admins can open the Admin Dashboard and use **AI event builder** to paste an event brief plus an optional rulebook URL. One action generates the public event page, schedule, requirements, and judging criteria, then publishes the event at `/events/<event-id>` on the same deployment.

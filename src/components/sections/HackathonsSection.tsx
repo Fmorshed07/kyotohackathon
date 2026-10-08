@@ -13,6 +13,7 @@ import { getFirestoreDb } from "@/lib/firebaseClient";
 import { PORTAL_HACKATHONS, type PortalHackathon } from "@/lib/hackathons";
 import { HackathonSubscribeForm } from "@/components/hackathons/HackathonSubscribeForm";
 import { cn } from "@/lib/utils";
+import { getBundledHackathons } from "@/lib/elevenLabsMeetup";
 
 type BoardCategory =
   | "Agentic AI"
@@ -30,7 +31,7 @@ type HackathonBoard = PortalHackathon & {
   organizerInitials: string;
   categories: BoardCategory[];
   tags: string[];
-  builders: number;
+  builders: number | null;
   prize: string;
   format: string;
   hubUrl: string;
@@ -100,7 +101,7 @@ const defaultBoardMeta = (
     organizerInitials: initials,
     categories: ["Agentic AI"],
     tags: [`#${hackathon.shortName.replace(/\s+/g, "")}`],
-    builders: 24,
+    builders: null,
     prize: statusPrize(hackathon.status),
     format: "See event",
   };
@@ -135,7 +136,7 @@ const toBoard = (
     organizer: hosted?.organizerName?.trim() || (isHosted ? "Community host" : base.organizer),
     organizerInitials: initials,
     format: hosted?.format?.trim() || base.format,
-    prize: statusPrize(hackathon.status),
+    prize: hosted?.registrationStatus === "waitlist" && hackathon.status !== "past" ? "Waitlist open" : statusPrize(hackathon.status),
     hubUrl: getHostedHackathonUrl(hackathon.id),
     isHosted,
   };
@@ -151,7 +152,7 @@ const sortByLifecycle = (left: PortalHackathon, right: PortalHackathon) => {
 const statusLabel: Record<PortalHackathon["status"], string> = {
   active: "Live",
   upcoming: "Upcoming",
-  past: "Closed",
+  past: "Finished",
 };
 
 const statusDot: Record<PortalHackathon["status"], string> = {
@@ -179,7 +180,7 @@ const HackathonsSection = () => {
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("default");
   const [sortOpen, setSortOpen] = useState(false);
-  const [boards, setBoards] = useState<HackathonBoard[]>([]);
+  const [boards, setBoards] = useState<HackathonBoard[]>(() => getBundledHackathons().map((event) => toBoard(event, event)));
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -187,8 +188,8 @@ const HackathonsSection = () => {
     const db = getFirestoreDb();
 
     void Promise.all([
-      fetchPortalHackathonCatalog(db).catch(() => [] as PortalHackathon[]),
-      fetchPublishedHackathons(db).catch(() => [] as HostedHackathon[]),
+      fetchPortalHackathonCatalog(db).catch(() => [...PORTAL_HACKATHONS, ...getBundledHackathons()] as PortalHackathon[]),
+      fetchPublishedHackathons(db).catch(() => getBundledHackathons()),
     ]).then(([catalog, events]) => {
       if (!isCurrent) return;
       const hostedById = new Map(events.map((event) => [event.id, event]));
@@ -250,7 +251,7 @@ const HackathonsSection = () => {
     };
 
     return [...filtered].sort((a, b) => {
-      if (sortMode === "builders") return b.builders - a.builders;
+      if (sortMode === "builders") return (b.builders ?? 0) - (a.builders ?? 0);
       if (sortMode === "live-first") return statusRank[a.status] - statusRank[b.status];
       if (sortMode === "upcoming-first") {
         const upcomingRank = { upcoming: 0, active: 1, past: 2 } as const;
@@ -565,7 +566,7 @@ const HackathonsSection = () => {
                             {board.format}
                           </p>
 
-                          <div className="flex items-center gap-2">
+                          {board.builders != null ? <div className="flex items-center gap-2">
                             <div className="flex -space-x-2" aria-hidden>
                               {Array.from({ length: 3 }).map((_, avatarIndex) => (
                                 <span
@@ -580,7 +581,7 @@ const HackathonsSection = () => {
                             <span className="font-body text-xs text-muted-foreground">
                               {board.builders} Builders
                             </span>
-                          </div>
+                          </div> : <span className="font-body text-xs text-muted-foreground">Community event</span>}
                         </div>
                       </div>
 

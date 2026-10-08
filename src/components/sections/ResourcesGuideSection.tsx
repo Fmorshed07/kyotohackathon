@@ -19,19 +19,6 @@ const ResourcesGuideSection = () => {
 
   return (
     <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-20 md:py-28" id="guide">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
-        <motion.div
-          className="absolute left-1/4 top-1/5 h-80 w-80 rounded-full bg-primary/10 blur-[130px]"
-          animate={{ opacity: [0.2, 0.45, 0.2], scale: [1, 1.05, 1] }}
-          transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute bottom-1/5 right-1/5 h-72 w-72 rounded-full bg-cyan/10 blur-[120px]"
-          animate={{ opacity: [0.15, 0.38, 0.15] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
 
       <div ref={ref} className="mx-auto max-w-5xl">
         <motion.div

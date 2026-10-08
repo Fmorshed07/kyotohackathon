@@ -10,9 +10,10 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { Activity, CalendarRange, ClipboardCheck, Gavel, Radar, Scale, ScanSearch, Ticket, Users } from "lucide-react";
+import { Activity, ArrowRight, CalendarRange, ClipboardCheck, Gavel, Plus, Radar, Scale, ScanSearch, Sparkles, Ticket, Users } from "lucide-react";
 import { DashboardLayout, dashJumpLinkClass, sectionClass } from "@/components/dashboard/DashboardLayout";
 import { JudgeInvitePanel } from "@/components/dashboard/JudgeInvitePanel";
+import { LumaEventImporter } from "@/components/dashboard/LumaEventImporter";
 import {
   HostEventBriefEditor,
   type HostEventBriefForm,
@@ -36,7 +37,7 @@ import {
   subscribeHackathon,
   type HostedHackathon,
 } from "@/lib/aiHackathons";
-import { formDraftStorageKey } from "@/lib/formDrafts";
+import { clearFormDraft, formDraftStorageKey, readFormDraft } from "@/lib/formDrafts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { type HackathonStatus, type PortalHackathon, type SubmissionMode, getHackathonSubmissionMode } from "@/lib/hackathons";
 import { buildInviteUrl } from "@/lib/inviteTokens";
@@ -141,6 +142,7 @@ export default function HostDashboardPage() {
   const [eventFormBaseline, setEventFormBaseline] = useState<HostEventBriefForm>(() => emptyEventForm());
   const [publicListing, setPublicListing] = useState<HostedHackathon | null>(null);
   const suppressEventFormSyncRef = useRef(false);
+  const pendingLumaDraftRef = useRef<HostEventBriefForm | null>(null);
   const hostAutosaveTimerRef = useRef<number | null>(null);
   const isHostAutosavingRef = useRef(false);
   const saveSelectedEventRef = useRef<((options?: { quiet?: boolean }) => Promise<void>) | null>(
@@ -172,6 +174,26 @@ export default function HostDashboardPage() {
     setEventFormBaseline(emptyEventForm());
     setPublicListing(null);
     setMessage(null);
+  };
+
+  const handleLumaDraftImport = (draft: HostEventBriefForm): boolean => {
+    if (isBusy || isHostAutosavingRef.current) return false;
+    const newDraftKey = formDraftStorageKey(["host-event", sessionUser?.id, "new"]);
+    if ((isHostEventDirty || readFormDraft(newDraftKey)) && !window.confirm("Start a new draft with these Luma details? This replaces your unsaved new draft. Save any changes you want to keep first.")) return false;
+    if (hostAutosaveTimerRef.current) {
+      window.clearTimeout(hostAutosaveTimerRef.current);
+      hostAutosaveTimerRef.current = null;
+    }
+    // Switching away from an existing event triggers form synchronization. Keep the import
+    // through that effect so it cannot be replaced by the blank draft or autosaved to that event.
+    pendingLumaDraftRef.current = selectedEventId ? draft : null;
+    clearFormDraft(newDraftKey);
+    consumeHostEventRestore();
+    beginNewDraft();
+    setEventForm(draft);
+    setMessage("Luma details imported into a new draft. Review the brief before creating and publishing it.");
+    document.getElementById("event-details")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return true;
   };
 
   const resumeOngoingEdit = () => {
@@ -206,7 +228,8 @@ export default function HostDashboardPage() {
   useEffect(() => {
     if (!selectedEvent) {
       const blank = emptyEventForm();
-      setEventForm(blank);
+      setEventForm(pendingLumaDraftRef.current ?? blank);
+      pendingLumaDraftRef.current = null;
       setEventFormBaseline(blank);
       setPublicListing(null);
       return;
@@ -843,6 +866,53 @@ export default function HostDashboardPage() {
       hackathons={hostBoardHackathons}
     >
       <div className="space-y-8">
+        <section
+          id="hosting-events"
+          className={`${sectionClass} relative isolate overflow-hidden scroll-mt-24 p-6 sm:p-8`}
+        >
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.55fr)] lg:items-center">
+            <div className="min-w-0">
+              <div className="mb-4 flex items-center gap-2 text-primary">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
+                  <Sparkles className="h-4 w-4" aria-hidden />
+                </span>
+                <p className="font-display text-xs font-semibold uppercase tracking-[0.2em]">Hosting events</p>
+              </div>
+              <h1 className="max-w-2xl font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                Build an event your community will remember.
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/70 sm:text-base">
+                Create the event brief, publish the public page, and bring tickets, check-in, judges,
+                and scoring into one calm command center.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Button type="button" size="lg" className="gap-2" onClick={beginNewDraft}>
+                  <Plus className="h-4 w-4" aria-hidden />
+                  Start a new event
+                </Button>
+                <a href="#event-details" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition hover:text-primary/80">
+                  Open event workspace
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </a>
+                <Button asChild variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
+                  <a href="#luma-import">Import from Luma</a>
+                </Button>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              {["Shape the brief", "Publish the experience", "Run the day"].map((step, index) => (
+                <div key={step} className="rounded-lg border border-border bg-background p-4">
+                  <p className="font-mono text-xs font-semibold text-primary/80">0{index + 1}</p>
+                  <p className="mt-2 font-display text-sm font-semibold text-foreground">{step}</p>
+                  <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${(index + 1) * 33}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section id="overview" className={`${sectionClass} dash-command-panel scroll-mt-24 p-6`}>
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
             <div className="min-w-0">
@@ -981,6 +1051,8 @@ export default function HostDashboardPage() {
             </p>
           ) : null}
         </section>
+
+        <LumaEventImporter disabled={isBusy} onImport={handleLumaDraftImport} />
 
         <section id="event-details" className={`${sectionClass} scroll-mt-24 space-y-5 p-6`}>
           <div className="flex flex-wrap items-end justify-between gap-3">

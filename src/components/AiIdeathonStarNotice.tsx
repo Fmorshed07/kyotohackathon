@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Sparkles, Star, X } from "lucide-react";
+import { ArrowRight, Star, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -38,37 +38,29 @@ export function AiIdeathonStarNotice() {
     <aside
       aria-label="AI Ideathon 2026 community voting"
       aria-live="polite"
-      className="fixed bottom-4 left-4 right-4 z-40 overflow-hidden rounded-2xl border border-primary/35 bg-[linear-gradient(145deg,hsl(215_35%_8%/0.98),hsl(205_45%_5%/0.98))] shadow-[0_24px_80px_-24px_hsl(199_100%_50%/0.55)] backdrop-blur-xl sm:left-auto sm:right-5 sm:w-[390px]"
+      className="fixed bottom-3 left-3 right-3 z-40 overflow-hidden rounded-lg border border-border bg-card shadow-lg sm:left-auto sm:right-5 sm:w-[350px]"
     >
-      <div className="h-px w-full bg-[var(--flare)] opacity-80" aria-hidden />
       <button
         type="button"
         onClick={dismiss}
-        className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label="Dismiss voting notification"
       >
         <X className="h-4 w-4" />
       </button>
 
-      <div className="p-5 pr-12">
-        <div className="flex items-center gap-2 text-primary">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-primary/30 bg-primary/15">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em]">Community vote · AI Ideathon 2026</p>
-        </div>
-        <h2 className="mt-3 font-display text-xl font-semibold tracking-tight text-white">
+      <div className="p-4">
+        <p className="pr-8 text-xs text-muted-foreground">AI Ideathon 2026 · Community vote</p>
+        <h2 className="mt-2 pr-5 font-display text-base font-medium text-foreground">
           Help choose the best project
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-white/65">
-          Explore the AI Ideathon projects and give your stars to the idea you believe deserves to win. No account is required.
-        </p>
-        <Button asChild size="sm" className="mt-4 w-full justify-between">
+        <Button asChild variant="ghost" size="sm" className="mt-2 h-auto min-h-10 w-full justify-between px-0 text-primary hover:bg-transparent">
           <Link to="/projects?spotlight=ai-ideathon-2026" onClick={dismiss}>
             <span className="inline-flex items-center gap-2"><Star className="h-4 w-4 fill-current" /> Star the best project</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
+        <p className="text-xs text-muted-foreground">No account required.</p>
       </div>
     </aside>
   );

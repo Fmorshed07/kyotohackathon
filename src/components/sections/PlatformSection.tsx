@@ -46,7 +46,7 @@ const PlatformSection = () => {
         <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Link
             to="/signin"
-            className="inline-flex min-w-[190px] items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 font-display text-sm font-semibold text-primary-foreground shadow-[0_0_24px_hsl(199_100%_50%/0.35)] transition hover:brightness-110"
+            className="btn-poster-cta min-w-[190px] gap-2"
           >
             Open live portal
             <ArrowRight className="h-4 w-4" />

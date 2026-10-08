@@ -1,5 +1,5 @@
-import type { HostEventGuest, HostEventScheduleItem } from "@/lib/hostEvents";
-import type { EventFontPreset, EventLayoutStyle } from "@/lib/eventBranding";
+import type { HostEventGuest, HostEventScheduleItem } from "./hostEvents";
+import type { EventFontPreset, EventLayoutStyle } from "./eventBranding";
 
 export type HostEventBriefForm = {
   name: string;

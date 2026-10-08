@@ -48,10 +48,6 @@ const BrandLogo = ({
         imgClassName,
       )}
     >
-      <span
-        className="pointer-events-none absolute inset-[-18%] rounded-[28%] bg-[radial-gradient(circle_at_50%_40%,hsl(199_100%_50%/0.35),transparent_68%)] opacity-80"
-        aria-hidden
-      />
       <img
         src={BRAND_LOGO_SRC}
         alt={showWordmark ? "" : BRAND_LOGO_ALT}
@@ -59,7 +55,7 @@ const BrandLogo = ({
         height={1024}
         decoding="async"
         loading={priority ? "eager" : "lazy"}
-        className="relative z-[1] h-full w-full object-contain drop-shadow-[0_0_28px_hsl(199_100%_50%/0.35)]"
+        className="relative z-[1] h-full w-full object-contain"
       />
     </span>
   );
@@ -76,7 +72,7 @@ const BrandLogo = ({
         <span className="flex min-w-0 flex-col leading-none">
           <span
             className={cn(
-              "font-display text-[13px] font-semibold tracking-[0.26em] text-white transition-colors group-hover:text-primary",
+              "font-display text-[13px] font-semibold tracking-normal text-foreground transition-colors group-hover:text-primary",
               wordmarkClassName,
             )}
           >

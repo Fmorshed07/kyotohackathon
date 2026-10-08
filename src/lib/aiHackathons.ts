@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { getFirebaseAuth } from "@/lib/firebaseClient";
 import {
+  HACKATHON_PUBLIC_URLS,
   PORTAL_HACKATHONS,
   STATUS_ORDER,
   buildAdminHackathonCatalog,
@@ -37,6 +38,13 @@ import {
   normalizeAccentHex,
 } from "@/lib/eventBranding";
 import { slugifyCriterionId, type JudgingCriterion } from "@/components/dashboard/judgingCriteria";
+import {
+  ELEVENLABS_MEETUP_SOURCE_URL,
+  getBundledEventStatus,
+  getBundledHackathon,
+  getBundledHackathons,
+  mergeBundledHackathons,
+} from "@/lib/elevenLabsMeetup";
 
 export type HackathonGuest = {
   name: string;
@@ -108,6 +116,26 @@ export type HostedHackathon = PortalHackathon & {
   tagline?: string;
   /** Organiser gate for project writes. Independent of live / upcoming / past. */
   submissionMode?: SubmissionMode;
+  /** Optional metadata preserved when importing a public organiser event. */
+  sourceUrl?: string;
+  sourceImportedAt?: string;
+  /** Imported timestamps drive lifecycle until an organiser explicitly changes it. */
+  sourceLifecycleAutomatic?: boolean;
+  sourceDescription?: string;
+  startAt?: string;
+  endAt?: string;
+  timezone?: string;
+  registrationStatus?: "open" | "waitlist" | "closed";
+  registrationNote?: string;
+  ticketPriceLabel?: string;
+  registrationQuestions?: Array<{ label: string; required: boolean }>;
+  judgingCriteriaNames?: string[];
+  focusAreas?: string[];
+  organizerLinks?: Array<{ name: string; url: string; imageUrl?: string }>;
+  hostProfiles?: Array<{ name: string; url: string; imageUrl?: string }>;
+  cooperationNote?: string;
+  cooperationImageUrl?: string;
+  mapUrl?: string;
 };
 
 function eventSlug(value: string) {
@@ -148,6 +176,21 @@ function normalizeGuests(value?: HackathonGuest[]) {
     }))
     .filter((guest) => guest.name || guest.imageUrl)
     .slice(0, 24);
+}
+
+function normalizePublicLinks(value?: HostedHackathon["organizerLinks"]) {
+  if (!Array.isArray(value)) return [];
+  return value.map((link) => ({
+    name: typeof link?.name === "string" ? link.name.trim() : "",
+    url: externalUrl(link?.url),
+    imageUrl: externalUrl(link?.imageUrl),
+  })).filter((link) => link.name && link.url).slice(0, 24);
+}
+
+function normalizeStringList(value?: string[]) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+    : [];
 }
 
 function normalizeCriteria(criteria: AiHackathonDraft["criteria"]): JudgingCriterion[] {
@@ -349,6 +392,10 @@ export async function publishHostEventPublicly(
     name: hostEvent.name.trim(),
     shortName,
     eventDate: formatPublicEventDate(hostEvent.start_at, hostEvent.end_at),
+    startAt: new Date(hostEvent.start_at).toISOString(),
+    endAt: hostEvent.end_at && !Number.isNaN(new Date(hostEvent.end_at).getTime())
+      ? new Date(hostEvent.end_at).toISOString()
+      : "",
     location: hostEvent.location.trim(),
     theme: hostEvent.theme.trim() || hostEvent.tagline.trim().slice(0, 120) || "Hosted event",
     status: lifecycleStatus,
@@ -422,7 +469,12 @@ function asHostedHackathon(
   const requirePublished = options?.requirePublished !== false;
   if (typeof data.name !== "string") return null;
   if (requirePublished && data.published !== true) return null;
-  const event = data as Partial<HostedHackathon>;
+  const event = { ...getBundledHackathon(id), ...data } as Partial<HostedHackathon>;
+  const sourceLifecycleAutomatic = Boolean(getBundledHackathon(id)) &&
+    event.sourceUrl === ELEVENLABS_MEETUP_SOURCE_URL && event.sourceLifecycleAutomatic !== false;
+  const status = sourceLifecycleAutomatic && event.startAt && event.endAt
+    ? getBundledEventStatus(event.startAt, event.endAt)
+    : event.status === "active" || event.status === "past" ? event.status : "upcoming";
   return {
     id,
     name: event.name?.trim() || "Untitled hackathon",
@@ -430,7 +482,7 @@ function asHostedHackathon(
     eventDate: event.eventDate?.trim() || "To be confirmed",
     location: event.location?.trim() || "To be confirmed",
     theme: event.theme?.trim() || "To be confirmed",
-    status: event.status === "active" || event.status === "past" ? event.status : "upcoming",
+    status,
     summary: event.summary?.trim() || "",
     format: event.format?.trim() || "To be confirmed",
     eligibility: event.eligibility?.trim() || "To be confirmed",
@@ -462,9 +514,30 @@ function asHostedHackathon(
     layoutStyle: getEventLayoutStyle(event.layoutStyle),
     tagline: typeof event.tagline === "string" ? event.tagline.trim() : "",
     submissionMode: getHackathonSubmissionMode({
-      status: event.status === "active" || event.status === "past" ? event.status : "upcoming",
-      submissionMode: isSubmissionMode(event.submissionMode) ? event.submissionMode : undefined,
+      status,
+      // A fallback's derived gate must not override a saved lifecycle change.
+      submissionMode: isSubmissionMode(data.submissionMode) ? data.submissionMode : undefined,
     }),
+    sourceUrl: externalUrl(event.sourceUrl),
+    sourceImportedAt: typeof event.sourceImportedAt === "string" ? event.sourceImportedAt : "",
+    sourceLifecycleAutomatic: sourceLifecycleAutomatic || event.sourceLifecycleAutomatic === true,
+    sourceDescription: typeof event.sourceDescription === "string" ? event.sourceDescription : "",
+    startAt: typeof event.startAt === "string" ? event.startAt : "",
+    endAt: typeof event.endAt === "string" ? event.endAt : "",
+    timezone: typeof event.timezone === "string" ? event.timezone : "",
+    registrationStatus: event.registrationStatus === "waitlist" || event.registrationStatus === "closed" || event.registrationStatus === "open" ? event.registrationStatus : undefined,
+    registrationNote: typeof event.registrationNote === "string" ? event.registrationNote : "",
+    ticketPriceLabel: typeof event.ticketPriceLabel === "string" ? event.ticketPriceLabel : "",
+    registrationQuestions: Array.isArray(event.registrationQuestions)
+      ? event.registrationQuestions.filter((item) => typeof item?.label === "string").map((item) => ({ label: item.label, required: item.required === true }))
+      : [],
+    judgingCriteriaNames: normalizeStringList(event.judgingCriteriaNames),
+    focusAreas: normalizeStringList(event.focusAreas),
+    organizerLinks: normalizePublicLinks(event.organizerLinks),
+    hostProfiles: normalizePublicLinks(event.hostProfiles),
+    cooperationNote: typeof event.cooperationNote === "string" ? event.cooperationNote : "",
+    cooperationImageUrl: externalUrl(event.cooperationImageUrl),
+    mapUrl: externalUrl(event.mapUrl),
   };
 }
 
@@ -756,12 +829,32 @@ async function syncLinkedHostEventVisibility(
 
 /** Public-safe event lookup used by the public hackathons directory. */
 export async function fetchPublishedHackathons(db: Firestore): Promise<HostedHackathon[]> {
-  const snapshot = await getDocs(
-    query(collection(db, "hackathons"), where("published", "==", true)),
-  );
-  return snapshot.docs
+  const [snapshot, bundledOverrides] = await Promise.all([
+    getDocs(query(collection(db, "hackathons"), where("published", "==", true))),
+    // The published query omits unpublished rows. Read curated ids separately so
+    // an organiser's explicit unpublish hides the bundled fallback as well.
+    Promise.all(getBundledHackathons().map(async (event) => {
+      try {
+        const override = await getDoc(doc(db, "hackathons", event.id));
+        if (!override.exists()) return { id: event.id, event: null, hidden: false };
+        return {
+          id: event.id,
+          event: asHostedHackathon(override.id, override.data(), { requirePublished: false }),
+          hidden: override.data().published !== true,
+        };
+      } catch (error) {
+        if (isPermissionDenied(error)) return { id: event.id, event: null, hidden: true };
+        throw error;
+      }
+    })),
+  ]);
+  const published = snapshot.docs
     .map((snapshot) => asHostedHackathon(snapshot.id, snapshot.data()))
-    .filter((event): event is HostedHackathon => event !== null)
+    .filter((event): event is HostedHackathon => event !== null);
+  const overrides = bundledOverrides.flatMap((override) => override.event ? [override.event] : []);
+  const hiddenIds = new Set(bundledOverrides.filter((override) => override.hidden).map((override) => override.id));
+  return mergeBundledHackathons([...published, ...overrides])
+    .filter((event) => event.published && !hiddenIds.has(event.id))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
@@ -799,9 +892,12 @@ async function fetchPortalEditionForPublicCatalog(
  * Portal editions that exist in Firestore but are unpublished are omitted
  * so home / boards / sign-in never show a stale Active Kyoto stub.
  */
-export async function fetchPortalHackathonCatalog(db: Firestore): Promise<PortalHackathon[]> {
+export async function fetchPortalHackathonCatalog(
+  db: Firestore,
+  publishedEvents?: HostedHackathon[],
+): Promise<PortalHackathon[]> {
   const [published, ...portalDocs] = await Promise.all([
-    fetchPublishedHackathons(db),
+    publishedEvents === undefined ? fetchPublishedHackathons(db) : Promise.resolve(publishedEvents),
     ...PORTAL_HACKATHONS.map((portal) => fetchPortalEditionForPublicCatalog(db, portal.id)),
   ]);
 
@@ -819,7 +915,10 @@ export async function fetchPortalHackathonCatalog(db: Firestore): Promise<Portal
       continue;
     }
     if (doc) {
-      if (!doc.published) continue;
+      if (!doc.published) {
+        publishedById.delete(portal.id);
+        continue;
+      }
       catalog.push(hostedToPortalHackathon(doc));
       publishedById.delete(portal.id);
       continue;
@@ -837,6 +936,28 @@ export async function fetchPortalHackathonCatalog(db: Firestore): Promise<Portal
     if (byStatus !== 0) return byStatus;
     return left.name.localeCompare(right.name);
   });
+}
+
+/** Public home previews may include legacy archives with a known external site. */
+export function mergePublicEventPreviews(
+  published: HostedHackathon[],
+  catalog: PortalHackathon[],
+): HostedHackathon[] {
+  const allowedIds = new Set(catalog.map((event) => event.id));
+  const cloudById = new Map(published.map((event) => [event.id, event]));
+  const previews = new Map<string, HostedHackathon>();
+  for (const event of cloudById.values()) {
+    if (event.published && allowedIds.has(event.id)) previews.set(event.id, event);
+  }
+  for (const event of catalog) {
+    // An existing row, including an unpublished override, wins over a fallback.
+    if (cloudById.has(event.id) || previews.has(event.id)) continue;
+    const archiveUrl = HACKATHON_PUBLIC_URLS[event.id];
+    if (event.status === "past" && archiveUrl && /^https?:\/\//i.test(archiveUrl)) {
+      previews.set(event.id, portalHackathonAsHosted(event));
+    }
+  }
+  return [...previews.values()];
 }
 
 /** Live event for hero / marketing: prefer published `active`, then joinable. */
@@ -889,8 +1010,23 @@ export function isAiIdeathonEvent(
 }
 
 export async function fetchAiHackathon(db: Firestore, id: string): Promise<HostedHackathon | null> {
-  const snapshot = await getDoc(doc(db, "hackathons", id));
-  return snapshot.exists() ? asHostedHackathon(snapshot.id, snapshot.data()) : null;
+  const bundled = getBundledHackathon(id);
+  try {
+    const snapshot = await getDoc(doc(db, "hackathons", id));
+    return snapshot.exists() ? asHostedHackathon(snapshot.id, snapshot.data()) : bundled;
+  } catch (error) {
+    // Respect an unreadable/unpublished override. Other Firebase failures must
+    // still surface for normal events; the curated listing can work offline.
+    if (!bundled) throw error;
+    if (isPermissionDenied(error)) return null;
+    console.warn("[hackathons] Using the imported public event while Firebase is unavailable.", error);
+    return bundled;
+  }
+}
+
+function isPermissionDenied(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error &&
+    (error.code === "permission-denied" || error.code === "firestore/permission-denied"));
 }
 
 /** Admin-only: load a single event even when unpublished. */
@@ -917,7 +1053,9 @@ export async function setHackathonStatus(
   status: HackathonStatus,
 ): Promise<void> {
   await ensurePortalCatalogHackathon(db, id);
-  const payload: { status: HackathonStatus; published?: boolean } = { status };
+  const payload: { status: HackathonStatus; published?: boolean; sourceLifecycleAutomatic?: boolean } = { status };
+  // An explicit organiser lifecycle decision wins over the imported timetable.
+  if (getBundledHackathon(id)) payload.sourceLifecycleAutomatic = false;
   // Going live also makes the event public so /hackathons and /events stay consistent.
   // Past / upcoming keep the current published flag so you can keep past events visible
   // or hide them independently via publish / unpublish.
@@ -980,11 +1118,13 @@ export function subscribeHackathon(
   onChange: (event: HostedHackathon | null) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
+  const bundled = getBundledHackathon(id);
+  if (bundled) onChange(bundled);
   return onSnapshot(
     doc(db, "hackathons", id),
     (snapshot) => {
       if (!snapshot.exists()) {
-        onChange(null);
+        onChange(getBundledHackathon(id));
         return;
       }
       onChange(
@@ -994,6 +1134,7 @@ export function subscribeHackathon(
       );
     },
     (error) => {
+      if (bundled && isPermissionDenied(error)) onChange(null);
       onError?.(error);
     },
   );
