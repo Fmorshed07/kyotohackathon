@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import { ArrowUpRight, Pause, Play } from "lucide-react";
 import { COMMUNITY_PARTNERS, FEATURED_BRAND_ROWS, type FeaturedCommunityBrand } from "@/data/communityPartners";
 import { useAmbientMotion } from "@/hooks/useAmbientMotion";
@@ -9,32 +9,18 @@ const directoryPartners = COMMUNITY_PARTNERS.map(partner =>
   FEATURED_BRAND_ROWS.flat().find(brand => brand.id === partner.id) ?? partner,
 );
 
-function PartnerLogo({ partner, decorative = false }: { partner: FeaturedCommunityBrand; decorative?: boolean }) {
+function PartnerLogo({ partner, decorative = false, eager = false }: { partner: FeaturedCommunityBrand; decorative?: boolean; eager?: boolean }) {
   const [failed, setFailed] = useState(false);
-  const maskId = `partner-mask-${useId().replace(/:/g, "")}`;
-  const mask = partner.monochromeMask;
-  return <div className="partner-logo" data-brand={partner.artworkClass} data-transparent={partner.transparentArtwork || undefined} title={partner.name}>
+  return <div className="partner-logo" data-brand={partner.artworkClass} data-named={partner.showName || undefined} data-surface={partner.surface} title={partner.name}>
     <div className="partner-logo-art">
-      {failed ? <span role={decorative ? undefined : "img"} aria-label={decorative ? undefined : partner.name}>{partner.name}</span> : mask ? <svg
-        className="partner-masked-logo" viewBox={mask.viewBox}
-        role={decorative ? undefined : "img"} aria-label={decorative ? undefined : partner.name}
-        aria-hidden={decorative || undefined} data-logo-source={partner.image}
-      >
-        <defs>
-          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={mask.width} height={mask.height} style={{ maskType: "luminance" }}>
-            <image href={partner.image} width={mask.width} height={mask.height} style={{ filter: "brightness(4)" }} onError={() => setFailed(true)} />
-          </mask>
-        </defs>
-        <rect width={mask.width} height={mask.height} fill="white" mask={`url(#${maskId})`} />
-      </svg> : <img
+      {failed ? <span role={decorative ? undefined : "img"} aria-label={decorative ? undefined : partner.name}>{partner.name}</span> : <img
         src={partner.image} alt={decorative ? "" : partner.name}
         data-logo-source={partner.image}
-        loading="lazy" decoding="async"
-        className={partner.darkArtwork ? "partner-art-dark" : undefined}
+        loading={eager ? "eager" : "lazy"} decoding="async"
         onError={() => setFailed(true)}
       />}
     </div>
-    {partner.category && <small className="partner-category">{partner.category}</small>}
+    {partner.showName && <small className="partner-brand-name">{partner.name}</small>}
   </div>;
 }
 
@@ -51,8 +37,8 @@ export default function PartnersSection() {
       {!expanded && <div className="partner-wall" aria-label="Featured partners and technology">
         {FEATURED_BRAND_ROWS.map((row, index) => <div className="partner-ribbon" key={index}>
           <div className="partner-track">
-            <div className="partner-track-set">{row.map(partner => <PartnerLogo key={partner.id} partner={partner} />)}</div>
-            <div className="partner-track-set" aria-hidden="true">{row.map(partner => <PartnerLogo key={partner.id} partner={partner} decorative />)}</div>
+            <div className="partner-track-set">{row.map(partner => <PartnerLogo key={partner.id} partner={partner} eager />)}</div>
+            <div className="partner-track-set" aria-hidden="true">{row.map(partner => <PartnerLogo key={partner.id} partner={partner} decorative eager />)}</div>
           </div>
         </div>)}
       </div>}

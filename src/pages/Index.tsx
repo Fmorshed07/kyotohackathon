@@ -25,7 +25,7 @@ const Index = () => {
       <HeroSection />
       <JapanHeroSection asSection />
       <PartnersSection />
-      <LiveEventsSection />
+      <LiveEventsSection showPastEvents={false} />
       <EventShowcase />
       <FeaturePreviewSection />
       <HostSection />

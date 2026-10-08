@@ -31,7 +31,7 @@ h2.font-display {
 .cognisor-grid,
 .starfield { display: none; }
 
-.minimal-home > section:not(.editorial-hero):not(.ecosystem-hero):not(.event-experience) {
+.minimal-home > section:not(.editorial-hero):not(.ecosystem-hero):not(.event-experience):not(.peer-careers) {
   border-top: 1px solid hsl(var(--border) / .65);
   padding-inline: clamp(1.25rem, 5vw, 5rem);
   padding-block: clamp(4.5rem, 9vw, 8rem);

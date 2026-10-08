@@ -72,7 +72,7 @@ function shortEventDate(event: HostedHackathon) {
   }
 }
 
-export default function LiveEventsSection() {
+export default function LiveEventsSection({ showPastEvents = true }: { showPastEvents?: boolean }) {
   const { live, upcoming, past, isLoading, hasError, refresh } = useEventPreviews();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { ref, paused, setPaused, running } = useAmbientMotion();
@@ -188,7 +188,7 @@ export default function LiveEventsSection() {
           </div>
         )}
 
-        <PastEventsSection events={past} />
+        {showPastEvents && <PastEventsSection events={past} />}
         <div className="event-section-footer"><span className="event-kicker">Real connections. New possibilities.</span><a href="#host">Create a moment of your own <ArrowUpRight aria-hidden="true" /></a></div>
       </div>
     </section>

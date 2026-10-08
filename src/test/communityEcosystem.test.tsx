@@ -60,7 +60,7 @@ describe("Japan community experience", () => {
     render(<PartnersSection />);
     expect(COMMUNITY_PARTNERS).toHaveLength(51);
     expect(new Set(COMMUNITY_PARTNERS.map(partner => partner.image)).size).toBe(51);
-    expect(screen.getAllByRole("img")).toHaveLength(9);
+    expect(screen.getAllByRole("img")).toHaveLength(12);
     fireEvent.click(screen.getByRole("button", { name: "Pause partner animation" }));
     expect(screen.getByRole("button", { name: "Resume partner animation" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: /View every logo/ }));
@@ -68,21 +68,23 @@ describe("Japan community experience", () => {
     expect(screen.getAllByRole("img")).toHaveLength(51);
     expect(screen.getByRole("img", { name: "ElevenLabs" })).toBeVisible();
     expect(screen.queryByRole("img", { name: "OpenAI" })).toBeNull();
+    expect(screen.queryByRole("img", { name: "Codex" })).toBeNull();
     expect(screen.getByRole("button", { name: "Partner directory is static" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: /Back to the logo wall/ }));
-    expect(screen.getAllByRole("img")).toHaveLength(9);
+    expect(screen.getAllByRole("img")).toHaveLength(12);
     expect(screen.getByRole("button", { name: "Resume partner animation" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("prioritises all requested brands in two seamless rows with accessible originals only", () => {
     const { container } = render(<PartnersSection />);
     expect(FEATURED_BRAND_ROWS.flat().map(brand => brand.name)).toEqual([
-      "Alchemist Japan", "Antler", "ElevenLabs", "Qwen", "Alibaba Cloud",
-      "Creators Circuit", "Tokyo International University — Impact Next", "Lovable", "OpenAI",
+      "SusHi Tech Tokyo", "Alchemist Japan", "Antler", "ElevenLabs", "Qwen", "Alibaba Cloud",
+      "ai&", "Creators Circuit", "Tokyo International University — Impact Next", "Lovable", "OpenAI", "Codex",
     ]);
     expect(container.querySelectorAll(".partner-ribbon")).toHaveLength(2);
     for (const track of container.querySelectorAll(".partner-track")) {
       const [original, duplicate] = track.querySelectorAll(".partner-track-set");
+      expect(original.querySelectorAll(".partner-logo")).toHaveLength(6);
       expect(duplicate).toHaveAttribute("aria-hidden", "true");
       expect(Array.from(original.querySelectorAll("[data-logo-source]"), logo => logo.getAttribute("data-logo-source")))
         .toEqual(Array.from(duplicate.querySelectorAll("[data-logo-source]"), logo => logo.getAttribute("data-logo-source")));
@@ -90,8 +92,10 @@ describe("Japan community experience", () => {
         Array(duplicate.querySelectorAll("img").length).fill(""),
       );
     }
-    expect(screen.getByRole("img", { name: "OpenAI" }).closest(".partner-logo"))
-      .toHaveTextContent("Technology");
+    expect(screen.queryByText(/^Technology$/i)).toBeNull();
+    for (const image of container.querySelectorAll(".partner-wall img")) {
+      expect(image).toHaveAttribute("loading", "eager");
+    }
   });
 
   it("keeps a brand readable if its logo cannot load", () => {
@@ -100,22 +104,36 @@ describe("Japan community experience", () => {
     expect(screen.getByRole("img", { name: "Alchemist Japan" })).toHaveTextContent("Alchemist Japan");
   });
 
-  it("uses replacement artwork without blend-mode dependency and unique community masks", () => {
-    const { container } = render(<PartnersSection />);
-    expect(FEATURED_BRAND_ROWS.flat().every(brand => brand.transparentArtwork)).toBe(true);
-    expect(FEATURED_BRAND_ROWS.flat().every(brand => brand.image.startsWith("/partners/featured/"))).toBe(true);
-    expect(FEATURED_BRAND_ROWS.flat().filter(brand => brand.image.endsWith(".svg"))).toHaveLength(7);
-    const masks = Array.from(container.querySelectorAll("mask"));
-    expect(masks).toHaveLength(4);
-    expect(new Set(masks.map(mask => mask.id)).size).toBe(4);
-    for (const name of ["Creators Circuit", "Tokyo International University — Impact Next"]) {
+  it("renders distinct OpenAI and Codex symbols with names only and readable fallbacks", () => {
+    render(<PartnersSection />);
+    for (const [name, asset] of [["OpenAI", "openai-blossom.svg"], ["Codex", "codex-color.svg"]]) {
       const logo = screen.getByRole("img", { name });
-      expect(logo.tagName.toLowerCase()).toBe("svg");
-      const image = logo.querySelector("image")!;
-      expect(image).toHaveAttribute("href", expect.stringContaining("/partners/featured/"));
-      fireEvent.error(image);
+      expect(logo).toHaveAttribute("src", `/partners/featured/${asset}`);
+      expect(logo.closest(".partner-logo")).toHaveAttribute("data-named", "true");
+      expect(logo.closest(".partner-logo")).not.toHaveTextContent("Technology");
+      expect(logo.closest(".partner-logo")?.querySelector(".partner-brand-name")).toHaveTextContent(name);
+      fireEvent.error(logo);
       expect(screen.getByRole("img", { name })).toHaveTextContent(name);
     }
+  });
+
+  it("preserves full-color source logos instead of whitening them with masks", () => {
+    const { container } = render(<PartnersSection />);
+    expect(container.querySelector("mask, filter, .partner-art-dark")).toBeNull();
+    for (const [name, id] of [
+      ["SusHi Tech Tokyo", 49], ["ai&", 51], ["Alchemist Japan", 18], ["Antler", 24],
+      ["Creators Circuit", 19], ["Tokyo International University — Impact Next", 1],
+    ] as const) {
+      const logo = screen.getByRole("img", { name });
+      expect(logo).toHaveAttribute("src", `/partners/cognisor-network/${id}.webp`);
+      expect(logo.closest(".partner-logo")).toHaveAttribute("data-surface", "light");
+      fireEvent.error(logo);
+      expect(screen.getByRole("img", { name })).toHaveTextContent(name);
+    }
+    fireEvent.click(screen.getByRole("button", { name: /View every logo/ }));
+    expect(screen.getByRole("img", { name: "SusHi Tech Tokyo" })).toHaveAttribute("src", "/partners/cognisor-network/49.webp");
+    expect(screen.getByRole("img", { name: "ai&" })).toHaveAttribute("src", "/partners/cognisor-network/51.webp");
+    expect(container.querySelector("mask, filter, .partner-art-dark")).toBeNull();
   });
 
   it("provides a readable fallback when event artwork fails", () => {

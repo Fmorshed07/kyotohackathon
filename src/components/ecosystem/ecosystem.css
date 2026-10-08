@@ -77,17 +77,20 @@
 .partner-track-set { display: flex; flex: 1 0 auto; align-items: center; }
 .partner-logo { display: flex; align-items: center; justify-content: center; width: 210px; height: 108px; padding: 1.5rem; flex-shrink: 0; }
 .partner-logo-art { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-width: 0; }
-.partner-logo img { max-width: 100%; max-height: 64px; object-fit: contain; filter: grayscale(1) invert(1); mix-blend-mode: screen; opacity: .9; }
-.partner-logo img.partner-art-dark { filter: grayscale(1); }
+.partner-logo img { max-width: 100%; max-height: 100%; object-fit: contain; filter: none; mix-blend-mode: normal; opacity: 1; }
+.partner-logo[data-surface] .partner-logo-art { padding: 12px; border-radius: 6px; }
+.partner-logo[data-surface="light"] .partner-logo-art { background: #fff; color: #151515; }
+.partner-logo[data-surface="dark"] .partner-logo-art { background: #000; color: #fff; }
 .partner-logo-art > span { font-size: .85rem; text-align: center; }
 .partner-wall .partner-logo { position: relative; flex: 1 0 244px; width: 244px; height: 148px; padding: 1.5rem 2rem; }
 .partner-wall .partner-logo-art { transition: transform .5s cubic-bezier(.2,.8,.2,1); }
 .partner-wall .partner-logo:hover .partner-logo-art { transform: translateY(-4px); }
-.partner-wall .partner-logo img, .partner-masked-logo { width: 100%; max-height: 66px; opacity: 1; }
-.partner-logo[data-transparent] img { filter: none; mix-blend-mode: normal; }
-.partner-logo[data-brand="alibaba"] img { filter: brightness(0) invert(1); }
-.partner-wall [data-brand="openai"] img { width: 248px; max-width: none; max-height: none; }
-.partner-category { position: absolute; bottom: 18px; color: #8995a5; font-size: .55rem; letter-spacing: .13em; text-transform: uppercase; }
+.partner-wall .partner-logo img { width: 100%; max-height: 66px; }
+.partner-wall .partner-logo[data-surface] img { max-height: 100%; }
+.partner-wall .partner-logo[data-named] { padding-bottom: 2.75rem; }
+.partner-wall [data-brand="openai"] img { width: 96px; height: 96px; max-height: none; }
+.partner-wall [data-brand="codex"] img { width: 64px; height: 64px; }
+.partner-brand-name { position: absolute; bottom: 20px; color: #edf6ff; font-size: .875rem; line-height: 1; text-align: center; }
 .partner-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 2rem; margin-top: 1.25rem; font-size: .7rem; color: var(--eco-muted); }
 .partner-control-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; }
 .partner-controls button { min-height: 44px; display: inline-flex; align-items: center; gap: .5rem; }
@@ -195,9 +198,12 @@
   .eco-partner-heading { margin-bottom: 2rem; }
   .eco-partner-heading p { font-size: .73rem; }
   .partner-wall .partner-logo { flex-basis: 196px; width: 196px; height: 126px; padding: 1.25rem 1.5rem; }
-  .partner-wall .partner-logo img, .partner-masked-logo { max-height: 56px; }
-  .partner-wall [data-brand="openai"] img { width: 202px; max-height: none; }
-  .partner-category { bottom: 12px; }
+  .partner-wall .partner-logo img { max-height: 56px; }
+  .partner-logo[data-surface] .partner-logo-art { padding: 9px; }
+  .partner-wall .partner-logo[data-named] { padding-bottom: 2.5rem; }
+  .partner-wall [data-brand="openai"] img { width: 84px; height: 84px; max-height: none; }
+  .partner-wall [data-brand="codex"] img { width: 56px; height: 56px; }
+  .partner-brand-name { bottom: 16px; }
   .partner-track { animation-duration: 40s; }
   .partner-ribbon:nth-child(even) .partner-track { animation-duration: 34s; }
   .partner-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }

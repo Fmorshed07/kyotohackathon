@@ -12,8 +12,9 @@ partner claims, attendance figures, or financial metrics have been copied.
 - Upstream URLs follow `https://www.cognisorai.com/partners/Logos/{1..51}.png`.
   Every exact source URL is recorded in `src/data/communityPartners.ts`.
 - Local WebP files preserve the artwork with trimmed margins and a maximum
-  480 × 180 bounding box. The wall uses monochrome presentation with appropriate
-  treatment of light- and dark-background source artwork.
+  480 × 180 bounding box. The wall and directory preserve the source colors:
+  no grayscale, inversion, brightness, blend-mode, or whitening-mask treatment.
+  Light/dark contrast backings keep original lettering readable without recoloring it.
 - Labels come from visible lettering in the source artwork. Unidentified marks
   retain neutral, numbered source labels rather than guessed company names.
 - The source's separate “Trusted tech” list is not repurposed as event sponsorship.
@@ -22,49 +23,61 @@ partner claims, attendance figures, or financial metrics have been copied.
 
 ### Featured logo wall
 
-The two counter-scrolling rows prioritise Alchemist Japan, Antler, ElevenLabs,
-Qwen, Alibaba Cloud, Creators Circuit, TIU Impact Next, Lovable, and OpenAI,
+The two counter-scrolling rows prioritise SusHi Tech Tokyo, Alchemist Japan,
+Antler, ElevenLabs, Qwen, Alibaba Cloud, ai&, Creators Circuit, TIU Impact Next,
+Lovable, OpenAI, and Codex,
 as requested. The original 51-asset directory remains unchanged. Identical
 track halves prevent a gap at the loop seam, including on wide screens.
 Only transforms animate; offscreen/hidden-tab suspension and explicit pause
 remain active. Hover does not stop the rows.
 
-OpenAI is labelled **Technology**, not added to the verified partner directory.
-Its unmodified white wordmark (including prescribed clear space) comes from
-`OpenAI-logos(new)/SVGs/OpenAI-white-wordmark.svg` in the official archive:
+OpenAI and Codex are user-requested additions to the featured wall, not added to
+the verified partner directory. Their captions display only their names, without
+category badges. OpenAI's unmodified white Blossom symbol (including prescribed clear
+space) comes from `OpenAI-logos(new)/SVGs/OpenAI-white-monoblossom.svg` in the official archive:
 https://cdn.openai.com/brand/OpenAI-Logos-2025.zip
 Guidelines: https://openai.com/brand/ . OpenAI's mark belongs to OpenAI;
 display here does not assert event sponsorship or endorsement.
 
+Codex's full-color app symbol comes from
+https://asvg.app/assets/svg/codex/codex-symbol-color.svg . This is the
+community-maintained `@lobehub/icons-static-svg` reproduction, not an official
+OpenAI brand-kit download; provenance is stated at https://asvg.app/icons/codex .
+Its paths, blue/lavender gradient, white rounded app tile, and viewBox are retained,
+with 24px intrinsic dimensions. The symbol is not redrawn, generated, or replaced with typed text.
+The product belongs to OpenAI: https://openai.com/codex/ . Both symbol tiles use
+separate readable name captions, not a fabricated symbol/wordmark lockup.
+Featured images and their repeated copies load eagerly to avoid a blank
+first pass through the animated wall; the full static directory remains lazy-loaded.
+
 #### Replacement artwork (9 October 2026)
 
-The featured wall no longer depends on CSS screen blending to conceal opaque
-backgrounds. Seven marks use native-alpha SVG assets, with the downloaded
-originals stored under `public/partners/featured/`:
+The featured wall uses original full-color Cognisor assets for SusHi Tech Tokyo
+(49), Alchemist Japan (18), Antler (24), ai& (51), Creators Circuit (19), and
+TIU Impact Next (1). Their original white backdrops and colored details are
+preserved inside consistent light logo plates. SusHi Tech Tokyo leads the first
+row and ai& leads the second. Each row contains six brands plus an identical,
+accessibility-hidden copy for a seamless loop.
 
-- Alchemist: official horizontal white artwork from
-  https://www.alchemistaccelerator.com/hubfs/Alchemist%20White%20horizontal%20logo.svg
-  (an SVG container with the brand's transparent embedded PNG).
-- Antler: exact header SVG paths from https://www.antler.co/ . A standalone
-  white `currentColor` is set, and an unresolved page-only clip reference is removed.
+The remaining six marks use native SVG assets under `public/partners/featured/`:
 - ElevenLabs: official white SVG linked from https://elevenlabs.io/brand .
 - Qwen: https://commons.wikimedia.org/wiki/File:Qwen_Logo.svg , attributed there
   to Alibaba Cloud / QwenLM. Artwork is retained unchanged. See the adjacent
   `QWEN-LICENSE.txt` for its Apache 2.0 license.
 - Alibaba Cloud: exact header SVG from https://www.alibabacloud.com/ . `viewBox`
-  casing and standalone dimensions are normalized; the UI renders it white.
+  casing and standalone dimensions are normalized; its original orange is preserved.
 - Lovable: exact header SVG from https://lovable.dev/brand , with a standalone
   white wordmark and its original gradient heart.
-- OpenAI: official white wordmark as recorded above.
+- OpenAI: official white Blossom symbol as recorded above.
+- Codex: full-color app symbol with the provenance recorded above.
 
-Creators Circuit and TIU Impact Next publish only black-backed raster marks at
-https://www.creatorscircuit.tech/creators-circuit-logo.png and
-https://www.tiuimpactnext.com/tiu-impact-hub-logo.png . Their downloaded originals
-are preserved. Native inline SVG luminance masks render just the lettering and
-symbols in white, without any black rectangle or generated/retyped brand text.
-Each original and decorative repeat has a unique mask ID; failed images expose
-the existing accessible text fallback. The static directory also uses these
-cleaner presentations for the matching featured brands; all source records remain.
+The previously used white Alchemist/Antler variants and masked Creators Circuit /
+TIU artwork are no longer rendered. Their original color versions from Cognisor
+are used instead. OpenAI and ElevenLabs have naturally monochrome official marks;
+no invented colors are applied. Failed images retain readable text fallbacks.
+The static directory uses the same presentations for matching featured brands,
+and its other source logos also render in their original colors. All 51 source
+records remain unchanged in identity, source URL, and stored artwork.
 
 To refresh upstream assets, run `node scripts/sync-community-assets.mjs <sharp-entry-point>`
 with an installed Sharp module. This is a maintenance script, not an app dependency.

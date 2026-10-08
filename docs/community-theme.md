@@ -31,6 +31,7 @@ in the full scroll journey; pause/resume never changes its layout or scroll posi
 - `src/index.css`: semantic theme tokens and shared dashboard/panel utilities.
 - `src/minimal-theme.css`: shared typography, homepage rhythm, and feature links.
 - `src/components/projects/project-feed.css`: feed and video-page spacing, surfaces, and typography.
+- `src/components/PeerPortalCampaign.tsx`: the supplied Peer Portal campaign artwork and direct career-platform link, replacing the blocked website iframe. The Get Hired section keeps its six-step guide in an expandable disclosure.
 - `src/lib/projectFeedEvents.ts`: date-aware ordering shared by the feed and video event filters. Ongoing events come first, then upcoming events, then past events; current published events remain discoverable before their first project. The default feed order follows that event order, with newest submissions first within each event.
 - `src/components/community-atmosphere.css`: native CSS ambient motion.
 - Shared UI components: buttons, cards, tabs, inputs, and textareas.

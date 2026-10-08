@@ -1,0 +1,66 @@
+.peer-careers {
+  padding: clamp(56px, 7vw, 100px) clamp(24px, 5vw, 80px);
+  border-top: 1px solid #a2bfec24;
+  background: #040a18;
+  color: #f3f7ff;
+  font-family: var(--font-sans);
+  scroll-margin-top: 76px;
+}
+
+.peer-careers-inner { max-width: 1280px; margin-inline: auto; }
+.peer-careers-topline { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 26px; border-bottom: 1px solid #a2bfec24; color: #abbdd3; font-size: 12px; }
+.peer-careers-topline > span:first-child { display: inline-flex; align-items: center; gap: 9px; }
+.peer-careers-dot { width: 6px; height: 6px; border-radius: 50%; background: #edff57; }
+.peer-careers-topline > span:last-child > span { margin-inline: 8px; color: #6c809d; }
+
+.peer-campaign { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(32px, 5vw, 72px); padding-block: 44px; }
+.peer-campaign-copy { min-width: 0; }
+.peer-campaign-eyebrow { margin: 0 0 22px; color: #b0c7e8; font-size: 12px; }
+.peer-campaign h2 { max-width: 620px; margin: 0; font-size: clamp(40px, 4.5vw, 68px); font-weight: 400; line-height: 1.08; letter-spacing: -.06em; }
+.peer-campaign h2 > span { display: block; color: #bddeff; }
+.peer-campaign-description { max-width: 400px; margin: 25px 0 0; color: #aebbd0; font-size: 15px; line-height: 1.8; }
+.peer-campaign-benefits { display: grid; gap: 13px; margin: 27px 0 0; padding: 0; list-style: none; }
+.peer-campaign-benefits li { display: flex; align-items: center; gap: 10px; color: #d4dfef; font-size: 12px; line-height: 1.6; }
+.peer-campaign-benefits svg { width: 14px; height: 14px; flex-shrink: 0; color: #edff57; stroke-width: 1.6; }
+.peer-campaign-action { display: flex; flex-direction: column; align-items: flex-start; gap: 13px; margin-top: 34px; }
+.peer-campaign-action a { display: inline-flex; align-items: center; justify-content: space-between; gap: 40px; min-height: 52px; padding: 16px 23px; border: 1px solid transparent; border-radius: 3px; background: #edff57; color: #08102d; font-size: 13px; font-weight: 600; transition: background-color .2s; }
+.peer-campaign-action a:hover { background: #f6ffa9; }
+.peer-campaign-action a:focus-visible, .peer-careers-guide summary:focus-visible { outline: 2px solid #bddeff; outline-offset: 5px; }
+.peer-campaign-action a svg { width: 19px; height: 19px; }
+.peer-campaign-action > span { color: #8297b2; font-size: 10px; }
+.peer-campaign-artwork { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #536ff542; border-radius: 8px; background: #0815a7; }
+.peer-campaign-artwork img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; }
+
+.peer-careers-guide { border-top: 1px solid #a2bfec24; border-bottom: 1px solid #a2bfec24; }
+.peer-careers-guide summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 25px; cursor: pointer; list-style: none; font-size: 14px; letter-spacing: -.015em; }
+.peer-careers-guide summary::-webkit-details-marker { display: none; }
+.peer-careers-guide-cue { display: inline-flex; align-items: center; gap: 18px; color: #96abc7; white-space: nowrap; font-size: 11px; }
+.peer-careers-guide-cue svg { width: 16px; height: 16px; transition: transform .2s; }
+.peer-careers-guide[open] .peer-careers-guide-cue svg { transform: rotate(180deg); }
+.peer-careers-guide > ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 48px; padding: 0; margin: 8px 0 30px; list-style: none; }
+.peer-careers-guide > ol > li { display: flex; gap: 18px; padding: 28px 0; border-top: 1px solid #a2bfec19; min-width: 0; }
+.peer-careers-step-number { color: #849cbf; font-size: 11px; padding-top: 5px; font-variant-numeric: tabular-nums; }
+.peer-careers-guide h3 { display: flex; align-items: flex-start; gap: 10px; margin: 0; font-size: 17px; font-weight: 500; letter-spacing: -.025em; line-height: 1.5; }
+.peer-careers-guide h3 svg { width: 17px; height: 17px; margin-top: 4px; flex-shrink: 0; color: #bddeff; }
+.peer-careers-guide p, .peer-careers-guide ul { color: #aebbd0; font-size: 12px; line-height: 1.9; }
+.peer-careers-guide p { margin: 13px 0; }
+.peer-careers-guide ul { padding-left: 16px; list-style: disc; }
+.peer-careers-guide ul li + li { margin-top: 6px; }
+
+@media (max-width: 760px) {
+  .peer-careers-topline { font-size: 10px; padding-bottom: 20px; }
+  .peer-careers-topline > span:last-child > span { margin-inline: 3px; }
+  .peer-campaign { grid-template-columns: minmax(0, 1fr); gap: 30px; padding-block: 28px 38px; }
+  .peer-campaign-artwork { grid-row: 1; }
+  .peer-campaign h2 { font-size: clamp(40px, 9vw, 62px); }
+  .peer-campaign-description { max-width: 540px; font-size: 14px; }
+  .peer-campaign-action a { width: 100%; }
+  .peer-careers-guide summary { font-size: 13px; }
+  .peer-careers-guide-cue { gap: 8px; }
+  .peer-careers-guide > ol { grid-template-columns: minmax(0, 1fr); margin-bottom: 12px; }
+}
+
+@media (max-width: 370px) {
+  .peer-careers-topline { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .peer-careers-guide-cue { font-size: 0; gap: 0; }
+}

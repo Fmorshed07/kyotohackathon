@@ -13,10 +13,10 @@ const labels = [
   "Tokyo Design", "TIU alumni emblem", "Partner featured by Cognisor — logo 47", "Partner featured by Cognisor — logo 48",
   "SusHi Tech Tokyo", "Open Design (alternate)", "ai&",
 ] as const;
-const darkArtwork = new Set([2, 4, 6, 8, 9, 15, 25, 26, 27, 31, 38, 39, 45]);
+const darkBackgroundArtwork = new Set([2, 4, 6, 8, 9, 15, 25, 26, 27, 31, 38, 39, 45]);
 export const COMMUNITY_PARTNERS = labels.map((name, index) => ({
   id: index + 1, name, image: `/partners/cognisor-network/${index + 1}.webp`,
-  darkArtwork: darkArtwork.has(index + 1),
+  surface: darkBackgroundArtwork.has(index + 1) ? "dark" as const : "light" as const,
   source: `https://www.cognisorai.com/partners/Logos/${index + 1}.png`,
 }));
 
@@ -24,45 +24,40 @@ export type FeaturedCommunityBrand = {
   id: string | number;
   name: string;
   image: string;
-  darkArtwork: boolean;
   source: string;
   artworkClass?: string;
-  category?: "Technology";
-  /** Native alpha artwork needs no background-blending workaround. */
-  transparentArtwork?: boolean;
-  /** Official black-backed community artwork rendered as a native SVG mask. */
-  monochromeMask?: { width: number; height: number; viewBox: string };
+  /** Contrast backing preserves the source's colors, including dark lettering. */
+  surface?: "light" | "dark";
+  /** Give standalone symbols a readable name, without a category badge. */
+  showName?: boolean;
 };
 
 const featuredArtwork: Record<number, Partial<FeaturedCommunityBrand>> = {
-  18: { image: "/partners/featured/alchemist.svg", source: "https://www.alchemistaccelerator.com/japan", artworkClass: "alchemist" },
-  24: { image: "/partners/featured/antler.svg", source: "https://www.antler.co/" },
-  44: { image: "/partners/featured/elevenlabs.svg", source: "https://elevenlabs.io/brand" },
-  21: { image: "/partners/featured/qwen.svg", source: "https://commons.wikimedia.org/wiki/File:Qwen_Logo.svg", artworkClass: "qwen" },
-  22: { image: "/partners/featured/alibaba-cloud.svg", source: "https://www.alibabacloud.com/", artworkClass: "alibaba" },
-  19: {
-    image: "/partners/featured/creators-circuit.png", source: "https://www.creatorscircuit.tech/",
-    monochromeMask: { width: 1080, height: 1080, viewBox: "40 270 1000 480" },
-  },
-  1: {
-    image: "/partners/featured/tiu-impact-next.png", source: "https://www.tiuimpactnext.com/",
-    monochromeMask: { width: 1000, height: 500, viewBox: "50 150 910 180" },
-  },
-  25: { image: "/partners/featured/lovable.svg", source: "https://lovable.dev/brand", artworkClass: "lovable" },
+  18: { artworkClass: "alchemist" },
+  44: { image: "/partners/featured/elevenlabs.svg", source: "https://elevenlabs.io/brand", surface: undefined },
+  21: { image: "/partners/featured/qwen.svg", source: "https://commons.wikimedia.org/wiki/File:Qwen_Logo.svg", artworkClass: "qwen", surface: undefined },
+  22: { image: "/partners/featured/alibaba-cloud.svg", source: "https://www.alibabacloud.com/", artworkClass: "alibaba", surface: undefined },
+  25: { image: "/partners/featured/lovable.svg", source: "https://lovable.dev/brand", artworkClass: "lovable", surface: undefined },
+  49: { artworkClass: "sushi-tech" },
+  51: { artworkClass: "ai-and" },
 };
 
 // Preserve the complete source directory; curate the moving wall independently.
 function featuredPartner(id: number): FeaturedCommunityBrand {
   const partner = COMMUNITY_PARTNERS.find(item => item.id === id);
   if (!partner) throw new Error(`Missing featured community partner: ${id}`);
-  return { ...partner, darkArtwork: true, transparentArtwork: true, ...featuredArtwork[id] };
+  return { ...partner, ...featuredArtwork[id] };
 }
 
 export const FEATURED_BRAND_ROWS: FeaturedCommunityBrand[][] = [
-  [featuredPartner(18), featuredPartner(24), featuredPartner(44), featuredPartner(21), featuredPartner(22)],
-  [featuredPartner(19), featuredPartner(1), featuredPartner(25), {
-    id: "openai", name: "OpenAI", image: "/partners/featured/openai-wordmark.svg",
-    darkArtwork: true, transparentArtwork: true, artworkClass: "openai", category: "Technology",
+  [featuredPartner(49), featuredPartner(18), featuredPartner(24), featuredPartner(44), featuredPartner(21), featuredPartner(22)],
+  [featuredPartner(51), featuredPartner(19), featuredPartner(1), featuredPartner(25), {
+    id: "openai", name: "OpenAI", image: "/partners/featured/openai-blossom.svg",
+    artworkClass: "openai", showName: true,
     source: "https://openai.com/brand/",
+  }, {
+    id: "codex", name: "Codex", image: "/partners/featured/codex-color.svg",
+    artworkClass: "codex", showName: true,
+    source: "https://asvg.app/icons/codex",
   }],
 ];

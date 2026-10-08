@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import { clearTranslationCookies, getSiteLanguage, setSiteLanguage, type SiteLanguage } from "@/lib/siteLanguage";
 
 declare global {
   interface Window {
-    __googleTranslateReady?: boolean;
     googleTranslateElementInit?: () => void;
     google?: {
       translate?: {
@@ -21,97 +21,87 @@ declare global {
 
 const SCRIPT_ID = "google-translate-script";
 const ELEMENT_ID = "google_translate_element";
-const PAGE_LANGUAGE = "en";
+let scriptReady: Promise<void> | undefined;
 
-const setTranslateCookie = (value: string) => {
-  const hostname = window.location.hostname;
-  const maxAge = "max-age=86400"; // 1 day
-  document.cookie = `googtrans=${value};path=/;${maxAge}`;
-  if (hostname !== "localhost" && hostname !== "127.0.0.1" && hostname.includes(".")) {
-    document.cookie = `googtrans=${value};path=/;${maxAge};domain=.${hostname}`;
-  }
-};
+function loadTranslateScript(): Promise<void> {
+  if (window.google?.translate?.TranslateElement) return Promise.resolve();
+  if (scriptReady) return scriptReady;
 
-const initTranslateElement = () => {
-  if (!window.google?.translate?.TranslateElement) {
-    return;
-  }
+  scriptReady = new Promise<void>((resolve, reject) => {
+    const ready = () => {
+      if (window.google?.translate?.TranslateElement) resolve();
+    };
+    window.googleTranslateElementInit = ready;
 
-  const container = document.getElementById(ELEMENT_ID);
-  if (container && container.childNodes.length > 0) {
-    return;
+    const existingScript = document.getElementById(SCRIPT_ID)
+      || document.querySelector('script[src*="translate.google.com/translate_a/element.js"]');
+    const script = (existingScript || document.createElement("script")) as HTMLScriptElement;
+    if (!existingScript) {
+      script.id = SCRIPT_ID;
+      script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+      script.async = true;
+    }
+    script.addEventListener("load", ready, { once: true });
+    script.addEventListener("error", () => {
+      script.remove();
+      scriptReady = undefined;
+      reject(new Error("Google Translate could not load"));
+    }, { once: true });
+    if (!existingScript) document.body.appendChild(script);
+  });
+
+  return scriptReady;
+}
+
+function initTranslateElement() {
+  if (getSiteLanguage() !== "ja" || !window.google?.translate?.TranslateElement) return;
+
+  // Both header layouts share one widget, outside React's translated DOM.
+  let container = document.getElementById(ELEMENT_ID);
+  if (!container) {
+    container = document.createElement("div");
+    container.id = ELEMENT_ID;
+    container.className = "skiptranslate";
+    container.setAttribute("aria-hidden", "true");
+    container.style.display = "none";
+    document.body.appendChild(container);
   }
+  if (container.dataset.initialized === "true" || container.childNodes.length > 0) return;
 
   new window.google.translate.TranslateElement(
-    {
-      pageLanguage: PAGE_LANGUAGE,
-      includedLanguages: "en,ja",
-      autoDisplay: false,
-    },
+    { pageLanguage: "en", includedLanguages: "en,ja", autoDisplay: false },
     ELEMENT_ID,
   );
-};
+  container.dataset.initialized = "true";
+}
 
 const GoogleTranslate = () => {
-  useEffect(() => {
-    const runInit = () => {
-      if (window.google?.translate?.TranslateElement) {
-        initTranslateElement();
-        return true;
-      }
-      return false;
-    };
-
-    if (runInit()) return;
-
-    const scriptEl = document.getElementById(SCRIPT_ID) || document.querySelector('script[src*="translate.google.com"]');
-    if (scriptEl) {
-      const id = setInterval(runInit, 80);
-      const stop = () => clearInterval(id);
-      setTimeout(stop, 8000);
-      return () => stop();
-    }
-
-    window.googleTranslateElementInit = () => {
-      window.__googleTranslateReady = true;
-      runInit();
-    };
-    const script = document.createElement("script");
-    script.id = SCRIPT_ID;
-    script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-    script.async = true;
-    script.onload = () => {
-      const id = setInterval(runInit, 80);
-      setTimeout(() => clearInterval(id), 5000);
-    };
-    document.body.appendChild(script);
-  }, []);
-
-  const [isJapanese, setIsJapanese] = useState(false);
+  const [language] = useState(getSiteLanguage);
+  const isJapanese = language === "ja";
 
   useEffect(() => {
-    if (typeof document === "undefined") {
+    if (!isJapanese) {
+      clearTranslationCookies();
       return;
     }
-    setIsJapanese(document.cookie.includes("googtrans=/en/ja"));
-  }, []);
+    // Restore the translation target if its one-day cookie expired before the preference.
+    setSiteLanguage("ja");
+    void loadTranslateScript().then(initTranslateElement).catch(() => {
+      // The original page and language controls remain usable if Google is offline.
+    });
+  }, [isJapanese]);
 
-  const handleLanguageChange = useCallback((lang: "en" | "ja") => {
-    const target = lang === "ja" ? "/en/ja" : "/en/en";
-    setTranslateCookie(target);
-    // Short delay so cookie is committed before reload
-    setTimeout(() => window.location.reload(), 80);
+  const handleLanguageChange = useCallback((lang: SiteLanguage) => {
+    setSiteLanguage(lang);
+    // Reload the original English DOM after clearing every translation cookie.
+    window.location.reload();
   }, []);
 
   return (
-    <div className="flex items-center gap-2">
-      <div
-        id={ELEMENT_ID}
-        className="absolute left-[-9999px] w-px h-px overflow-hidden"
-        aria-hidden="true"
-      />
+    <div className="notranslate flex items-center gap-2" translate="no">
       <button
         type="button"
+        lang="en"
         onClick={() => handleLanguageChange("en")}
         className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.3em] transition-colors ${
           isJapanese
@@ -124,6 +114,7 @@ const GoogleTranslate = () => {
       </button>
       <button
         type="button"
+        lang="ja"
         onClick={() => handleLanguageChange("ja")}
         className={`rounded-full border px-3 py-1 text-[10px] tracking-[0.3em] transition-colors ${
           isJapanese
