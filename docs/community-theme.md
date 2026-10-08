@@ -3,8 +3,8 @@
 The site uses one restrained visual language across the homepage, event pages,
 project/feed pages, resources, authentication, and all dashboard roles:
 
-- Manrope display and body type, with readable metadata and tighter headings.
-- Ink backgrounds, flat panels, subtle neutral borders, and blue primary actions.
+- Plus Jakarta Sans display and body type, shared with the homepage through `--font-sans`.
+- Deep navy backgrounds, flat panels, subtle blue borders, and restrained blue actions.
 - Consistent controls, visible keyboard focus, wrapping tabs, and mobile-safe inputs.
 - Actual event posters, project media, and logos remain content, not decoration.
 
@@ -30,11 +30,14 @@ in the full scroll journey; pause/resume never changes its layout or scroll posi
 
 - `src/index.css`: semantic theme tokens and shared dashboard/panel utilities.
 - `src/minimal-theme.css`: shared typography, homepage rhythm, and feature links.
+- `src/components/projects/project-feed.css`: feed and video-page spacing, surfaces, and typography.
+- `src/lib/projectFeedEvents.ts`: date-aware ordering shared by the feed and video event filters. Ongoing events come first, then upcoming events, then past events; current published events remain discoverable before their first project. The default feed order follows that event order, with newest submissions first within each event.
 - `src/components/community-atmosphere.css`: native CSS ambient motion.
 - Shared UI components: buttons, cards, tabs, inputs, and textareas.
 - `src/components/ecosystem/`: Japan map, partner wall, event fan, and complete footer.
 - `src/pages/CommunityWorkPage.tsx`: searchable, URL-filtered public event collection.
 - `docs/community-ecosystem-sources.md`: partner, map, and company-figure provenance.
 
-Event-specific font and color variables are preserved. Authentication, event date
+The default Horizon event typography also uses the shared font; explicitly selected
+alternate event fonts and accent colors remain available. Authentication, event date
 classification, Luma importing, ticketing, and publication workflows are unchanged.

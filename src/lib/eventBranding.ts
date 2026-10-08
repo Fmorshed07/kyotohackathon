@@ -20,9 +20,9 @@ export const EVENT_FONT_PRESETS: Array<{
   {
     id: "horizon",
     label: "Horizon",
-    display: "Space Grotesk",
-    body: "Manrope",
-    note: "Crisp tech default",
+    display: "Plus Jakarta Sans",
+    body: "Plus Jakarta Sans",
+    note: "Cognisor homepage typography",
   },
   {
     id: "editorial",
@@ -122,7 +122,7 @@ export function buildEventThemeStyle(options: {
         ? '"Syne", system-ui, sans-serif'
         : font === "atelier"
           ? '"Instrument Serif", Georgia, serif'
-          : '"Space Grotesk", system-ui, sans-serif';
+          : 'var(--font-sans)';
   const body =
     font === "editorial"
       ? '"Source Sans 3", system-ui, sans-serif'
@@ -130,7 +130,7 @@ export function buildEventThemeStyle(options: {
         ? '"DM Sans", system-ui, sans-serif'
         : font === "atelier"
           ? '"Figtree", system-ui, sans-serif'
-          : '"Manrope", system-ui, sans-serif';
+          : 'var(--font-sans)';
 
   return {
     "--primary": accent,

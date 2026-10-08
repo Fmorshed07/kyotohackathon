@@ -20,6 +20,52 @@ partner claims, attendance figures, or financial metrics have been copied.
 - The static directory exposes every asset. Repeated marquee copies are hidden
   from screen readers; motion plays by default and can be manually paused.
 
+### Featured logo wall
+
+The two counter-scrolling rows prioritise Alchemist Japan, Antler, ElevenLabs,
+Qwen, Alibaba Cloud, Creators Circuit, TIU Impact Next, Lovable, and OpenAI,
+as requested. The original 51-asset directory remains unchanged. Identical
+track halves prevent a gap at the loop seam, including on wide screens.
+Only transforms animate; offscreen/hidden-tab suspension and explicit pause
+remain active. Hover does not stop the rows.
+
+OpenAI is labelled **Technology**, not added to the verified partner directory.
+Its unmodified white wordmark (including prescribed clear space) comes from
+`OpenAI-logos(new)/SVGs/OpenAI-white-wordmark.svg` in the official archive:
+https://cdn.openai.com/brand/OpenAI-Logos-2025.zip
+Guidelines: https://openai.com/brand/ . OpenAI's mark belongs to OpenAI;
+display here does not assert event sponsorship or endorsement.
+
+#### Replacement artwork (9 October 2026)
+
+The featured wall no longer depends on CSS screen blending to conceal opaque
+backgrounds. Seven marks use native-alpha SVG assets, with the downloaded
+originals stored under `public/partners/featured/`:
+
+- Alchemist: official horizontal white artwork from
+  https://www.alchemistaccelerator.com/hubfs/Alchemist%20White%20horizontal%20logo.svg
+  (an SVG container with the brand's transparent embedded PNG).
+- Antler: exact header SVG paths from https://www.antler.co/ . A standalone
+  white `currentColor` is set, and an unresolved page-only clip reference is removed.
+- ElevenLabs: official white SVG linked from https://elevenlabs.io/brand .
+- Qwen: https://commons.wikimedia.org/wiki/File:Qwen_Logo.svg , attributed there
+  to Alibaba Cloud / QwenLM. Artwork is retained unchanged. See the adjacent
+  `QWEN-LICENSE.txt` for its Apache 2.0 license.
+- Alibaba Cloud: exact header SVG from https://www.alibabacloud.com/ . `viewBox`
+  casing and standalone dimensions are normalized; the UI renders it white.
+- Lovable: exact header SVG from https://lovable.dev/brand , with a standalone
+  white wordmark and its original gradient heart.
+- OpenAI: official white wordmark as recorded above.
+
+Creators Circuit and TIU Impact Next publish only black-backed raster marks at
+https://www.creatorscircuit.tech/creators-circuit-logo.png and
+https://www.tiuimpactnext.com/tiu-impact-hub-logo.png . Their downloaded originals
+are preserved. Native inline SVG luminance masks render just the lettering and
+symbols in white, without any black rectangle or generated/retyped brand text.
+Each original and decorative repeat has a unique mask ID; failed images expose
+the existing accessible text fallback. The static directory also uses these
+cleaner presentations for the matching featured brands; all source records remain.
+
 To refresh upstream assets, run `node scripts/sync-community-assets.mjs <sharp-entry-point>`
 with an installed Sharp module. This is a maintenance script, not an app dependency.
 It downloads only the numbered logo assets and Natural Earth geometry, and does

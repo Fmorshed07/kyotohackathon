@@ -11,7 +11,7 @@
   height: 260svh;
   color: #f4f7fa;
   background: #02060e;
-  font-family: 'Plus Jakarta Sans', 'Manrope', sans-serif;
+  font-family: var(--font-sans);
   isolation: isolate;
   overflow-anchor: none;
 }

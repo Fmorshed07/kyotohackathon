@@ -19,18 +19,22 @@ import { useProjectCommunityStars } from "@/hooks/useProjectCommunityStars";
 import { useProjectShareCounts } from "@/hooks/useProjectShareCounts";
 import { fetchPublishedHackathons, type HostedHackathon } from "@/lib/aiHackathons";
 import { formatSubmissionDateTime } from "@/lib/datetime";
+import { getEventTimeRange } from "@/lib/eventPreviews";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { getHackathonById, getHackathonPublicUrl, getSubmissionHackathonId, PORTAL_HACKATHONS, type PortalHackathon } from "@/lib/hackathons";
+import { getHackathonById, getHackathonPublicUrl, getSubmissionHackathonId, PORTAL_HACKATHONS } from "@/lib/hackathons";
 import { projectFeedHttpUrl } from "@/lib/projectFeedMedia";
+import { buildFeedEventOptions, type FeedEvent } from "@/lib/projectFeedEvents";
 import { buildProjectPermalink, listPublicProjectLinks, toPublicGallerySubmission } from "@/lib/projectSocial";
 import { compareStarStats, EMPTY_STAR_STATS } from "@/lib/projectStars";
 import { countTeamBuilders, formatTeamMemberNames } from "@/lib/teamRoster";
 import { cn } from "@/lib/utils";
 import type { Submission } from "@/types/portal";
+import "@/components/projects/project-feed.css";
 
-type FeedEvent = PortalHackathon | HostedHackathon;
 type MediaFilter = "all" | "videos" | "projects";
-type FeedSort = "newest" | "stars" | "title";
+type FeedSort = "current" | "newest" | "stars" | "title";
+
+const eventStatusLabel = { active: "Live now", upcoming: "Upcoming", past: "Past", unknown: "Date to be confirmed" };
 
 const hasVideo = (submission: Submission) => Boolean(projectFeedHttpUrl(submission.demo_video_url));
 const submittedAt = (submission: Submission) => Date.parse(submission.created_at ?? "") || 0;
@@ -61,7 +65,8 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
   const [query, setQuery] = useState("");
   const [eventFilter, setEventFilter] = useState(() => searchParams.get("event") || "all");
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
-  const [sort, setSort] = useState<FeedSort>("newest");
+  const [sort, setSort] = useState<FeedSort>("current");
+  const [now, setNow] = useState(Date.now);
   const [autoplayEnabled, setAutoplayEnabled] = useState(() => !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const stars = useProjectCommunityStars();
@@ -96,9 +101,26 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
 
   const eventById = useMemo(() => new Map<string, FeedEvent>([...PORTAL_HACKATHONS, ...hostedEvents].map((event) => [event.id, event])), [hostedEvents]);
   const baseSubmissions = useMemo(() => videoOnly ? submissions.filter(hasVideo) : submissions, [submissions, videoOnly]);
-  const eventOptions = useMemo(() => Array.from(new Set(baseSubmissions.map(getSubmissionHackathonId)))
-    .map((id) => ({ id, event: eventById.get(id) ?? getHackathonById(id), count: baseSubmissions.filter((submission) => getSubmissionHackathonId(submission) === id).length }))
-    .sort((left, right) => left.event.name.localeCompare(right.event.name)), [baseSubmissions, eventById]);
+  const eventOptions = useMemo(() => buildFeedEventOptions(baseSubmissions, eventById, now, eventFilter), [baseSubmissions, eventById, now, eventFilter]);
+  const eventOrder = useMemo(() => new Map(eventOptions.map(({ id }, index) => [id, index])), [eventOptions]);
+
+  useEffect(() => {
+    let timer: number | undefined;
+    const tick = () => {
+      window.clearTimeout(timer);
+      const current = Date.now();
+      setNow(current);
+      if (document.visibilityState === "hidden") return;
+      const boundaries = [...eventById.values()].flatMap(event => {
+        const range = getEventTimeRange(event);
+        return range ? [range.start, range.end].filter(time => time > current) : [];
+      });
+      timer = window.setTimeout(tick, Math.max(1, Math.min(30_000, ...boundaries.map(time => time - current))));
+    };
+    tick();
+    document.addEventListener("visibilitychange", tick);
+    return () => { window.clearTimeout(timer); document.removeEventListener("visibilitychange", tick); };
+  }, [eventById]);
 
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -112,40 +134,45 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
     }).sort((left, right) => {
       if (sort === "title") return (left.title ?? "").localeCompare(right.title ?? "");
       if (sort === "stars") return compareStarStats(stars.statsById[left.id] ?? EMPTY_STAR_STATS, stars.statsById[right.id] ?? EMPTY_STAR_STATS) || submittedAt(right) - submittedAt(left);
+      if (sort === "current") {
+        const byEvent = (eventOrder.get(getSubmissionHackathonId(left)) ?? eventOptions.length) - (eventOrder.get(getSubmissionHackathonId(right)) ?? eventOptions.length);
+        if (byEvent) return byEvent;
+      }
       return submittedAt(right) - submittedAt(left);
     });
-  }, [baseSubmissions, eventById, eventFilter, mediaFilter, query, sort, stars.statsById, videoOnly]);
+  }, [baseSubmissions, eventById, eventFilter, eventOrder, eventOptions.length, mediaFilter, query, sort, stars.statsById, videoOnly]);
 
   const videoCount = baseSubmissions.filter(hasVideo).length;
+  const emptyEvent = eventOptions.find(option => option.id === eventFilter && option.count === 0)?.event;
   const clearFilters = () => { setQuery(""); setEventFilter("all"); setMediaFilter("all"); };
   const title = videoOnly ? "Video previews" : "The project feed";
 
   return (
-    <div className="relative min-h-svh bg-background text-foreground">
+    <div className="project-feed-page relative min-h-svh bg-background text-foreground">
       <AnimatedBackground />
       <SiteHeader />
-      <main className="relative mx-auto max-w-6xl px-4 pb-16 pt-24 sm:px-6 lg:px-8">
-        <header className="mb-7 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <main className="project-feed-main relative mx-auto">
+        <header className="feed-page-heading flex">
           <div>
-            <p className="dash-eyebrow inline-flex items-center gap-2"><Sparkles className="h-3.5 w-3.5" aria-hidden />Made by the community</p>
-            <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">{title}<span className="text-primary">.</span></h1>
+            <p className="feed-eyebrow dash-eyebrow inline-flex items-center gap-2"><Sparkles className="h-3.5 w-3.5" aria-hidden />Made by the community</p>
+            <h1 className="feed-page-title font-display">{title}<span className="text-primary">.</span></h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{videoOnly ? "Watch demos, meet the builders, and discover what they made. Scroll to preview a video, then explore the full project." : "Fresh ideas. Real demos. Meet the builders behind them. Scroll to discover what the community is making."}</p>
           </div>
-          <nav aria-label="Project views" className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-card/70 p-1 backdrop-blur">
-            <Link to="/feed" aria-current={!videoOnly ? "page" : undefined} className={cn("inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors", !videoOnly ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}><ListVideo className="h-4 w-4" aria-hidden />Feed</Link>
-            <Link to="/videos" aria-current={videoOnly ? "page" : undefined} className={cn("inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors", videoOnly ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}><CirclePlay className="h-4 w-4" aria-hidden />Videos</Link>
-            <Link to="/projects" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"><LayoutGrid className="h-4 w-4" aria-hidden />Gallery</Link>
+          <nav aria-label="Project views" className="feed-view-tabs flex shrink-0 items-center">
+            <Link to="/feed" aria-current={!videoOnly ? "page" : undefined} className="inline-flex items-center transition-colors"><ListVideo className="h-4 w-4" aria-hidden />Feed</Link>
+            <Link to="/videos" aria-current={videoOnly ? "page" : undefined} className="inline-flex items-center transition-colors"><CirclePlay className="h-4 w-4" aria-hidden />Videos</Link>
+            <Link to="/projects" className="inline-flex items-center transition-colors"><LayoutGrid className="h-4 w-4" aria-hidden />Gallery</Link>
           </nav>
         </header>
 
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <section aria-label={videoOnly ? "Video preview feed" : "Project feed"} className="min-w-0">
-            <div className="rounded-2xl border border-border bg-card/80 p-4 shadow-[var(--surface-elevated)] backdrop-blur sm:p-5">
+        <div className="feed-layout grid items-start lg:grid-cols-[minmax(0,1fr)_280px]">
+          <section aria-label={videoOnly ? "Video preview feed" : "Project feed"} className="feed-stream min-w-0">
+            <div className="feed-controls">
               <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden /><Input aria-label="Search projects" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search projects, teams, or ideas" className="h-11 rounded-xl pl-10" /></div>
                 <Select value={sort} onValueChange={(value: FeedSort) => setSort(value)}>
-                  <SelectTrigger aria-label="Sort projects" className="h-11 w-full rounded-xl sm:w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="newest">Newest first</SelectItem><SelectItem value="stars">Most starred</SelectItem><SelectItem value="title">A–Z</SelectItem></SelectContent>
+                  <SelectTrigger aria-label="Sort projects" className="h-11 w-full rounded-xl sm:w-52"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="current">Current events first</SelectItem><SelectItem value="newest">Newest first</SelectItem><SelectItem value="stars">Most starred</SelectItem><SelectItem value="title">A–Z</SelectItem></SelectContent>
                 </Select>
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -154,7 +181,7 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
                 </div>}
                 <div className="flex items-center gap-2"><Switch id="feed-autoplay" checked={autoplayEnabled} onCheckedChange={setAutoplayEnabled} /><label htmlFor="feed-autoplay" className="cursor-pointer text-xs text-muted-foreground">Autoplay</label></div>
               </div>
-              <div className="mt-4 lg:hidden"><Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger aria-label="Filter by event" className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All events</SelectItem>{eventOptions.map(({ id, event }) => <SelectItem key={id} value={id}>{event.name}</SelectItem>)}{eventFilter !== "all" && !eventOptions.some(({ id }) => id === eventFilter) ? <SelectItem value={eventFilter}>{getHackathonById(eventFilter).name}</SelectItem> : null}</SelectContent></Select></div>
+              <div className="mt-4 lg:hidden"><Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger aria-label="Filter by event" className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)]"><SelectItem value="all">All events</SelectItem>{eventOptions.map(({ id, event, status }) => <SelectItem key={id} value={id} className="whitespace-normal break-words">{event.name} — {eventStatusLabel[status]}</SelectItem>)}{eventFilter !== "all" && !eventOptions.some(({ id }) => id === eventFilter) ? <SelectItem value={eventFilter}>{getHackathonById(eventFilter).name}</SelectItem> : null}</SelectContent></Select></div>
               <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{reducedMotion && !autoplayEnabled ? "Autoplay starts off for your reduced motion preference. Enable it or press play to watch a demo." : "Supported videos start muted and pause when you scroll past. Other previews use their own play controls."}</p>
             </div>
 
@@ -163,7 +190,7 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
             {loading ? <div aria-busy="true" className="space-y-5">{[0, 1].map((index) => <div key={index} className="overflow-hidden rounded-2xl border border-border bg-card/60"><div className="flex items-center gap-3 p-5"><div className="h-10 w-10 rounded-xl bg-muted motion-safe:animate-pulse" /><div className="space-y-2"><div className="h-3 w-32 rounded bg-muted motion-safe:animate-pulse" /><div className="h-2 w-20 rounded bg-muted motion-safe:animate-pulse" /></div></div><div className="aspect-video bg-muted/70 motion-safe:animate-pulse" /><div className="space-y-3 p-5"><div className="h-4 w-2/3 rounded bg-muted motion-safe:animate-pulse" /><div className="h-3 w-full rounded bg-muted motion-safe:animate-pulse" /></div></div>)}<span className="sr-only">Loading project feed</span></div> : loadError ? (
               <div role="alert" className="rounded-2xl border border-destructive/25 bg-card/70 px-6 py-14 text-center"><RefreshCw className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden /><h2 className="mt-4 font-display text-xl font-semibold">We couldn’t load the feed</h2><p className="mt-2 text-sm text-muted-foreground">Please try again in a moment.</p><Button className="mt-5 gap-2" onClick={() => setRefreshKey((value) => value + 1)}><RefreshCw className="h-4 w-4" aria-hidden />Try again</Button></div>
             ) : filtered.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border bg-card/60 px-6 py-16 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">{videoOnly ? <Film className="h-6 w-6 text-primary" aria-hidden /> : <FolderKanban className="h-6 w-6 text-primary" aria-hidden />}</span><h2 className="mt-5 font-display text-xl font-semibold">{baseSubmissions.length === 0 ? videoOnly ? "The next demo starts here" : "The next big idea starts here" : videoOnly ? "No matching video demos" : "No matching projects"}</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{baseSubmissions.length === 0 ? videoOnly ? "Videos appear when builders share their project demos publicly. Come back to see what they’re making." : "Projects appear here when builders choose to share them publicly. Come back to discover their work." : "Try another event, search term, or preview filter."}</p>{baseSubmissions.length ? <Button variant="outline" className="mt-5" onClick={clearFilters}>Clear filters</Button> : <Button asChild className="mt-5"><Link to="/hackathons">Explore events <ArrowUpRight className="ml-2 h-4 w-4" aria-hidden /></Link></Button>}</div>
+              <div className="rounded-2xl border border-dashed border-border bg-card/60 px-6 py-16 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">{videoOnly ? <Film className="h-6 w-6 text-primary" aria-hidden /> : <FolderKanban className="h-6 w-6 text-primary" aria-hidden />}</span><h2 className="mt-5 font-display text-xl font-semibold">{emptyEvent ? (videoOnly ? "No video demos from this event yet" : "No projects from this event yet") : baseSubmissions.length === 0 ? videoOnly ? "The next demo starts here" : "The next big idea starts here" : videoOnly ? "No matching video demos" : "No matching projects"}</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{emptyEvent ? "Projects will appear here when builders publish their work. You can still explore the event." : baseSubmissions.length === 0 ? videoOnly ? "Videos appear when builders share their project demos publicly. Come back to see what they’re making." : "Projects appear here when builders choose to share them publicly. Come back to discover their work." : "Try another event, search term, or preview filter."}</p>{emptyEvent ? <div className="mt-5"><EventLink event={emptyEvent} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">View event <ArrowUpRight className="h-4 w-4" aria-hidden /></EventLink></div> : null}{baseSubmissions.length ? <Button variant="outline" className="mt-5" onClick={clearFilters}>Clear filters</Button> : <Button asChild className="mt-5"><Link to="/hackathons">Explore events <ArrowUpRight className="ml-2 h-4 w-4" aria-hidden /></Link></Button>}</div>
             ) : <div className="space-y-5">
               {filtered.map((submission) => {
                 const event = eventById.get(getSubmissionHackathonId(submission)) ?? getHackathonById(getSubmissionHackathonId(submission));
@@ -186,9 +213,9 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
             </div>}
           </section>
 
-          <aside className="space-y-5 lg:sticky lg:top-24">
-            <section className="rounded-2xl border border-primary/20 bg-card/80 p-5 shadow-[var(--surface-elevated)] backdrop-blur"><p className="dash-eyebrow">Community in motion</p><div className="mt-5 grid grid-cols-2 gap-3"><div><p className="font-display text-3xl font-semibold">{loading ? "—" : baseSubmissions.length}</p><p className="mt-1 text-xs text-muted-foreground">{videoOnly ? "video previews" : "shared projects"}</p></div><div className="border-l border-border pl-4"><p className="font-display text-3xl font-semibold text-primary">{loading ? "—" : videoOnly ? eventOptions.length : videoCount}</p><p className="mt-1 text-xs text-muted-foreground">{videoOnly ? "events" : "video demos"}</p></div></div><p className="mt-5 text-xs leading-relaxed text-muted-foreground">Ideas from real builders. Give a project stars or share it with someone who would love it.</p></section>
-            <section className="hidden rounded-2xl border border-border bg-card/75 p-5 backdrop-blur lg:block"><h2 className="font-display text-sm font-semibold">Explore by event</h2><div className="mt-4 space-y-1.5"><button type="button" aria-pressed={eventFilter === "all"} onClick={() => setEventFilter("all")} className={cn("flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm transition-colors", eventFilter === "all" ? "border-primary/25 bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:bg-muted/50")}><span>All events</span><span className="text-xs opacity-75">{baseSubmissions.length}</span></button>{eventOptions.map(({ id, event, count }) => <button key={id} type="button" aria-pressed={eventFilter === id} onClick={() => setEventFilter(id)} className={cn("flex w-full items-start justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors", eventFilter === id ? "border-primary/25 bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:bg-muted/50")}><span className="min-w-0"><span className="block text-sm font-medium">{event.name}</span><span className="mt-1 flex items-center gap-1 text-[11px] opacity-70"><MapPin className="h-3 w-3 shrink-0" aria-hidden />{event.location}</span></span><span className="mt-1 text-xs opacity-75">{count}</span></button>)}</div></section>
+          <aside className="feed-sidebar space-y-5 lg:sticky lg:top-24">
+            <section className="rounded-2xl border border-primary/20 bg-card/80 p-5 shadow-[var(--surface-elevated)] backdrop-blur"><p className="dash-eyebrow">Community in motion</p><div className="mt-5 grid grid-cols-2 gap-3"><div><p className="font-display text-3xl font-semibold">{loading ? "—" : baseSubmissions.length}</p><p className="mt-1 text-xs text-muted-foreground">{videoOnly ? "video previews" : "shared projects"}</p></div><div className="border-l border-border pl-4"><p className="font-display text-3xl font-semibold text-primary">{loading ? "—" : videoOnly ? eventOptions.filter(option => option.count > 0).length : videoCount}</p><p className="mt-1 text-xs text-muted-foreground">{videoOnly ? "events" : "video demos"}</p></div></div><p className="mt-5 text-xs leading-relaxed text-muted-foreground">Ideas from real builders. Give a project stars or share it with someone who would love it.</p></section>
+            <section className="hidden rounded-2xl border border-border bg-card/75 p-5 backdrop-blur lg:block"><h2 className="font-display text-sm font-semibold">Explore by event</h2><div className="mt-4 space-y-1.5"><button type="button" aria-pressed={eventFilter === "all"} onClick={() => setEventFilter("all")} className={cn("flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm transition-colors", eventFilter === "all" ? "border-primary/25 bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:bg-muted/50")}><span>All events</span><span className="text-xs opacity-75">{baseSubmissions.length}</span></button>{eventOptions.map(({ id, event, count, status }) => <button key={id} type="button" aria-pressed={eventFilter === id} onClick={() => setEventFilter(id)} className={cn("flex w-full items-start justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors", eventFilter === id ? "border-primary/25 bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:bg-muted/50")}><span className="min-w-0"><span className="block text-sm font-medium">{event.name}</span><span className="mt-1 flex items-center gap-1 text-[11px] opacity-70"><MapPin className="h-3 w-3 shrink-0" aria-hidden />{event.location}</span><span className="mt-1 block text-[10px] text-muted-foreground">{eventStatusLabel[status]}</span></span><span className="mt-1 text-xs opacity-75">{count}</span></button>)}</div></section>
             <section className="rounded-2xl border border-border bg-card/75 p-5 backdrop-blur"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10"><CalendarDays className="h-4 w-4 text-primary" aria-hidden /></span><h2 className="mt-4 font-display text-lg font-semibold">Find your next event</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Meet the community, build something new, and share what you make.</p><Button asChild variant="outline" className="mt-4 w-full gap-2"><Link to="/hackathons">Explore events <ArrowUpRight className="h-4 w-4" aria-hidden /></Link></Button></section>
           </aside>
         </div>

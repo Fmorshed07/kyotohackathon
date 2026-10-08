@@ -39,12 +39,11 @@ const SiteHeader = () => {
   const closeMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
 
   useEffect(() => {
-    if (!isHome) return;
     const updateScroll = () => setHasScrolled(window.scrollY > 24);
     updateScroll();
     window.addEventListener("scroll", updateScroll, { passive: true });
     return () => window.removeEventListener("scroll", updateScroll);
-  }, [isHome]);
+  }, []);
 
   useEffect(() => {
     closeMobileNav();
@@ -155,8 +154,8 @@ const SiteHeader = () => {
     <>
       <header className={cn(
         "fixed top-0 z-40 w-full border-b border-border/70 bg-background/90 backdrop-blur-md",
-        isHome && "immersive-header",
-        isHome && hasScrolled && "immersive-header--scrolled",
+        "immersive-header",
+        (hasScrolled || !isHome) && "immersive-header--scrolled",
       )}>
         <div className="immersive-header__inner mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-2 px-4 sm:px-6 lg:gap-3 lg:px-10">
           <div className="immersive-header__brand flex min-w-0 shrink-0 items-center">
@@ -258,7 +257,7 @@ const SiteHeader = () => {
 
       {isMobileNavOpen ? (
         <div
-          className={cn("fixed inset-0 z-[80]", isHome ? "immersive-menu" : "min-[1161px]:hidden")}
+          className="immersive-menu fixed inset-0 z-[80] min-[1161px]:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Navigation menu"

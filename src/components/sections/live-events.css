@@ -8,13 +8,13 @@
   padding: 5rem clamp(1.5rem, 3vw, 4rem) 4rem;
   background: #05070a;
   color: #f5f9ff;
-  font-family: "Manrope", "DM Sans", sans-serif;
+  font-family: var(--font-sans);
 }
 .event-experience-inner { position: relative; width: 100%; min-width: 0; margin-inline: auto; }
-.event-kicker { font-family: "Manrope", sans-serif; font-size: 11px; font-weight: 400; letter-spacing: .01em; }
+.event-kicker { font-family: var(--font-sans); font-size: 11px; font-weight: 400; letter-spacing: .01em; }
 .event-section-topline { display: flex; align-items: center; justify-content: space-between; gap: 1rem; color: #bfc6d1; font-size: clamp(13px, 1.35vw, 18px); line-height: 1.55; letter-spacing: -.025em; padding-bottom: 1.25rem; }
 .event-section-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 2rem; padding: 2.5rem 0 2.75rem; }
-.event-section-heading h2 { margin: 0; font-family: "Manrope", sans-serif; font-size: clamp(4.5rem, 9vw, 9rem); line-height: 1.05; font-weight: 400; letter-spacing: -.065em; }
+.event-section-heading h2 { margin: 0; font-family: var(--font-sans); font-size: clamp(4.5rem, 9vw, 9rem); line-height: 1.05; font-weight: 400; letter-spacing: -.065em; }
 .event-section-heading h2 > span { color: var(--event-blue); }
 .event-section-heading p { margin-top: 1.25rem; color: #9faebc; font-size: 14px; line-height: 1.7; }
 .event-directory-link { display: inline-flex; align-items: center; gap: 1.5rem; flex-shrink: 0; padding: .75rem 0; border-bottom: 1px solid #6789a4; font-size: 12px; color: #d8e9f7; transition: color .2s, border-color .2s; }
@@ -40,10 +40,10 @@
 .event-poster:hover { box-shadow: 0 36px 80px -20px #000e; }
 .event-poster > img { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
 .event-art-fallback { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; background: radial-gradient(circle at 75% 20%, #126cbe, transparent 60%), linear-gradient(130deg, #061324, #07375a); }
-.event-art-monogram { font-family: "Manrope", sans-serif; font-size: clamp(7rem, 16vw, 16rem); line-height: 1; font-weight: 400; color: #f3f6ff; }
+.event-art-monogram { font-family: var(--font-sans); font-size: clamp(7rem, 16vw, 16rem); line-height: 1; font-weight: 400; color: #f3f6ff; }
 .event-art-fallback > svg { position: absolute; width: 150%; height: 150%; left: 30%; top: 30%; color: #68b9ff33; stroke-width: .3; }
 .event-visual-footer { position: absolute; bottom: 1.75rem; left: 1.75rem; right: 1.75rem; display: flex; justify-content: space-between; align-items: flex-end; color: #a8c4d9; }
-.event-visual-coordinate { font: 400 24px "Manrope", sans-serif; color: #dbe3f0; }
+.event-visual-coordinate { font: 400 24px var(--font-sans); color: #dbe3f0; }
 .event-visual-coordinate > span { font-size: 12px; color: #839db0; }
 .event-story { display: flex; flex-direction: column; min-width: 0; padding: clamp(1.5rem, 3vw, 3rem); background: #090d13; }
 .event-story > * { animation: event-content-enter .65s cubic-bezier(.2,.75,.25,1) both; }
@@ -54,7 +54,7 @@
 .event-status-pill svg { height: 12px; width: 12px; }
 .event-format { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a2b0c0; font-size: 11px; }
 .event-organizer { margin-top: 1.5rem; color: #a3bacd; font-size: 11px; line-height: 1.5; }
-.event-story h3 { margin-top: .6rem; font: 400 clamp(1.85rem, 3.2vw, 3.2rem)/1.15 "Manrope", sans-serif; letter-spacing: -.05em; overflow-wrap: anywhere; text-wrap: balance; }
+.event-story h3 { margin-top: .6rem; font: 400 clamp(1.85rem, 3.2vw, 3.2rem)/1.15 var(--font-sans); letter-spacing: -.05em; overflow-wrap: anywhere; text-wrap: balance; }
 .event-story h3 a { transition: color .2s; }
 .event-story h3 a:hover { color: var(--event-ice); }
 .event-description { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 1rem; font-size: 13px; line-height: 1.8; color: #a0b0c0; }
@@ -70,8 +70,8 @@
 .event-clock-line { height: 1px; flex: 1; background: #88c4ff22; }
 .event-clock-digits { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-top: .85rem; }
 .event-clock-digits > div + div { border-left: 1px solid #8ec3ff1c; padding-left: 1rem; }
-.event-clock-digits span { display: block; color: #e4ecf9; font: 400 clamp(1.6rem, 3vw, 2.8rem)/1.1 "Manrope", sans-serif; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
-.event-clock-digits small { display: block; padding-top: .45rem; font: 400 10px "Manrope", sans-serif; color: #95a5b8; }
+.event-clock-digits span { display: block; color: #e4ecf9; font: 400 clamp(1.6rem, 3vw, 2.8rem)/1.1 var(--font-sans); letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+.event-clock-digits small { display: block; padding-top: .45rem; font: 400 10px var(--font-sans); color: #95a5b8; }
 .event-time-track { margin-top: 1rem; height: 2px; overflow: hidden; background: #3d6d9329; }
 .event-time-track > span { display: block; height: 100%; background: linear-gradient(90deg, #007aff, #75ddff); box-shadow: 0 0 12px #00a3ff; transition: width 1s linear; }
 .event-actions { display: flex; align-items: stretch; flex-wrap: wrap; gap: .6rem; margin-top: 1.75rem; }
@@ -116,7 +116,7 @@
 .event-quiet-orbit > span + span { inset: -25px; animation-direction: reverse; animation-duration: 42s; border-style: dashed; border-color: #429eff22; }
 .event-quiet-copy { max-width: 420px; }
 .event-quiet-copy .event-kicker { color: #67bdf4; font-size: 9px; }
-.event-quiet-copy h3 { margin-top: .8rem; font: 400 clamp(1.8rem, 3vw, 2.5rem)/1.2 "Manrope", sans-serif; letter-spacing: -.035em; }
+.event-quiet-copy h3 { margin-top: .8rem; font: 400 clamp(1.8rem, 3vw, 2.5rem)/1.2 var(--font-sans); letter-spacing: -.035em; }
 .event-quiet-copy p { margin-top: .75rem; color: #9aafc2; font-size: 13px; line-height: 1.7; }
 .event-quiet-copy .event-primary-action { margin-top: 1.5rem; }
 .event-loading { display: grid; grid-template-columns: 1fr 1fr; min-height: 590px; overflow: hidden; border: 1px solid #6ebeff30; border-radius: 1.5rem; background: #060e18; }

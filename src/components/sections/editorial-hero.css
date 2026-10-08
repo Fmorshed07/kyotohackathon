@@ -9,7 +9,7 @@
   overflow: hidden;
   color: #fff;
   background: #02060c;
-  font-family: "Plus Jakarta Sans", "Manrope", sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
 }

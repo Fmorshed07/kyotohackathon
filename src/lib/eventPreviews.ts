@@ -1,6 +1,6 @@
 import type { HostedHackathon } from "@/lib/aiHackathons";
 
-type ScheduledEvent = Pick<HostedHackathon, "published" | "startAt" | "endAt">;
+type ScheduledEvent = Pick<HostedHackathon, "startAt" | "endAt">;
 
 export function getEventTimeRange(event: ScheduledEvent): { start: number; end: number } | null {
   const start = new Date(event.startAt || "").getTime();

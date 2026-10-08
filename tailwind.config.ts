@@ -15,8 +15,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["var(--event-display)", "Manrope", "system-ui", "sans-serif"],
-        body: ["var(--event-body)", "Manrope", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans)"],
+        display: ["var(--event-display)", "var(--font-sans)"],
+        body: ["var(--event-body)", "var(--font-sans)"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       colors: {
