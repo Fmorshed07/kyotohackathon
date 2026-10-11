@@ -20,11 +20,13 @@ import { useProjectShareCounts } from "@/hooks/useProjectShareCounts";
 import { fetchPublishedHackathons, type HostedHackathon } from "@/lib/aiHackathons";
 import { formatSubmissionDateTime } from "@/lib/datetime";
 import { getEventTimeRange } from "@/lib/eventPreviews";
+import { ELEVENLABS_MEETUP } from "@/lib/elevenLabsMeetup";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { getHackathonById, getHackathonPublicUrl, getSubmissionHackathonId, PORTAL_HACKATHONS } from "@/lib/hackathons";
 import { projectFeedHttpUrl } from "@/lib/projectFeedMedia";
 import { buildFeedEventOptions, type FeedEvent } from "@/lib/projectFeedEvents";
 import { buildProjectPermalink, listPublicProjectLinks, toPublicGallerySubmission } from "@/lib/projectSocial";
+import { mergePublicShowcaseProjects, type PublicShowcaseSubmission } from "@/lib/publicShowcaseProjects";
 import { compareStarStats, EMPTY_STAR_STATS } from "@/lib/projectStars";
 import { countTeamBuilders, formatTeamMemberNames } from "@/lib/teamRoster";
 import { cn } from "@/lib/utils";
@@ -57,8 +59,8 @@ function FeedDescription({ text }: { text: string }) {
 export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boolean }) {
   const db = getFirestoreDb();
   const [searchParams] = useSearchParams();
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [hostedEvents, setHostedEvents] = useState<HostedHackathon[]>([]);
+  const [submissions, setSubmissions] = useState<PublicShowcaseSubmission[]>(() => mergePublicShowcaseProjects([]));
+  const [hostedEvents, setHostedEvents] = useState<HostedHackathon[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -77,11 +79,20 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
     setLoading(true);
     setLoadError(false);
     void Promise.all([
-      getDocs(collection(db, "public_projects")),
-      fetchPublishedHackathons(db).catch(() => [] as HostedHackathon[]),
+      getDocs(collection(db, "public_projects")).catch(() => null),
+      fetchPublishedHackathons(db).catch(() => null),
     ]).then(([snapshot, events]) => {
       if (!current) return;
-      setSubmissions(snapshot.docs.map((item) => toPublicGallerySubmission(item.id, item.data())).filter((item): item is Submission => item !== null));
+      const showBundled = events === null || events.some(event => event.id === ELEVENLABS_MEETUP.id);
+      const visible = (project: PublicShowcaseSubmission) => !project.showcase || showBundled;
+      if (snapshot) setSubmissions(mergePublicShowcaseProjects(
+        snapshot.docs.map((item) => toPublicGallerySubmission(item.id, item.data())).filter((item): item is Submission => item !== null),
+        snapshot.docs.filter(item => item.data().public_preview_consent === false).map(item => item.id),
+      ).filter(visible));
+      else {
+        setLoadError(true);
+        setSubmissions(previous => previous.filter(visible));
+      }
       setHostedEvents(events);
     }).catch(() => { if (current) setLoadError(true); })
       .finally(() => { if (current) setLoading(false); });
@@ -99,7 +110,7 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
     setEventFilter(searchParams.get("event") || "all");
   }, [searchParams]);
 
-  const eventById = useMemo(() => new Map<string, FeedEvent>([...PORTAL_HACKATHONS, ...hostedEvents].map((event) => [event.id, event])), [hostedEvents]);
+  const eventById = useMemo(() => new Map<string, FeedEvent>([...PORTAL_HACKATHONS, ...(hostedEvents === null ? [ELEVENLABS_MEETUP] : hostedEvents)].map((event) => [event.id, event])), [hostedEvents]);
   const baseSubmissions = useMemo(() => videoOnly ? submissions.filter(hasVideo) : submissions, [submissions, videoOnly]);
   const eventOptions = useMemo(() => buildFeedEventOptions(baseSubmissions, eventById, now, eventFilter), [baseSubmissions, eventById, now, eventFilter]);
   const eventOrder = useMemo(() => new Map(eventOptions.map(({ id }, index) => [id, index])), [eventOptions]);
@@ -146,6 +157,7 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
   const emptyEvent = eventOptions.find(option => option.id === eventFilter && option.count === 0)?.event;
   const clearFilters = () => { setQuery(""); setEventFilter("all"); setMediaFilter("all"); };
   const title = videoOnly ? "Video previews" : "The project feed";
+  const eventQuery = eventFilter === "all" ? "" : `?event=${encodeURIComponent(eventFilter)}`;
 
   return (
     <div className="project-feed-page relative min-h-svh bg-background text-foreground">
@@ -159,9 +171,9 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{videoOnly ? "Watch demos, meet the builders, and discover what they made. Scroll to preview a video, then explore the full project." : "Fresh ideas. Real demos. Meet the builders behind them. Scroll to discover what the community is making."}</p>
           </div>
           <nav aria-label="Project views" className="feed-view-tabs flex shrink-0 items-center">
-            <Link to="/feed" aria-current={!videoOnly ? "page" : undefined} className="inline-flex items-center transition-colors"><ListVideo className="h-4 w-4" aria-hidden />Feed</Link>
-            <Link to="/videos" aria-current={videoOnly ? "page" : undefined} className="inline-flex items-center transition-colors"><CirclePlay className="h-4 w-4" aria-hidden />Videos</Link>
-            <Link to="/projects" className="inline-flex items-center transition-colors"><LayoutGrid className="h-4 w-4" aria-hidden />Gallery</Link>
+            <Link to={`/feed${eventQuery}`} aria-current={!videoOnly ? "page" : undefined} className="inline-flex items-center transition-colors"><ListVideo className="h-4 w-4" aria-hidden />Feed</Link>
+            <Link to={`/videos${eventQuery}`} aria-current={videoOnly ? "page" : undefined} className="inline-flex items-center transition-colors"><CirclePlay className="h-4 w-4" aria-hidden />Videos</Link>
+            <Link to={`/projects${eventQuery}`} className="inline-flex items-center transition-colors"><LayoutGrid className="h-4 w-4" aria-hidden />Gallery</Link>
           </nav>
         </header>
 
@@ -187,9 +199,8 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
 
             <div className="my-4 flex items-center justify-between px-1"><p role="status" className="text-xs text-muted-foreground">{loading ? "Loading previews…" : `${filtered.length} ${videoOnly ? "video" : "project"}${filtered.length === 1 ? "" : "s"}${eventFilter !== "all" || query || (!videoOnly && mediaFilter !== "all") ? ` of ${baseSubmissions.length}` : ""}`}</p><span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><ArrowDown className="h-3 w-3" aria-hidden />Scroll to discover</span></div>
 
-            {loading ? <div aria-busy="true" className="space-y-5">{[0, 1].map((index) => <div key={index} className="overflow-hidden rounded-2xl border border-border bg-card/60"><div className="flex items-center gap-3 p-5"><div className="h-10 w-10 rounded-xl bg-muted motion-safe:animate-pulse" /><div className="space-y-2"><div className="h-3 w-32 rounded bg-muted motion-safe:animate-pulse" /><div className="h-2 w-20 rounded bg-muted motion-safe:animate-pulse" /></div></div><div className="aspect-video bg-muted/70 motion-safe:animate-pulse" /><div className="space-y-3 p-5"><div className="h-4 w-2/3 rounded bg-muted motion-safe:animate-pulse" /><div className="h-3 w-full rounded bg-muted motion-safe:animate-pulse" /></div></div>)}<span className="sr-only">Loading project feed</span></div> : loadError ? (
-              <div role="alert" className="rounded-2xl border border-destructive/25 bg-card/70 px-6 py-14 text-center"><RefreshCw className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden /><h2 className="mt-4 font-display text-xl font-semibold">We couldn’t load the feed</h2><p className="mt-2 text-sm text-muted-foreground">Please try again in a moment.</p><Button className="mt-5 gap-2" onClick={() => setRefreshKey((value) => value + 1)}><RefreshCw className="h-4 w-4" aria-hidden />Try again</Button></div>
-            ) : filtered.length === 0 ? (
+            {loadError ? <div role="alert" className="mb-5 rounded-xl border border-destructive/25 bg-card/70 p-5"><p className="text-sm text-muted-foreground">Some projects couldn’t be loaded. Showing available previews.</p><Button variant="outline" className="mt-3 gap-2" onClick={() => setRefreshKey((value) => value + 1)}><RefreshCw className="h-4 w-4" aria-hidden />Try again</Button></div> : null}
+            {loading && submissions.length === 0 ? <div aria-busy="true" className="space-y-5">{[0, 1].map((index) => <div key={index} className="overflow-hidden rounded-2xl border border-border bg-card/60"><div className="flex items-center gap-3 p-5"><div className="h-10 w-10 rounded-xl bg-muted motion-safe:animate-pulse" /><div className="space-y-2"><div className="h-3 w-32 rounded bg-muted motion-safe:animate-pulse" /><div className="h-2 w-20 rounded bg-muted motion-safe:animate-pulse" /></div></div><div className="aspect-video bg-muted/70 motion-safe:animate-pulse" /><div className="space-y-3 p-5"><div className="h-4 w-2/3 rounded bg-muted motion-safe:animate-pulse" /><div className="h-3 w-full rounded bg-muted motion-safe:animate-pulse" /></div></div>)}<span className="sr-only">Loading project feed</span></div> : filtered.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border bg-card/60 px-6 py-16 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">{videoOnly ? <Film className="h-6 w-6 text-primary" aria-hidden /> : <FolderKanban className="h-6 w-6 text-primary" aria-hidden />}</span><h2 className="mt-5 font-display text-xl font-semibold">{emptyEvent ? (videoOnly ? "No video demos from this event yet" : "No projects from this event yet") : baseSubmissions.length === 0 ? videoOnly ? "The next demo starts here" : "The next big idea starts here" : videoOnly ? "No matching video demos" : "No matching projects"}</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{emptyEvent ? "Projects will appear here when builders publish their work. You can still explore the event." : baseSubmissions.length === 0 ? videoOnly ? "Videos appear when builders share their project demos publicly. Come back to see what they’re making." : "Projects appear here when builders choose to share them publicly. Come back to discover their work." : "Try another event, search term, or preview filter."}</p>{emptyEvent ? <div className="mt-5"><EventLink event={emptyEvent} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">View event <ArrowUpRight className="h-4 w-4" aria-hidden /></EventLink></div> : null}{baseSubmissions.length ? <Button variant="outline" className="mt-5" onClick={clearFilters}>Clear filters</Button> : <Button asChild className="mt-5"><Link to="/hackathons">Explore events <ArrowUpRight className="ml-2 h-4 w-4" aria-hidden /></Link></Button>}</div>
             ) : <div className="space-y-5">
               {filtered.map((submission) => {
@@ -201,11 +212,17 @@ export default function ProjectFeedPage({ videoOnly = false }: { videoOnly?: boo
                 const imageUrl = submission.cover_url || submission.gallery_urls?.[0];
                 return <article key={submission.id} aria-label={`${projectTitle} by ${team}`} className="overflow-hidden rounded-2xl border border-border bg-card/85 shadow-[var(--surface-elevated)] backdrop-blur">
                   <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-5"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 font-display text-xs font-semibold text-primary" aria-hidden>{initialFor(team)}</span><div className="min-w-0"><p className="truncate text-sm font-semibold">{team}</p><div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground"><EventLink event={event} className="hover:text-primary">{event.shortName}</EventLink>{date ? <><span aria-hidden>·</span><time dateTime={submission.created_at || undefined}>{date}</time></> : null}</div></div></div><Badge variant="outline" className="shrink-0 border-primary/25 bg-primary/5 text-[10px] text-primary">{hasVideo(submission) ? "Video demo" : "Project"}</Badge></div>
-                  <ProjectFeedMedia title={projectTitle} videoUrl={submission.demo_video_url} imageUrl={imageUrl} autoplayEnabled={autoplayEnabled && !stars.emailPrompt} reducedMotion={reducedMotion} />
-                  <div className="px-4 py-5 sm:px-5"><div className="flex items-start justify-between gap-3"><Link to={buildProjectPermalink(submission.id, "")} className="font-display text-xl font-semibold tracking-tight transition-colors hover:text-primary sm:text-2xl">{projectTitle}</Link><ProjectShareMenu projectId={submission.id} title={projectTitle} teamName={team} description={submission.short_description} imageUrl={imageUrl} demoVideoUrl={submission.demo_video_url} eventName={event.shortName} onShare={() => shares.recordShare(submission.id)} /></div>{submission.short_description?.trim() ? <FeedDescription text={submission.short_description.trim()} /> : null}
+                  {submission.showcase?.previewStatus === "unavailable" ? <div className="flex aspect-video flex-col items-center justify-center gap-3 bg-muted/40 px-6 text-center"><Film className="h-8 w-8 text-muted-foreground" aria-hidden /><p className="font-semibold">Preview unavailable</p><p className="max-w-md text-sm text-muted-foreground">{submission.showcase.previewNote || "Open the original link to view this project."}</p></div> : <ProjectFeedMedia title={projectTitle} videoUrl={submission.demo_video_url} imageUrl={imageUrl} autoplayEnabled={autoplayEnabled && !stars.emailPrompt} reducedMotion={reducedMotion} />}
+                  <div className="px-4 py-5 sm:px-5"><div className="flex items-start justify-between gap-3"><Link to={`${buildProjectPermalink(submission.id, "")}${eventQuery}`} className="font-display text-xl font-semibold tracking-tight transition-colors hover:text-primary sm:text-2xl">{projectTitle}</Link><ProjectShareMenu projectId={submission.id} title={projectTitle} teamName={team} description={submission.short_description} imageUrl={imageUrl} demoVideoUrl={submission.demo_video_url} eventName={event.shortName} onShare={submission.showcase ? undefined : () => shares.recordShare(submission.id)} allowRating={!submission.showcase} /></div>{submission.short_description?.trim() ? <FeedDescription text={submission.short_description.trim()} /> : null}
+                    {submission.showcase && formatTeamMemberNames(submission) ? <p className="mt-3 whitespace-pre-line text-xs text-muted-foreground"><span className="font-semibold text-foreground">Participants: </span>{formatTeamMemberNames(submission)}</p> : null}
+                    {submission.showcase?.toolsUsed ? <p className="mt-2 text-xs text-muted-foreground"><span className="font-semibold text-foreground">Tools used: </span>{submission.showcase.toolsUsed}</p> : null}
                     <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2"><span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Users className="h-3.5 w-3.5 text-primary" aria-hidden />{builders} {builders === 1 ? "builder" : "builders"}</span><EventLink event={event} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary"><CalendarDays className="h-3.5 w-3.5 text-primary" aria-hidden />{event.name}</EventLink></div>
                     <ProjectPublicLinks links={listPublicProjectLinks(submission)} className="mt-4" />
-                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><div className="flex flex-wrap items-center gap-3"><ProjectStarRating fill={stars.communityFill(submission.id)} myRating={stars.myRatingById[submission.id] ?? 0} disabled={stars.pendingId === submission.id || (stars.myRatingById[submission.id] ?? 0) > 0} onRate={(value) => void stars.rate(submission.id, value)} /><ProjectEngagementStats starCount={stars.statsById[submission.id]?.count ?? 0} shareCount={shares.shareCount(submission.id)} /></div><Link to={buildProjectPermalink(submission.id, "")} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">Explore project <ArrowUpRight className="h-3.5 w-3.5" aria-hidden /></Link></div>
+                    {submission.showcase?.additionalLinks.map(link => {
+                      const href = projectFeedHttpUrl(link.url);
+                      return href ? <div key={href} className="mt-3 text-sm"><a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline">{link.label} <ArrowUpRight className="inline h-3.5 w-3.5" /> <span className="text-xs">{href}</span></a>{link.note ? <p className="mt-1 text-xs text-muted-foreground">{link.note}</p> : null}</div> : null;
+                    })}
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">{!submission.showcase ? <div className="flex flex-wrap items-center gap-3"><ProjectStarRating fill={stars.communityFill(submission.id)} myRating={stars.myRatingById[submission.id] ?? 0} disabled={stars.pendingId === submission.id || (stars.myRatingById[submission.id] ?? 0) > 0} onRate={(value) => void stars.rate(submission.id, value)} /><ProjectEngagementStats starCount={stars.statsById[submission.id]?.count ?? 0} shareCount={shares.shareCount(submission.id)} /></div> : null}<Link to={`${buildProjectPermalink(submission.id, "")}${eventQuery}`} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">Explore project <ArrowUpRight className="h-3.5 w-3.5" aria-hidden /></Link></div>
                   </div>
                 </article>;
               })}

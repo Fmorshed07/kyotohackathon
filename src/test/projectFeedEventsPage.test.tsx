@@ -14,6 +14,8 @@ vi.mock("firebase/firestore", async original => ({
 }));
 vi.mock("@/lib/firebaseClient", () => ({ getFirestoreDb: () => backend.db }));
 vi.mock("@/lib/aiHackathons", () => ({ fetchPublishedHackathons: backend.publishedEvents }));
+// Keep these ordering fixtures independent of the bundled showcase inventory.
+vi.mock("@/lib/publicShowcaseProjects", () => ({ mergePublicShowcaseProjects: (projects: unknown[]) => projects }));
 vi.mock("@/components/AnimatedBackground", () => ({ default: () => null }));
 vi.mock("@/components/SiteHeader", () => ({ default: () => null }));
 vi.mock("@/components/projects/ProjectFeedMedia", () => ({ ProjectFeedMedia: () => null }));

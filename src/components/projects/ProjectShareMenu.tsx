@@ -55,6 +55,7 @@ export function ProjectShareMenu({
   demoVideoUrl,
   eventName,
   onShare,
+  allowRating = true,
 }: {
   projectId: string;
   title: string;
@@ -64,6 +65,7 @@ export function ProjectShareMenu({
   demoVideoUrl?: string | null;
   eventName?: string | null;
   onShare?: () => void | Promise<void>;
+  allowRating?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<CopiedValue>(null);
@@ -227,7 +229,9 @@ export function ProjectShareMenu({
             <div className="mt-6 rounded-xl border border-primary/20 bg-primary/[0.06] p-4">
               <p className="inline-flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
                 <Send className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                The shared link opens this project directly in the public gallery. Friends can preview it and give their stars without creating an account.
+                {allowRating
+                  ? "The shared link opens this project directly in the public gallery. Friends can preview it and give their stars without creating an account."
+                  : "The shared link opens this project directly in the public gallery. Friends can explore the project and its original links without creating an account."}
               </p>
             </div>
           </section>

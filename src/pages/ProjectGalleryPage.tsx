@@ -52,6 +52,9 @@ import {
 import { compareStarStats, EMPTY_STAR_STATS } from "@/lib/projectStars";
 import { cn } from "@/lib/utils";
 import { formatSubmissionDateTime } from "@/lib/datetime";
+import { ELEVENLABS_MEETUP } from "@/lib/elevenLabsMeetup";
+import { getProjectFeedVideo, projectFeedEmbedUrl, projectFeedHttpUrl } from "@/lib/projectFeedMedia";
+import { mergePublicShowcaseProjects, type PublicShowcaseSubmission } from "@/lib/publicShowcaseProjects";
 
 type AssetKind = "demo" | "project" | "document";
 type AssetFilter = "all" | AssetKind;
@@ -71,11 +74,11 @@ const documentPreviewUrl = (url: string) => {
   return normalized;
 };
 
-const getPreviewUrl = (submission: Submission, kind: AssetKind) => {
+const getPreviewUrl = (submission: PublicShowcaseSubmission, kind: AssetKind) => {
+  if (submission.showcase?.previewStatus === "unavailable") return "";
   if (kind === "demo") {
-    const url = normalizeHttpUrl(submission.demo_video_url);
-    const videoId = youtubeVideoId(url);
-    return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : url;
+    const video = getProjectFeedVideo(submission.demo_video_url);
+    return video ? projectFeedEmbedUrl(video, { autoplay: false, muted: false }) : projectFeedHttpUrl(submission.demo_video_url);
   }
   if (kind === "document") return documentPreviewUrl(submission.submission_pdf_url ?? "");
   return normalizeHttpUrl(submission.project_url);
@@ -104,11 +107,12 @@ const getEvent = (submission: Submission, eventById: Map<string, GalleryEvent>) 
 
 const initialFor = (value: string) => value.trim().slice(0, 2).toUpperCase() || "AI";
 
-function ProjectVisual({ submission }: { submission: Submission }) {
-  const videoId = youtubeVideoId(submission.demo_video_url);
+function ProjectVisual({ submission }: { submission: PublicShowcaseSubmission }) {
+  const unavailable = submission.showcase?.previewStatus === "unavailable";
+  const videoId = unavailable ? null : youtubeVideoId(submission.demo_video_url);
   const projectImage = normalizeHttpUrl(submission.cover_url) || normalizeHttpUrl(submission.gallery_urls?.[0]);
   const projectTitle = submission.title?.trim() || "Untitled project";
-  const hasDemo = Boolean(videoId || normalizeHttpUrl(submission.demo_video_url));
+  const hasDemo = !unavailable && Boolean(videoId || normalizeHttpUrl(submission.demo_video_url));
 
   return (
     <div className="relative aspect-[16/10] overflow-hidden bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.45),transparent_42%),linear-gradient(135deg,hsl(225_34%_12%),hsl(215_40%_6%))]">
@@ -126,7 +130,7 @@ function ProjectVisual({ submission }: { submission: Submission }) {
       <div className="absolute left-3 top-3 flex items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-md bg-black/70 px-2.5 py-1 font-body text-[11px] font-semibold text-white backdrop-blur">
           {hasDemo ? <Play className="h-3 w-3 fill-current" /> : <FolderKanban className="h-3 w-3" />}
-          {hasDemo ? "Demo" : "Project"}
+          {unavailable ? "Preview unavailable" : hasDemo ? "Demo" : "Project"}
         </span>
       </div>
       <div className="absolute inset-x-4 bottom-4 flex items-end justify-between gap-3">
@@ -153,14 +157,14 @@ function ProjectCard({
   onRate,
   onShare,
 }: {
-  submission: Submission;
+  submission: PublicShowcaseSubmission;
   event: GalleryEvent;
   starFill: number;
   starCount: number;
   shareCount: number;
   myRating: number;
   ratingDisabled: boolean;
-  onPreview: (submission: Submission, kind?: AssetKind) => void;
+  onPreview: (submission: PublicShowcaseSubmission, kind?: AssetKind) => void;
   onRate: (stars: number) => void;
   onShare: () => void | Promise<void>;
 }) {
@@ -199,10 +203,10 @@ function ProjectCard({
           </p>
         ) : null}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {!submission.showcase ? <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <ProjectStarRating fill={starFill} myRating={myRating} disabled={ratingDisabled} onRate={onRate} />
             <ProjectEngagementStats starCount={starCount} shareCount={shareCount} />
-          </div>
+          </div> : null}
           <ProjectShareMenu
             projectId={submission.id}
             title={title}
@@ -211,7 +215,8 @@ function ProjectCard({
             imageUrl={submission.cover_url || submission.gallery_urls?.[0]}
             demoVideoUrl={submission.demo_video_url}
             eventName={event.shortName}
-            onShare={onShare}
+            onShare={submission.showcase ? undefined : onShare}
+            allowRating={!submission.showcase}
           />
         </div>
         <ProjectPublicLinks links={links} className="mt-3" />
@@ -232,32 +237,40 @@ export default function ProjectGalleryPage() {
   const db = getFirestoreDb();
   const { statsById, myRatingById, pendingId, emailPrompt, communityFill, rate, submitStarEmail, cancelStarEmail } = useProjectCommunityStars();
   const { shareCount, recordShare } = useProjectShareCounts();
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [hostedEvents, setHostedEvents] = useState<HostedHackathon[]>([]);
+  const [submissions, setSubmissions] = useState<PublicShowcaseSubmission[]>(() => mergePublicShowcaseProjects([]));
+  const [hostedEvents, setHostedEvents] = useState<HostedHackathon[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [eventFilter, setEventFilter] = useState(() => searchParams.get("event") || "all");
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
   const [sortMode, setSortMode] = useState<GallerySort>("newest");
-  const [previewSubmission, setPreviewSubmission] = useState<Submission | null>(null);
+  const [previewSubmission, setPreviewSubmission] = useState<PublicShowcaseSubmission | null>(null);
   const [previewKind, setPreviewKind] = useState<AssetKind>("demo");
+  const eventQuery = eventFilter === "all" ? "" : `?event=${encodeURIComponent(eventFilter)}`;
 
   useEffect(() => {
     let isCurrent = true;
     setIsLoading(true);
     setLoadError(null);
     void Promise.all([
-      getDocs(collection(db, "public_projects")),
-      fetchPublishedHackathons(db).catch(() => [] as HostedHackathon[]),
+      getDocs(collection(db, "public_projects")).catch(() => null),
+      fetchPublishedHackathons(db).catch(() => null),
     ])
       .then(([snapshot, events]) => {
         if (!isCurrent) return;
-        setSubmissions(
-          snapshot.docs
+        const showBundled = events === null || events.some(event => event.id === ELEVENLABS_MEETUP.id);
+        const visible = (project: PublicShowcaseSubmission) => !project.showcase || showBundled;
+        if (snapshot) setSubmissions(
+          mergePublicShowcaseProjects(snapshot.docs
             .map((item) => toPublicGallerySubmission(item.id, item.data() as Record<string, unknown>))
             .filter((item): item is Submission => item != null),
+          snapshot.docs.filter(item => item.data().public_preview_consent === false).map(item => item.id)).filter(visible),
         );
+        else {
+          setLoadError("Could not load project gallery.");
+          setSubmissions(previous => previous.filter(visible));
+        }
         setHostedEvents(events);
       })
       .catch((error: unknown) => {
@@ -271,7 +284,7 @@ export default function ProjectGalleryPage() {
 
   const eventById = useMemo(() => new Map<string, GalleryEvent>([
     ...PORTAL_HACKATHONS,
-    ...hostedEvents,
+    ...(hostedEvents === null ? [ELEVENLABS_MEETUP] : hostedEvents),
   ].map((event) => [event.id, event])), [hostedEvents]);
 
   const eventOptions = useMemo(() => Array.from(new Set(submissions.map(getSubmissionHackathonId)))
@@ -284,8 +297,15 @@ export default function ProjectGalleryPage() {
       setEventFilter(requestedEvent);
       return;
     }
-    if (searchParams.get("spotlight") !== "ai-ideathon-2026") return;
-    const ideathon = hostedEvents.find(isAiIdeathonEvent);
+    if (searchParams.get("spotlight") !== "ai-ideathon-2026") {
+      setEventFilter("all");
+      return;
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("event") || searchParams.get("spotlight") !== "ai-ideathon-2026") return;
+    const ideathon = hostedEvents?.find(isAiIdeathonEvent);
     if (ideathon) setEventFilter(ideathon.id);
   }, [hostedEvents, searchParams]);
 
@@ -313,30 +333,36 @@ export default function ProjectGalleryPage() {
       });
   }, [assetFilter, eventById, eventFilter, searchQuery, sortMode, statsById, submissions]);
 
-  const openPreview = (submission: Submission, kind?: AssetKind) => {
+  const openPreview = (submission: PublicShowcaseSubmission, kind?: AssetKind) => {
     const available = getAssetKinds(submission);
     if (available.length === 0) return;
     setPreviewSubmission(submission);
     setPreviewKind(kind && available.includes(kind) ? kind : available[0]);
     if (projectIdParam !== submission.id) {
-      navigate(`/projects/${submission.id}`);
+      navigate(`/projects/${submission.id}${eventQuery}`);
     }
   };
 
   useEffect(() => {
-    if (!projectIdParam || isLoading) return;
+    if (!projectIdParam) {
+      setPreviewSubmission(null);
+      return;
+    }
     const match = submissions.find((submission) => submission.id === projectIdParam);
     if (match) {
       const available = getAssetKinds(match);
-      if (available.length === 0) return;
+      if (available.length === 0) {
+        setPreviewSubmission(null);
+        return;
+      }
       setPreviewSubmission(match);
       setPreviewKind((current) => (available.includes(current) ? current : available[0]));
-    }
+    } else setPreviewSubmission(null);
   }, [isLoading, projectIdParam, submissions]);
 
   const closePreview = () => {
     setPreviewSubmission(null);
-    if (projectIdParam) navigate("/projects", { replace: true });
+    if (projectIdParam) navigate(`/projects${eventQuery}`, { replace: true });
   };
 
   const activePreviewUrl = previewSubmission ? getPreviewUrl(previewSubmission, previewKind) : "";
@@ -360,9 +386,9 @@ export default function ProjectGalleryPage() {
               <p className="dash-eyebrow">Public hackathon showcase</p>
               <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Projects & demos</h1>
               <nav aria-label="Project views" className="mt-4 flex flex-wrap gap-2">
-                <Button asChild variant="secondary" size="sm"><Link to="/projects" aria-current="page"><LayoutGrid className="mr-2 h-4 w-4" />Gallery</Link></Button>
-                <Button asChild variant="outline" size="sm"><Link to="/feed"><Sparkles className="mr-2 h-4 w-4" />Feed</Link></Button>
-                <Button asChild variant="outline" size="sm"><Link to="/videos"><Play className="mr-2 h-4 w-4" />Video previews</Link></Button>
+                <Button asChild variant="secondary" size="sm"><Link to={`/projects${eventQuery}`} aria-current="page"><LayoutGrid className="mr-2 h-4 w-4" />Gallery</Link></Button>
+                <Button asChild variant="outline" size="sm"><Link to={`/feed${eventQuery}`}><Sparkles className="mr-2 h-4 w-4" />Feed</Link></Button>
+                <Button asChild variant="outline" size="sm"><Link to={`/videos${eventQuery}`}><Play className="mr-2 h-4 w-4" />Video previews</Link></Button>
               </nav>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
                 Explore projects participants chose to share. Star a project with your email — no account needed. Subscribe for more hackathons, send a link to friends, and open the live demo, repo, or document.
@@ -416,7 +442,8 @@ export default function ProjectGalleryPage() {
             </div>
             <div className="mt-4 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{filteredSubmissions.length} of {submissions.length} projects</p><span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><LayoutGrid className="h-3.5 w-3.5" />Gallery view</span></div>
 
-            {isLoading ? <div className="mt-5 rounded-2xl border border-white/10 bg-card/50 px-5 py-20 text-center text-sm text-muted-foreground">Loading submitted projects...</div> : loadError ? <div className="mt-5 rounded-2xl border border-destructive/30 bg-destructive/10 px-5 py-20 text-center text-sm text-destructive">{loadError}</div> : filteredSubmissions.length === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-card/40 px-5 py-20 text-center"><FolderKanban className="mx-auto h-9 w-9 text-muted-foreground/60" /><h2 className="mt-4 font-display text-xl font-semibold text-foreground">No matching projects yet</h2><p className="mt-2 text-sm text-muted-foreground">Only projects participants chose to share appear here. Try a different search or filter.</p></div> : (
+            {loadError ? <p role="alert" className="mt-5 rounded-xl border border-destructive/30 bg-destructive/10 px-5 py-4 text-sm text-destructive">Some projects couldn’t be loaded. Showing available projects.</p> : null}
+            {isLoading && submissions.length === 0 ? <div className="mt-5 rounded-2xl border border-white/10 bg-card/50 px-5 py-20 text-center text-sm text-muted-foreground">Loading submitted projects...</div> : filteredSubmissions.length === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-card/40 px-5 py-20 text-center"><FolderKanban className="mx-auto h-9 w-9 text-muted-foreground/60" /><h2 className="mt-4 font-display text-xl font-semibold text-foreground">No matching projects yet</h2><p className="mt-2 text-sm text-muted-foreground">Only projects participants chose to share appear here. Try a different search or filter.</p></div> : (
               <div className="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
                 {filteredSubmissions.map((submission) => (
                   <ProjectCard
@@ -451,8 +478,10 @@ export default function ProjectGalleryPage() {
                   {previewSubmission.short_description?.trim() || "Open the submitted asset below."}
                 </DialogDescription>
               </DialogHeader>
+              {formatTeamMemberNames(previewSubmission) || previewSubmission.owner_name ? <p className="mt-4 whitespace-pre-line text-sm text-muted-foreground"><span className="font-semibold text-foreground">Participants: </span>{formatTeamMemberNames(previewSubmission) || previewSubmission.owner_name}</p> : null}
+              {previewSubmission.showcase?.toolsUsed ? <p className="mt-2 text-sm text-muted-foreground"><span className="font-semibold text-foreground">Tools used: </span>{previewSubmission.showcase.toolsUsed}</p> : null}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                {!previewSubmission.showcase ? <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <ProjectStarRating
                     fill={communityFill(previewSubmission.id)}
                     myRating={myRatingById[previewSubmission.id] ?? 0}
@@ -463,7 +492,7 @@ export default function ProjectGalleryPage() {
                     starCount={statsById[previewSubmission.id]?.count ?? 0}
                     shareCount={shareCount(previewSubmission.id)}
                   />
-                </div>
+                </div> : null}
                 <ProjectShareMenu
                   projectId={previewSubmission.id}
                   title={previewTitle}
@@ -472,10 +501,15 @@ export default function ProjectGalleryPage() {
                   imageUrl={previewSubmission.cover_url || previewSubmission.gallery_urls?.[0]}
                   demoVideoUrl={previewSubmission.demo_video_url}
                   eventName={getEvent(previewSubmission, eventById).shortName}
-                  onShare={() => recordShare(previewSubmission.id)}
+                  onShare={previewSubmission.showcase ? undefined : () => recordShare(previewSubmission.id)}
+                  allowRating={!previewSubmission.showcase}
                 />
               </div>
               <ProjectPublicLinks links={previewLinks} className="mt-3" />
+              {previewSubmission.showcase?.additionalLinks.map(link => {
+                const href = projectFeedHttpUrl(link.url);
+                return href ? <div key={href} className="mt-3 text-sm"><a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline">{link.label} <ArrowUpRight className="inline h-3.5 w-3.5" /> <span className="text-xs">{href}</span></a>{link.note ? <p className="mt-1 text-xs text-muted-foreground">{link.note}</p> : null}</div> : null;
+              })}
               <div className="mt-5 flex flex-wrap gap-2">
                 {previewLinks.map((link) => (
                   <button
@@ -492,13 +526,14 @@ export default function ProjectGalleryPage() {
                 ))}
               </div>
               <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-black">
-                <iframe
+                {activePreviewUrl ? <iframe
                   title={`${previewTitle} ${previewKind} preview`}
                   src={activePreviewUrl}
                   className="h-[min(60svh,620px)] w-full bg-black"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
-                />
+                  referrerPolicy="strict-origin-when-cross-origin"
+                /> : <div className="px-5 py-14 text-center"><p className="font-semibold text-foreground">Preview unavailable</p><p className="mt-2 text-sm text-muted-foreground">{previewSubmission.showcase?.previewNote || "Open the original link to view this project."}</p></div>}
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">If a provider blocks embedded previews, open it in a new tab.</p>
