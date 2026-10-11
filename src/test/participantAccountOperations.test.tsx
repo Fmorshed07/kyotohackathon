@@ -1,0 +1,327 @@
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import ParticipantDashboardPage from "@/pages/ParticipantDashboardPage";
+import type { ParticipantDashboardProps } from "@/components/dashboard/ParticipantDashboard";
+import type { PortalHackathon } from "@/lib/hackathons";
+import { formDraftStorageKey, readFormDraft } from "@/lib/formDrafts";
+
+const backend = vi.hoisted(() => ({
+  db: {},
+  sessionUser: { id: "account-a", email: "a@example.com", role: "participant", hackathonId: "event-one" },
+  auth: { currentUser: { uid: "account-a" } as { uid: string } | null },
+  getDoc: vi.fn(),
+  setDoc: vi.fn(),
+  deleteDoc: vi.fn(),
+  assertWritable: vi.fn(),
+  catalog: vi.fn(),
+  joinable: vi.fn(),
+  selectEvent: vi.fn(),
+  queueEmail: vi.fn(),
+  submissions: vi.fn(),
+  newSubmissionIds: 0,
+}));
+
+vi.mock("firebase/firestore", async (original) => ({
+  ...await original<typeof import("firebase/firestore")>(),
+  collection: (_db: unknown, name: string) => ({ path: name }),
+  doc: (source: { path?: string }, name?: string, id?: string) => {
+    if (name) return { id, path: `${name}/${id}` };
+    backend.newSubmissionIds += 1;
+    const generatedId = backend.newSubmissionIds === 1 ? "new-project" : `new-project-${backend.newSubmissionIds}`;
+    return { id: generatedId, path: `${source.path}/${generatedId}` };
+  },
+  getDoc: backend.getDoc,
+  setDoc: backend.setDoc,
+  deleteDoc: backend.deleteDoc,
+}));
+vi.mock("@/lib/firebaseClient", () => ({
+  getFirestoreDb: () => backend.db,
+  getFirebaseAuth: () => backend.auth,
+}));
+vi.mock("@/hooks/usePortalAuth", () => ({
+  usePortalAuth: () => ({
+    sessionUser: backend.sessionUser,
+    loading: false,
+    signOut: vi.fn(),
+  }),
+}));
+vi.mock("@/hooks/useHackathonSelection", () => ({
+  useHackathonSelection: () => ({ selectedHackathonId: "event-one", setSelectedHackathonId: backend.selectEvent }),
+}));
+vi.mock("@/lib/aiHackathons", () => ({
+  assertSubmissionsWritable: backend.assertWritable,
+  fetchPortalHackathonCatalog: backend.catalog,
+  fetchJoinablePortalHackathons: backend.joinable,
+  subscribeHackathon: () => () => {},
+}));
+vi.mock("@/lib/portalInvites", () => ({
+  listAccessibleSubmissions: backend.submissions,
+  listTeamMembershipsForSubmission: async () => [],
+  loadUserProfiles: async () => ({}),
+}));
+vi.mock("@/lib/profileMedia", () => ({ uploadProfileImage: vi.fn() }));
+vi.mock("@/lib/participantEmail", () => ({ queueParticipantEmail: backend.queueEmail }));
+vi.mock("@/components/dashboard/DashboardLayout", () => ({
+  DashboardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+vi.mock("@/components/dashboard/ParticipantDashboard", () => ({
+  ParticipantDashboard: ({ isLoadingWorkspace, isReadOnly, isSubmittingProject, participantForm, setParticipantForm, submissionMessage, autosaveStatus, onSave, onJoinHackathon }: ParticipantDashboardProps) => (
+    <div>
+      <input aria-label="Project title" value={participantForm.title} onChange={(event) => setParticipantForm((form) => ({ ...form, title: event.target.value }))} />
+      <input type="checkbox" aria-label="Public preview" checked={participantForm.allowPublicPreview} onChange={(event) => setParticipantForm((form) => ({ ...form, allowPublicPreview: event.target.checked }))} />
+      <button disabled={isLoadingWorkspace || isReadOnly || isSubmittingProject} onClick={() => void onSave()}>Save project</button>
+      <button disabled={isLoadingWorkspace} onClick={() => void onJoinHackathon("event-two")}>Join event</button>
+      {submissionMessage ? <p>{submissionMessage}</p> : null}
+      {autosaveStatus ? <p>{autosaveStatus}</p> : null}
+    </div>
+  ),
+}));
+
+const event = (id: string): PortalHackathon => ({
+  id, name: id, shortName: id, eventDate: "", location: "", theme: "", status: "active",
+});
+const snapshot = (id: string, data: Record<string, unknown>) => ({ id, exists: () => true, data: () => data });
+const savedProject = snapshot("new-project", {
+  user_id: "account-a", hackathon_id: "event-one", title: "Account A project", team_name: "Team A",
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  localStorage.clear();
+  backend.auth.currentUser = { uid: "account-a" };
+  backend.sessionUser = { id: "account-a", email: "a@example.com", role: "participant", hackathonId: "event-one" };
+  backend.submissions.mockReset().mockResolvedValue([]);
+  backend.newSubmissionIds = 0;
+  backend.getDoc.mockReset().mockImplementation(async ({ path }: { path: string }) =>
+    path.startsWith("users/")
+      ? snapshot("account-a", { fullName: "Account A", hackathon_id: "event-one" })
+      : path.startsWith("public_projects/") ? { exists: () => false, data: () => undefined } : savedProject,
+  );
+  backend.setDoc.mockReset().mockResolvedValue(undefined);
+  backend.deleteDoc.mockReset().mockResolvedValue(undefined);
+  backend.assertWritable.mockReset().mockResolvedValue(undefined);
+  backend.catalog.mockResolvedValue([event("event-one"), event("event-two")]);
+  backend.joinable.mockResolvedValue([event("event-two")]);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  localStorage.clear();
+  vi.unstubAllGlobals();
+});
+
+async function showDashboard() {
+  const view = render(
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <ParticipantDashboardPage />
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(screen.getByRole("button", { name: "Save project" })).toBeEnabled());
+  return view;
+}
+
+describe("participant operations during account changes", () => {
+  it("reuses the created project when a secondary write fails and the participant retries", async () => {
+    backend.setDoc.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("Enrollment write failed"));
+    await showDashboard();
+    fireEvent.change(screen.getByRole("textbox", { name: "Project title" }), { target: { value: "One project only" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+    expect(await screen.findByText("Enrollment write failed")).toBeInTheDocument();
+    expect(backend.newSubmissionIds).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+
+    expect(await screen.findByText("Submission saved successfully.")).toBeInTheDocument();
+    const projectWrites = backend.setDoc.mock.calls.filter(([reference]) => reference.path.startsWith("submissions/"));
+    expect(projectWrites).toHaveLength(2);
+    expect(backend.newSubmissionIds).toBe(1);
+    expect(projectWrites[1][0].path).toBe(projectWrites[0][0].path);
+    expect(projectWrites[1][1].created_at).toBe(projectWrites[0][1].created_at);
+    expect(projectWrites[1][2]).toEqual({ merge: true });
+  });
+
+  it("reports failed public-preview withdrawal, retains the draft, and lets the participant retry", async () => {
+    const project = { id: "existing-project", user_id: "account-a", hackathon_id: "event-one", title: "Public project", public_preview_consent: true };
+    backend.submissions.mockResolvedValue([project]);
+    backend.getDoc.mockImplementation(async ({ path }: { path: string }) => path.startsWith("users/")
+      ? snapshot("account-a", { fullName: "Account A", hackathon_id: "event-one" })
+      : snapshot("existing-project", { ...project, public_preview_consent: false }));
+    backend.deleteDoc.mockRejectedValueOnce(new Error("Permission denied"));
+    await showDashboard();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Public preview" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+
+    expect(await screen.findByText(/Could not remove the public preview/)).toBeInTheDocument();
+    expect(backend.setDoc).not.toHaveBeenCalled();
+    expect(backend.queueEmail).not.toHaveBeenCalled();
+    const key = formDraftStorageKey(["participant-project", "account-a", "event-one", "existing-project"]);
+    expect(readFormDraft<{ allowPublicPreview: boolean }>(key)?.value.allowPublicPreview).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+
+    expect(await screen.findByText("Submission saved successfully.")).toBeInTheDocument();
+    expect(backend.deleteDoc).toHaveBeenCalledTimes(2);
+    expect(backend.queueEmail).toHaveBeenCalledOnce();
+    expect(readFormDraft(key)).toBeNull();
+  });
+
+  it("disables manual save during autosave and saves newer edits afterward without creating a duplicate", async () => {
+    const pendingWrite = deferred<void>();
+    backend.setDoc.mockReturnValueOnce(pendingWrite.promise);
+    backend.getDoc.mockImplementation(async ({ path }: { path: string }) => {
+      if (path.startsWith("users/")) return snapshot("account-a", { fullName: "Account A", hackathon_id: "event-one" });
+      if (path.startsWith("public_projects/")) return { exists: () => false, data: () => undefined };
+      const savedWrites = backend.setDoc.mock.calls.filter(([reference]) => reference.path.startsWith("submissions/"));
+      const savedWrite = savedWrites[savedWrites.length - 1];
+      return snapshot("new-project", savedWrite?.[1] ?? {});
+    });
+    await showDashboard();
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByRole("textbox", { name: "Project title" }), { target: { value: "First draft" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2600); });
+
+    expect(backend.setDoc).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Save project" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+    expect(backend.setDoc).toHaveBeenCalledOnce();
+    fireEvent.change(screen.getByRole("textbox", { name: "Project title" }), { target: { value: "Newer draft" } });
+    await act(async () => pendingWrite.resolve(undefined));
+    expect(screen.getByRole("textbox", { name: "Project title" })).toHaveValue("Newer draft");
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(2600); });
+
+    const projectWrites = backend.setDoc.mock.calls.filter(([reference]) => reference.path.startsWith("submissions/"));
+    expect(projectWrites).toHaveLength(2);
+    expect(projectWrites[0][1].title).toBe("First draft");
+    expect(projectWrites[1][1].title).toBe("Newer draft");
+    expect(projectWrites[1][0].path).toBe(projectWrites[0][0].path);
+    expect(projectWrites[1][2]).toEqual({ merge: true });
+    expect(backend.queueEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not repeat the same failed autosave until the participant retries", async () => {
+    backend.assertWritable.mockRejectedValueOnce(new Error("Connection interrupted"));
+    await showDashboard();
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByRole("textbox", { name: "Project title" }), { target: { value: "Retained draft" } });
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+
+    expect(backend.assertWritable).toHaveBeenCalledOnce();
+    expect(backend.setDoc).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Save project" })).toBeEnabled();
+    expect(screen.getByText("Connection interrupted")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+    await act(async () => {});
+    expect(backend.assertWritable).toHaveBeenCalledTimes(2);
+    expect(backend.queueEmail).toHaveBeenCalledOnce();
+  });
+
+  it("does not offer an empty writable project after an existing-project lookup fails", async () => {
+    backend.submissions.mockRejectedValueOnce(new Error("Connection interrupted"));
+    render(<MemoryRouter><ParticipantDashboardPage /></MemoryRouter>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load your projects");
+    expect(screen.getByRole("button", { name: "Save project" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+    expect(backend.setDoc).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading projects" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save project" })).toBeEnabled());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the participant's edit when a same-account profile snapshot arrives", async () => {
+    const view = await showDashboard();
+    fireEvent.change(screen.getByRole("textbox", { name: "Project title" }), { target: { value: "Unfinished idea" } });
+    backend.sessionUser = { ...backend.sessionUser, email: "updated@example.com" };
+
+    view.rerender(<MemoryRouter><ParticipantDashboardPage /></MemoryRouter>);
+    await act(async () => {});
+
+    expect(screen.getByRole("textbox", { name: "Project title" })).toHaveValue("Unfinished idea");
+    expect(backend.submissions).toHaveBeenCalledOnce();
+  });
+
+  it("finishes enrollment and sends the saved submission confirmation for the same account", async () => {
+    await showDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Join event" }));
+    await waitFor(() => expect(backend.selectEvent).toHaveBeenCalledWith("event-two"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+    await waitFor(() => expect(backend.queueEmail).toHaveBeenCalledWith(expect.objectContaining({
+      type: "submission_created", title: "Account A project", teamName: "Team A",
+    })));
+  });
+
+  it.each(["account changes", "page unmounts"])("ignores a pending enrollment selection when the %s", async (change) => {
+    const pendingWrite = deferred<void>();
+    backend.setDoc.mockReturnValueOnce(pendingWrite.promise);
+    const view = await showDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Join event" }));
+    expect(backend.setDoc).toHaveBeenCalledTimes(1);
+    backend.selectEvent.mockClear();
+
+    if (change === "account changes") backend.auth.currentUser = { uid: "account-b" };
+    else view.unmount();
+    await act(async () => { pendingWrite.resolve(undefined); });
+
+    expect(backend.selectEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not begin a submission write if accounts change during the permission check", async () => {
+    const pendingCheck = deferred<void>();
+    backend.assertWritable.mockReturnValueOnce(pendingCheck.promise);
+    await showDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+    expect(backend.assertWritable).toHaveBeenCalledOnce();
+
+    backend.auth.currentUser = { uid: "account-b" };
+    await act(async () => { pendingCheck.resolve(undefined); });
+
+    expect(backend.setDoc).not.toHaveBeenCalled();
+    expect(backend.queueEmail).not.toHaveBeenCalled();
+  });
+
+  it("stops follow-up enrollment and public writes if accounts change while the project saves", async () => {
+    const pendingWrite = deferred<void>();
+    backend.setDoc.mockReturnValueOnce(pendingWrite.promise);
+    await showDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+    await waitFor(() => expect(backend.setDoc).toHaveBeenCalledOnce());
+
+    backend.auth.currentUser = { uid: "account-b" };
+    await act(async () => { pendingWrite.resolve(undefined); });
+
+    expect(backend.setDoc).toHaveBeenCalledTimes(1);
+    expect(backend.setDoc.mock.calls[0][0].path).toBe("submissions/new-project");
+    expect(backend.deleteDoc).not.toHaveBeenCalled();
+    expect(backend.queueEmail).not.toHaveBeenCalled();
+  });
+
+  it.each(["account changes", "page unmounts"])("does not send a delayed submission email when the %s", async (change) => {
+    const pendingRead = deferred<typeof savedProject>();
+    backend.getDoc.mockImplementation(({ path }: { path: string }) =>
+      path.startsWith("users/")
+        ? Promise.resolve(snapshot("account-a", { fullName: "Account A", hackathon_id: "event-one" }))
+        : pendingRead.promise,
+    );
+    const view = await showDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+    await waitFor(() => expect(backend.getDoc).toHaveBeenCalledWith(expect.objectContaining({ path: "submissions/new-project" })));
+
+    if (change === "account changes") backend.auth.currentUser = { uid: "account-b" };
+    else view.unmount();
+    await act(async () => { pendingRead.resolve(savedProject); });
+
+    expect(backend.queueEmail).not.toHaveBeenCalled();
+  });
+});

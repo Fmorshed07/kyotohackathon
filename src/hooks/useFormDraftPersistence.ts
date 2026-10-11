@@ -40,21 +40,14 @@ export function useFormDraftPersistence<T>({
   debounceMs = 500,
   baseline = null,
 }: UseFormDraftPersistenceOptions<T>): UseFormDraftPersistenceResult {
-  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
-  const [pendingRestore, setPendingRestore] = useState<{
-    value: unknown;
-    savedAt: string;
-  } | null>(null);
-
-  const valueRef = useRef(value);
-  const baselineRef = useRef(baseline);
-  const enabledRef = useRef(enabled);
-  const keyRef = useRef(storageKey);
-
-  valueRef.current = value;
-  baselineRef.current = baseline;
-  enabledRef.current = enabled;
-  keyRef.current = storageKey;
+  type DraftState = { storageKey: string | null; value: T; baseline: T | null; enabled: boolean };
+  type Restore = { storageKey: string; value: unknown; savedAt: string };
+  const [savedDraft, setSavedDraft] = useState<{ storageKey: string; savedAt: string } | null>(null);
+  const [pendingRestore, setPendingRestore] = useState<Restore | null>(null);
+  const restoreRef = useRef<Restore | null>(null);
+  const committedRef = useRef<DraftState>({ storageKey, value, baseline, enabled });
+  const clearedRef = useRef<{ storageKey: string; value: T; baseline: T | null } | null>(null);
+  const timerRef = useRef<{ storageKey: string; id: number } | null>(null);
 
   const isDirty =
     enabled &&
@@ -62,70 +55,94 @@ export function useFormDraftPersistence<T>({
     baseline != null &&
     draftsDiffer(value, baseline);
 
-  const flushDraft = useCallback(() => {
-    const key = keyRef.current;
-    if (!key || !enabledRef.current) return;
-
-    const current = valueRef.current;
-    const base = baselineRef.current;
+  const persistDraft = useCallback((draft: DraftState) => {
+    const { storageKey: key, value: current, baseline: base } = draft;
+    if (!key || !draft.enabled || restoreRef.current?.storageKey === key) return undefined;
+    // A successful save/discard must not be undone by a timer or cleanup.
+    if (clearedRef.current?.storageKey === key &&
+        !draftsDiffer(current, clearedRef.current.value) &&
+        !draftsDiffer(base, clearedRef.current.baseline)) return null;
     if (base != null && !draftsDiffer(current, base)) {
       clearFormDraft(key);
-      setDraftSavedAt(null);
-      return;
+      return null;
     }
-
-    const savedAt = writeFormDraft(key, current);
-    if (savedAt) setDraftSavedAt(savedAt);
+    return writeFormDraft(key, current);
   }, []);
+
+  const flushDraft = useCallback(() => {
+    const draft = committedRef.current;
+    if (!storageKey || draft.storageKey !== storageKey) return;
+    const savedAt = persistDraft(draft);
+    if (savedAt !== undefined) setSavedDraft(savedAt ? { storageKey, savedAt } : null);
+  }, [storageKey, persistDraft]);
 
   const clearDraft = useCallback(() => {
-    const key = keyRef.current;
-    clearFormDraft(key);
-    setDraftSavedAt(null);
-    setPendingRestore(null);
-  }, []);
+    if (!storageKey) return;
+    clearFormDraft(storageKey);
+    if (timerRef.current?.storageKey === storageKey) {
+      window.clearTimeout(timerRef.current.id);
+      timerRef.current = null;
+    }
+    if (committedRef.current.storageKey === storageKey) {
+      clearedRef.current = { storageKey, value: committedRef.current.value, baseline: committedRef.current.baseline };
+    }
+    if (restoreRef.current?.storageKey === storageKey) restoreRef.current = null;
+    setSavedDraft((current) => current?.storageKey === storageKey ? null : current);
+    setPendingRestore((current) => current?.storageKey === storageKey ? null : current);
+  }, [storageKey]);
 
   const consumePendingRestore = useCallback(() => {
-    setPendingRestore(null);
-  }, []);
+    if (restoreRef.current?.storageKey === storageKey) restoreRef.current = null;
+    setPendingRestore((current) => current?.storageKey === storageKey ? null : current);
+  }, [storageKey]);
 
-  // Load any existing draft when the storage key becomes available / changes.
+  // Resolve restoration before any write can clear or replace the stored draft.
   useEffect(() => {
+    restoreRef.current = null;
     setPendingRestore(null);
-    setDraftSavedAt(null);
+    setSavedDraft(null);
     if (!storageKey || !enabled) return;
 
     const existing = readFormDraft<T>(storageKey);
-    if (!existing) return;
-
-    if (baseline != null && !draftsDiffer(existing.value, baseline)) {
+    if (existing && baseline != null && !draftsDiffer(existing.value, baseline)) {
       clearFormDraft(storageKey);
-      return;
+    } else if (existing) {
+      const restored = { storageKey, value: existing.value, savedAt: existing.savedAt };
+      restoreRef.current = restored;
+      setSavedDraft({ storageKey, savedAt: existing.savedAt });
+      setPendingRestore(restored);
     }
 
-    setDraftSavedAt(existing.savedAt);
-    setPendingRestore({ value: existing.value, savedAt: existing.savedAt });
-    // Only re-read when the key or enabled flag changes — not on every baseline tick.
+    return () => {
+      const previous = committedRef.current;
+      if (previous.storageKey === storageKey) persistDraft(previous);
+    };
+    // Baseline changes must not re-restore old edits after a successful save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey, enabled]);
+  }, [storageKey, enabled, persistDraft]);
+
+  // Commit after the previous scope's cleanup, so it flushes to its own key.
+  useEffect(() => {
+    committedRef.current = { storageKey, value, baseline, enabled };
+  }, [storageKey, value, baseline, enabled]);
 
   // Debounced write while editing.
   useEffect(() => {
-    if (!storageKey || !enabled) return;
+    if (!storageKey || !enabled || restoreRef.current?.storageKey === storageKey) return;
 
     if (baseline != null && !draftsDiffer(value, baseline)) {
       clearFormDraft(storageKey);
-      setDraftSavedAt(null);
+      setSavedDraft(null);
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      const savedAt = writeFormDraft(storageKey, value);
-      if (savedAt) setDraftSavedAt(savedAt);
-    }, debounceMs);
-
-    return () => window.clearTimeout(timer);
-  }, [storageKey, enabled, value, baseline, debounceMs]);
+    const timer = window.setTimeout(flushDraft, debounceMs);
+    timerRef.current = { storageKey, id: timer };
+    return () => {
+      window.clearTimeout(timer);
+      if (timerRef.current?.id === timer) timerRef.current = null;
+    };
+  }, [storageKey, enabled, value, baseline, debounceMs, flushDraft]);
 
   // Flush immediately when the tab hides or the page is unloading.
   useEffect(() => {
@@ -137,19 +154,19 @@ export function useFormDraftPersistence<T>({
     };
 
     window.addEventListener("pagehide", flush);
-    window.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.removeEventListener("pagehide", flush);
-      window.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [storageKey, enabled, flushDraft]);
 
   return {
-    draftSavedAt,
+    draftSavedAt: savedDraft?.storageKey === storageKey ? savedDraft.savedAt : null,
     isDirty,
     clearDraft,
     flushDraft,
-    pendingRestore,
+    pendingRestore: enabled && pendingRestore?.storageKey === storageKey ? pendingRestore : null,
     consumePendingRestore,
   };
 }

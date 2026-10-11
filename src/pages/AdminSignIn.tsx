@@ -51,11 +51,11 @@ export default function AdminSignIn() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || isAuthLoading) return;
     if (sessionUser?.role === "admin") {
       navigate("/dashboard/admin", { replace: true });
     }
-  }, [authLoading, sessionUser, navigate]);
+  }, [authLoading, isAuthLoading, sessionUser, navigate]);
 
   const handleCredentialSignIn = async () => {
     setIsAuthLoading(true);
@@ -86,14 +86,14 @@ export default function AdminSignIn() {
   const handleGoogleSignIn = async () => {
     setIsAuthLoading(true);
     setAuthError(null);
+    let accountId: string | undefined;
     try {
-      if (auth.currentUser) {
-        await firebaseSignOut(auth);
-      }
-
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      accountId = user.uid;
+      if (auth.currentUser?.uid !== user.uid) return;
       if (!user.email) {
         await firebaseSignOut(auth);
         setAuthError("Your Google account does not have an email address.");
@@ -102,8 +102,10 @@ export default function AdminSignIn() {
 
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
+      if (auth.currentUser?.uid !== user.uid) return;
       const existingRole = normalizePortalRole(userSnap.data()?.role);
       const hasAdminGrant = await hasPendingAdminGrant(db, user.email);
+      if (auth.currentUser?.uid !== user.uid) return;
 
       if (existingRole !== "admin" && !hasAdminGrant) {
         await firebaseSignOut(auth);
@@ -119,11 +121,14 @@ export default function AdminSignIn() {
         },
         { merge: true },
       );
+      if (auth.currentUser?.uid !== user.uid) return;
       if (hasAdminGrant) {
         await consumePendingAdminGrant(db, user.email);
       }
+      if (auth.currentUser?.uid !== user.uid) return;
       navigate("/dashboard/admin", { replace: true });
     } catch (error: unknown) {
+      if (accountId && auth.currentUser?.uid !== accountId) return;
       const message =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
@@ -142,7 +147,7 @@ export default function AdminSignIn() {
     );
   }
 
-  if (sessionUser?.role === "admin") {
+  if (!isAuthLoading && sessionUser?.role === "admin") {
     return <Navigate to="/dashboard/admin" replace />;
   }
 

@@ -37,7 +37,7 @@ import {
   subscribeHackathon,
   type HostedHackathon,
 } from "@/lib/aiHackathons";
-import { clearFormDraft, formDraftStorageKey, readFormDraft } from "@/lib/formDrafts";
+import { clearFormDraft, draftsDiffer, formDraftStorageKey, readFormDraft } from "@/lib/formDrafts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { type HackathonStatus, type PortalHackathon, type SubmissionMode, getHackathonSubmissionMode } from "@/lib/hackathons";
 import { buildInviteUrl } from "@/lib/inviteTokens";
@@ -120,8 +120,52 @@ const mapJudge = (id: string, data: Record<string, unknown>): HostEventJudge => 
   created_at: typeof data.created_at === "string" ? data.created_at : "",
 });
 
+const mapEventToForm = (event: HostEvent): HostEventBriefForm => ({
+  name: event.name,
+  tagline: event.tagline,
+  description: event.description,
+  theme: event.theme,
+  format: event.format || "Online",
+  eligibility: event.eligibility || "Open to participants worldwide",
+  teamSize: event.teamSize || "Solo or teams of 1–4",
+  prize: event.prize,
+  rulebookUrl: event.rulebookUrl,
+  registrationUrl: event.registrationUrl,
+  highlightNote: event.highlightNote,
+  focusAreas: event.focusAreas.join(", "),
+  schedule: event.schedule,
+  coverImageUrl: event.coverImageUrl,
+  bannerImageUrl: event.bannerImageUrl,
+  logoUrl: event.logoUrl,
+  galleryUrls: event.galleryUrls,
+  guests: event.guests,
+  organizerName: event.organizerName,
+  accentColor: event.accentColor || "#00A3FF",
+  fontPreset: getEventFontPreset(event.fontPreset),
+  layoutStyle: getEventLayoutStyle(event.layoutStyle),
+  startAt: event.start_at ? toDatetimeLocalValue(event.start_at) : "",
+  endAt: event.end_at ? toDatetimeLocalValue(event.end_at) : "",
+  location: event.location,
+  capacity: String(event.capacity || ""),
+});
+
+const mergeUnchangedEventFields = (
+  current: HostEventBriefForm,
+  baseline: HostEventBriefForm,
+  saved: HostEventBriefForm,
+): HostEventBriefForm => ({
+  ...current,
+  ...Object.fromEntries(Object.entries(saved).filter(([key]) => {
+    const field = key as keyof HostEventBriefForm;
+    return !draftsDiffer(current[field], baseline[field]);
+  })),
+});
+
 export default function HostDashboardPage() {
   const { sessionUser, loading, signOut } = usePortalAuth();
+  const userId = sessionUser?.id;
+  const userRole = sessionUser?.role;
+  const hostApprovalStatus = sessionUser?.hostApprovalStatus;
   const db = getFirestoreDb();
 
   const [events, setEvents] = useState<HostEvent[]>([]);
@@ -141,7 +185,13 @@ export default function HostDashboardPage() {
   const [isCreatingPortalJudgeInvite, setIsCreatingPortalJudgeInvite] = useState(false);
   const [eventFormBaseline, setEventFormBaseline] = useState<HostEventBriefForm>(() => emptyEventForm());
   const [publicListing, setPublicListing] = useState<HostedHackathon | null>(null);
-  const suppressEventFormSyncRef = useRef(false);
+  const syncedEventIdRef = useRef<string | null>(null);
+  const eventFormBaselineRef = useRef(eventFormBaseline);
+  eventFormBaselineRef.current = eventFormBaseline;
+  const editorScopeRef = useRef(0);
+  const editorRef = useRef<{ userId: string | undefined; eventId: string; form: HostEventBriefForm } | null>(null);
+  editorRef.current = { userId, eventId: selectedEventId, form: eventForm };
+  useEffect(() => () => { editorRef.current = null; }, []);
   const pendingLumaDraftRef = useRef<HostEventBriefForm | null>(null);
   const hostAutosaveTimerRef = useRef<number | null>(null);
   const isHostAutosavingRef = useRef(false);
@@ -168,6 +218,7 @@ export default function HostDashboardPage() {
   }, [events, lastEditedEventId]);
 
   const beginNewDraft = () => {
+    editorScopeRef.current += 1;
     if (selectedEventId) setLastEditedEventId(selectedEventId);
     setSelectedEventId("");
     setEventForm(emptyEventForm());
@@ -198,6 +249,7 @@ export default function HostDashboardPage() {
 
   const resumeOngoingEdit = () => {
     if (!ongoingEditEventId) return;
+    editorScopeRef.current += 1;
     setSelectedEventId(ongoingEditEventId);
     setLastEditedEventId(ongoingEditEventId);
     setMessage(null);
@@ -226,6 +278,8 @@ export default function HostDashboardPage() {
   }, [publicListing, selectedEvent?.public_hackathon_id, hostBoardHackathons]);
 
   useEffect(() => {
+    const sameEvent = syncedEventIdRef.current === (selectedEvent?.id ?? "");
+    syncedEventIdRef.current = selectedEvent?.id ?? "";
     if (!selectedEvent) {
       const blank = emptyEventForm();
       setEventForm(pendingLumaDraftRef.current ?? blank);
@@ -234,39 +288,9 @@ export default function HostDashboardPage() {
       setPublicListing(null);
       return;
     }
-    if (suppressEventFormSyncRef.current) {
-      suppressEventFormSyncRef.current = false;
-      return;
-    }
-    const nextForm: HostEventBriefForm = {
-      name: selectedEvent.name,
-      tagline: selectedEvent.tagline,
-      description: selectedEvent.description,
-      theme: selectedEvent.theme,
-      format: selectedEvent.format || "Online",
-      eligibility: selectedEvent.eligibility || "Open to participants worldwide",
-      teamSize: selectedEvent.teamSize || "Solo or teams of 1–4",
-      prize: selectedEvent.prize,
-      rulebookUrl: selectedEvent.rulebookUrl,
-      registrationUrl: selectedEvent.registrationUrl,
-      highlightNote: selectedEvent.highlightNote,
-      focusAreas: selectedEvent.focusAreas.join(", "),
-      schedule: selectedEvent.schedule.length > 0 ? selectedEvent.schedule : [],
-      coverImageUrl: selectedEvent.coverImageUrl,
-      bannerImageUrl: selectedEvent.bannerImageUrl,
-      logoUrl: selectedEvent.logoUrl,
-      galleryUrls: selectedEvent.galleryUrls,
-      guests: selectedEvent.guests,
-      organizerName: selectedEvent.organizerName,
-      accentColor: selectedEvent.accentColor || "#00A3FF",
-      fontPreset: getEventFontPreset(selectedEvent.fontPreset),
-      layoutStyle: getEventLayoutStyle(selectedEvent.layoutStyle),
-      startAt: selectedEvent.start_at ? toDatetimeLocalValue(selectedEvent.start_at) : "",
-      endAt: selectedEvent.end_at ? toDatetimeLocalValue(selectedEvent.end_at) : "",
-      location: selectedEvent.location,
-      capacity: String(selectedEvent.capacity || ""),
-    };
-    setEventForm(nextForm);
+    const nextForm = mapEventToForm(selectedEvent);
+    const previousBaseline = eventFormBaselineRef.current;
+    setEventForm((current) => sameEvent ? mergeUnchangedEventFields(current, previousBaseline, nextForm) : nextForm);
     setEventFormBaseline(nextForm);
   }, [selectedEvent]);
 
@@ -300,24 +324,31 @@ export default function HostDashboardPage() {
 
   useEffect(() => {
     const publicId = selectedEvent?.public_hackathon_id?.trim();
+    setPublicListing(null);
     if (!publicId) {
-      setPublicListing(null);
       return;
     }
-    return subscribeHackathon(
+    let cancelled = false;
+    const unsubscribe = subscribeHackathon(
       db,
       publicId,
-      (listing) => setPublicListing(listing),
-      () => setPublicListing(null),
+      (listing) => { if (!cancelled) setPublicListing(listing); },
+      () => { if (!cancelled) setPublicListing(null); },
     );
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [db, selectedEvent?.public_hackathon_id]);
 
   useEffect(() => {
-    if (!sessionUser) return;
-    const isAdmin = sessionUser.role === "admin";
+    if (!userId) return;
+    const isAdmin = userRole === "admin";
     const isApprovedHost =
-      sessionUser.role === "host" && sessionUser.hostApprovalStatus === "approved";
+      userRole === "host" && hostApprovalStatus === "approved";
     if (!isAdmin && !isApprovedHost) return;
+    let cancelled = false;
+    const startingScope = editorScopeRef.current;
 
     const load = async () => {
       setIsBusy(true);
@@ -331,11 +362,12 @@ export default function HostDashboardPage() {
                 getDocs(collection(db, "host_judges")),
               ]
             : [
-                getDocs(query(collection(db, "host_events"), where("owner_id", "==", sessionUser.id))),
-                getDocs(query(collection(db, "host_tickets"), where("host_id", "==", sessionUser.id))),
-                getDocs(query(collection(db, "host_judges"), where("host_id", "==", sessionUser.id))),
+                getDocs(query(collection(db, "host_events"), where("owner_id", "==", userId))),
+                getDocs(query(collection(db, "host_tickets"), where("host_id", "==", userId))),
+                getDocs(query(collection(db, "host_judges"), where("host_id", "==", userId))),
               ],
         );
+        if (cancelled) return;
 
         const nextEvents = eventsSnap.docs.map((item) =>
           mapHostEventFromFirestore(item.id, item.data() as Record<string, unknown>),
@@ -347,19 +379,23 @@ export default function HostDashboardPage() {
         setJudges(
           judgesSnap.docs.map((item) => mapJudge(item.id, item.data() as Record<string, unknown>)),
         );
-        setSelectedEventId((current) => current || nextEvents[0]?.id || "");
+        if (editorScopeRef.current === startingScope) {
+          setSelectedEventId((current) => current || nextEvents[0]?.id || "");
+        }
         setLastEditedEventId((current) => current || nextEvents[0]?.id || "");
       } catch (error) {
+        if (cancelled) return;
         setMessage(
           error instanceof Error ? error.message : "Unable to load host dashboard data.",
         );
       } finally {
-        setIsBusy(false);
+        if (!cancelled) setIsBusy(false);
       }
     };
 
     void load();
-  }, [db, sessionUser]);
+    return () => { cancelled = true; };
+  }, [db, userId, userRole, hostApprovalStatus]);
 
   // Autosave existing host event briefs after a short idle.
   // Must stay above early returns to keep hook order stable.
@@ -473,7 +509,33 @@ export default function HostDashboardPage() {
     };
   };
 
+  const isCurrentHost = () => editorRef.current?.userId === sessionUser.id;
+  const isCurrentEditor = (scope: number) =>
+    isCurrentHost() && editorScopeRef.current === scope && editorRef.current?.eventId === selectedEventId;
+
+  const completeEventSave = (
+    nextEvent: HostEvent,
+    scope: number,
+    successMessage: string,
+    publicEvent?: HostedHackathon,
+  ) => {
+    if (!isCurrentHost()) return;
+    setEvents((prev) => prev.map((event) => event.id === nextEvent.id ? nextEvent : event));
+    if (!isCurrentEditor(scope)) {
+      // Only discard the old event's draft if it still matches the submitted snapshot.
+      const stored = readFormDraft<HostEventBriefForm>(hostEventDraftKey);
+      if (stored && !draftsDiffer(stored.value, eventForm)) clearHostEventDraft();
+      return;
+    }
+    const hasNewerEdits = draftsDiffer(editorRef.current!.form, eventForm);
+    setEventFormBaseline(eventForm);
+    if (!hasNewerEdits) clearHostEventDraft();
+    if (publicEvent) setPublicListing(publicEvent);
+    setMessage(hasNewerEdits ? `${successMessage} Your newer edits still need to be saved.` : successMessage);
+  };
+
   const createEvent = async () => {
+    const scope = editorScopeRef.current;
     setIsBusy(true);
     setMessage(null);
     setPublicListing(null);
@@ -489,22 +551,28 @@ export default function HostDashboardPage() {
         updated_at: now,
       };
       const ref = await addDoc(collection(db, "host_events"), payload);
+      if (!isCurrentHost()) return;
       const created = mapHostEventFromFirestore(ref.id, payload);
-      suppressEventFormSyncRef.current = true;
       setEvents((prev) => [created, ...prev]);
+      if (!isCurrentEditor(scope)) return;
+      const hasNewerEdits = draftsDiffer(editorRef.current!.form, eventForm);
+      // The new record owns this editor now; preserve edits made while it was created.
+      syncedEventIdRef.current = ref.id;
       setSelectedEventId(ref.id);
       setEventFormBaseline(eventForm);
-      clearHostEventDraft();
+      if (!hasNewerEdits) clearHostEventDraft();
       setMessage("Event draft created. Publish it when you are ready for it to appear on /hackathons.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to create event.");
+      if (isCurrentEditor(scope)) setMessage(error instanceof Error ? error.message : "Unable to create event.");
     } finally {
-      setIsBusy(false);
+      if (isCurrentHost()) setIsBusy(false);
     }
   };
 
   const saveSelectedEvent = async (options?: { quiet?: boolean }) => {
     if (!selectedEvent) return;
+    if (!options?.quiet && isHostAutosavingRef.current) return;
+    const scope = editorScopeRef.current;
 
     if (!options?.quiet) {
       setIsBusy(true);
@@ -515,42 +583,39 @@ export default function HostDashboardPage() {
       const updatedAt = new Date().toISOString();
       const patch = { ...fields, updated_at: updatedAt };
       await updateDoc(doc(db, "host_events", selectedEvent.id), patch);
+      if (!isCurrentHost()) return;
       let nextEvent: HostEvent = { ...selectedEvent, ...patch };
+      let publicEvent: HostedHackathon | undefined;
 
       // Keep the public listing in sync when the event is already live.
       if (selectedEvent.status === "published" && !options?.quiet) {
-        const publicEvent = await publishHostEventPublicly(db, nextEvent, sessionUser.id);
+        publicEvent = await publishHostEventPublicly(db, nextEvent, sessionUser.id);
         nextEvent = {
           ...nextEvent,
           public_hackathon_id: publicEvent.id,
           status: "published",
         };
-        setPublicListing(publicEvent);
-        setMessage("Event details saved and public page updated.");
-      } else if (!options?.quiet) {
-        setMessage("Event details saved.");
-      } else {
-        setMessage("Event draft autosaved.");
       }
 
-      suppressEventFormSyncRef.current = true;
-      setEvents((prev) =>
-        prev.map((event) => (event.id === selectedEvent.id ? nextEvent : event)),
+      completeEventSave(
+        nextEvent,
+        scope,
+        publicEvent ? "Event details saved and public page updated." : options?.quiet ? "Event draft autosaved." : "Event details saved.",
+        publicEvent,
       );
-      setEventFormBaseline(eventForm);
-      clearHostEventDraft();
     } catch (error) {
-      if (!options?.quiet) {
+      if (!options?.quiet && isCurrentEditor(scope)) {
         setMessage(error instanceof Error ? error.message : "Unable to save event details.");
       }
     } finally {
-      if (!options?.quiet) setIsBusy(false);
+      if (!options?.quiet && isCurrentHost()) setIsBusy(false);
     }
   };
   saveSelectedEventRef.current = saveSelectedEvent;
 
   const publishEvent = async () => {
-    if (!selectedEvent) return;
+    if (!selectedEvent || isHostAutosavingRef.current) return;
+    const scope = editorScopeRef.current;
     setIsBusy(true);
     setMessage(null);
     try {
@@ -560,6 +625,7 @@ export default function HostDashboardPage() {
         ...fields,
         updated_at: updatedAt,
       });
+      if (!isCurrentHost()) return;
 
       const eventForPublish: HostEvent = {
         ...selectedEvent,
@@ -568,30 +634,25 @@ export default function HostDashboardPage() {
       };
       const publicEvent = await publishHostEventPublicly(db, eventForPublish, sessionUser.id);
 
-      setEvents((prev) =>
-        prev.map((event) =>
-          event.id === selectedEvent.id
-            ? {
-                ...eventForPublish,
-                status: "published",
-                public_hackathon_id: publicEvent.id,
-                updated_at: new Date().toISOString(),
-              }
-            : event,
-        ),
-      );
-      setPublicListing(publicEvent);
-      setMessage(
+      completeEventSave(
+        {
+          ...eventForPublish,
+          status: "published",
+          public_hackathon_id: publicEvent.id,
+          updated_at: new Date().toISOString(),
+        },
+        scope,
         publicEvent.status === "past"
           ? "Past event is published again on the public directory."
           : publicEvent.status === "active"
             ? "Event is live on the public directory."
             : "Event is published on the public directory.",
+        publicEvent,
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to publish event.");
+      if (isCurrentEditor(scope)) setMessage(error instanceof Error ? error.message : "Unable to publish event.");
     } finally {
-      setIsBusy(false);
+      if (isCurrentHost()) setIsBusy(false);
     }
   };
 
@@ -1101,6 +1162,7 @@ export default function HostDashboardPage() {
                 beginNewDraft();
                 return;
               }
+              editorScopeRef.current += 1;
               setSelectedEventId(eventId);
               setLastEditedEventId(eventId);
             }}

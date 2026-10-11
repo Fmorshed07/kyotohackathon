@@ -128,6 +128,7 @@ export function PeopleProfileSection({
   const profileCompleteness = getPeopleProfileCompleteness(form);
   const displayName = form.fullName.trim() || "Your name";
   const displayRole = form.headline.trim() || form.publicRole.trim() || "Add a short headline";
+  const isBusy = isSaving || isUploadingAvatar || isUploadingCover || isUploadingGallery;
 
   if (isLoading) {
     return (
@@ -174,7 +175,7 @@ export function PeopleProfileSection({
               variant="outline"
               size="sm"
               className="h-8 gap-1.5 bg-background/80 backdrop-blur"
-              disabled={isUploadingCover}
+              disabled={isBusy}
               onClick={() => coverInputRef.current?.click()}
             >
               <ImagePlus className="h-3.5 w-3.5" />
@@ -186,7 +187,8 @@ export function PeopleProfileSection({
                 variant="ghost"
                 size="sm"
                 className="h-8 gap-1.5 bg-background/70 text-muted-foreground hover:text-destructive"
-                disabled={isUploadingCover}
+                disabled={isBusy}
+                aria-label="Remove banner"
                 onClick={() => void onRemoveCover()}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -196,6 +198,8 @@ export function PeopleProfileSection({
           </div>
           <input
             ref={coverInputRef}
+            aria-label="Choose banner"
+            disabled={isBusy}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
             className="hidden"
@@ -224,7 +228,7 @@ export function PeopleProfileSection({
               <button
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
-                disabled={isUploadingAvatar}
+                disabled={isBusy}
                 className="absolute -bottom-2 -right-2 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary/40 bg-background text-primary shadow-md transition hover:bg-primary/10 disabled:opacity-60"
                 aria-label="Upload profile photo"
               >
@@ -236,6 +240,8 @@ export function PeopleProfileSection({
               </button>
               <input
                 ref={avatarInputRef}
+                aria-label="Choose profile photo"
+                disabled={isBusy}
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 className="hidden"
@@ -257,7 +263,7 @@ export function PeopleProfileSection({
                   variant="outline"
                   size="sm"
                   onClick={() => avatarInputRef.current?.click()}
-                  disabled={isUploadingAvatar}
+                  disabled={isBusy}
                   className="h-8 gap-1.5"
                 >
                   <ImagePlus className="h-3.5 w-3.5" />
@@ -269,7 +275,8 @@ export function PeopleProfileSection({
                     variant="ghost"
                     size="sm"
                     onClick={() => void onRemoveAvatar()}
-                    disabled={isUploadingAvatar}
+                    aria-label="Remove profile photo"
+                    disabled={isBusy}
                     className="h-8 gap-1.5 text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -327,7 +334,7 @@ export function PeopleProfileSection({
             variant="secondary"
             size="sm"
             className="gap-1.5"
-            disabled={isUploadingGallery || form.galleryUrls.length >= 12}
+            disabled={isBusy || form.galleryUrls.length >= 12}
             onClick={() => galleryInputRef.current?.click()}
           >
             <ImagePlus className="h-3.5 w-3.5" />
@@ -335,6 +342,8 @@ export function PeopleProfileSection({
           </Button>
           <input
             ref={galleryInputRef}
+            aria-label="Choose gallery photos"
+            disabled={isBusy}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
             multiple
@@ -362,7 +371,7 @@ export function PeopleProfileSection({
                   type="button"
                   className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/20 bg-black/70 text-white opacity-0 transition group-hover:opacity-100"
                   onClick={() => void onRemoveGalleryImage(url)}
-                  disabled={isUploadingGallery}
+                  disabled={isBusy}
                   aria-label="Remove gallery photo"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -479,15 +488,25 @@ export function PeopleProfileSection({
               <label className="dash-field-label">GitHub username</label>
               <Input
                 value={form.githubUsername}
-                onChange={(e) => setForm((prev) => ({ ...prev, githubUsername: e.target.value }))}
+                onChange={(e) => {
+                  const githubUsername = e.target.value;
+                  setForm((prev) => ({
+                    ...prev,
+                    githubUsername,
+                    githubProfileUrl: getGithubProfileUrl(githubUsername, ""),
+                  }));
+                }}
                 placeholder="octocat"
               />
             </div>
             <div className="space-y-2">
               <label className="dash-field-label">GitHub profile URL</label>
               <Input
-                value={githubProfileUrl}
-                onChange={(e) => setForm((prev) => ({ ...prev, githubProfileUrl: e.target.value }))}
+                value={form.githubProfileUrl}
+                onChange={(e) => {
+                  const githubProfileUrl = e.target.value;
+                  setForm((prev) => ({ ...prev, githubProfileUrl, githubUsername: "" }));
+                }}
                 placeholder="https://github.com/username"
               />
             </div>
@@ -567,7 +586,7 @@ export function PeopleProfileSection({
           {saveMessage ? <p className="dash-message">{saveMessage}</p> : null}
           <Button
             onClick={() => void onSave()}
-            disabled={isSaving}
+            disabled={isBusy}
             size="lg"
             className="w-full uppercase tracking-[0.12em] sm:w-auto sm:tracking-[0.18em]"
           >

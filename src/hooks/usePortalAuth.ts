@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
@@ -39,57 +39,66 @@ const normalizeJudgeApprovalStatus = (value: unknown): JudgeApprovalStatus | und
   return undefined;
 };
 
-const readAdminOverrideSession = (): SessionUser | null => {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(ADMIN_OVERRIDE_STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as SessionUser;
-    if (parsed?.role === "admin") {
-      return parsed;
-    }
-  } catch {
-    // ignore malformed local storage payload
-  }
-  return null;
+type PortalAuthSnapshot = {
+  sessionUser: SessionUser | null;
+  loading: boolean;
 };
 
-export function usePortalAuth() {
-  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
-  const [loading, setLoading] = useState(true);
+const initialSnapshot: PortalAuthSnapshot = {
+  sessionUser: null,
+  loading: true,
+};
 
-  useEffect(() => {
-    const auth = getFirebaseAuth();
-    let unsubscribeRoleDoc: (() => void) | undefined;
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setLoading(true);
+let snapshot = initialSnapshot;
+const listeners = new Set<() => void>();
+let unsubscribeAuth: (() => void) | undefined;
+let unsubscribeRoleDoc: (() => void) | undefined;
+let authGeneration = 0;
+let authSubscription: object | undefined;
 
-      if (unsubscribeRoleDoc) {
-        unsubscribeRoleDoc();
-        unsubscribeRoleDoc = undefined;
-      }
+function updateSnapshot(update: Partial<PortalAuthSnapshot>) {
+  snapshot = { ...snapshot, ...update };
+  listeners.forEach((listener) => listener());
+}
 
-      if (!user) {
-        const adminOverride = readAdminOverrideSession();
-        setSessionUser(adminOverride);
-        setLoading(false);
-        return;
-      }
+function startAuthSubscription() {
+  const auth = getFirebaseAuth();
+  const subscription = {};
+  authSubscription = subscription;
+  unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+    if (authSubscription !== subscription) return;
+    const generation = ++authGeneration;
 
-      const db = getFirestoreDb();
-      const userRef = doc(db, "users", user.uid);
-      unsubscribeRoleDoc = onSnapshot(
-        userRef,
-        (userSnap) => {
-          const data = userSnap.data() ?? {};
-          const role = normalizePortalRole(data.role);
-          const judgeApprovalStatus = normalizeJudgeApprovalStatus(data.judgeApprovalStatus);
-          const hostApprovalStatus = normalizeHostApprovalStatus(data.hostApprovalStatus);
-          const hackathonIds = getUserAllowedHackathonIds({
-            hackathon_id: data.hackathon_id,
-            hackathon_ids: data.hackathon_ids,
-          });
-          setSessionUser({
+    if (unsubscribeRoleDoc) {
+      unsubscribeRoleDoc();
+      unsubscribeRoleDoc = undefined;
+    }
+
+    if (!user) {
+      // Portal access always follows Firebase auth; legacy local overrides must
+      // not restore a signed-out account or grant a role without authentication.
+      updateSnapshot({ sessionUser: null, loading: false });
+      return;
+    }
+
+    // Never expose the previous account while the next account's profile loads.
+    updateSnapshot({ sessionUser: null, loading: true });
+    const db = getFirestoreDb();
+    const userRef = doc(db, "users", user.uid);
+    unsubscribeRoleDoc = onSnapshot(
+      userRef,
+      (userSnap) => {
+        if (generation !== authGeneration || auth.currentUser?.uid !== user.uid) return;
+        const data = userSnap.data() ?? {};
+        const role = normalizePortalRole(data.role);
+        const judgeApprovalStatus = normalizeJudgeApprovalStatus(data.judgeApprovalStatus);
+        const hostApprovalStatus = normalizeHostApprovalStatus(data.hostApprovalStatus);
+        const hackathonIds = getUserAllowedHackathonIds({
+          hackathon_id: data.hackathon_id,
+          hackathon_ids: data.hackathon_ids,
+        });
+        updateSnapshot({
+          sessionUser: {
             id: user.uid,
             email:
               typeof data.email === "string" && data.email.trim()
@@ -110,36 +119,67 @@ export function usePortalAuth() {
               profileUpdatedAt:
                 typeof data.profileUpdatedAt === "string" ? data.profileUpdatedAt : null,
             },
-          });
-          setLoading(false);
-        },
-        () => {
-          setSessionUser({
+          },
+          loading: false,
+        });
+      },
+      () => {
+        if (generation !== authGeneration || auth.currentUser?.uid !== user.uid) return;
+        updateSnapshot({
+          sessionUser: {
             id: user.uid,
             email: user.email ?? "",
             role: undefined,
-          });
-          setLoading(false);
-        },
-      );
+          },
+          loading: false,
+        });
+      },
+    );
+  });
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  if (!unsubscribeAuth) startAuthSubscription();
+
+  return () => {
+    listeners.delete(listener);
+    // Route changes and StrictMode can replace all subscribers in one commit.
+    // Reuse the resolved session instead of restarting auth and flashing a loader.
+    queueMicrotask(() => {
+      if (listeners.size) return;
+      authGeneration += 1;
+      authSubscription = undefined;
+      unsubscribeRoleDoc?.();
+      unsubscribeRoleDoc = undefined;
+      unsubscribeAuth?.();
+      unsubscribeAuth = undefined;
+      snapshot = initialSnapshot;
     });
-
-    return () => {
-      if (unsubscribeRoleDoc) {
-        unsubscribeRoleDoc();
-      }
-      unsubscribeAuth();
-    };
-  }, []);
-
-  const signOut = async () => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(ADMIN_OVERRIDE_STORAGE_KEY);
-    }
-    const auth = getFirebaseAuth();
-    await firebaseSignOut(auth);
-    setSessionUser(null);
   };
+}
 
-  return { sessionUser, loading, signOut };
+const signOut = async () => {
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(ADMIN_OVERRIDE_STORAGE_KEY);
+    } catch {
+      // Browser storage restrictions must not prevent Firebase sign-out.
+    }
+  }
+  const auth = getFirebaseAuth();
+  await firebaseSignOut(auth);
+  // Another account may have signed in while this request was completing.
+  if (!auth.currentUser) {
+    updateSnapshot({ sessionUser: null, loading: false });
+  }
+};
+
+const getSnapshot = () => snapshot;
+const getServerSnapshot = () => initialSnapshot;
+
+export function usePortalAuth() {
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  return { ...state, signOut };
 }

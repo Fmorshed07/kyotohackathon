@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -695,6 +696,7 @@ function DashboardLayoutContent({
 }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const { isMobile, setOpenMobile } = useSidebar();
   const isStaffDashboard = role === "judge" || role === "mentor";
   const isParticipantHome = location.pathname === "/dashboard/participant";
@@ -736,9 +738,17 @@ function DashboardLayoutContent({
   };
 
   const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
     closeMobileNav();
-    await onSignOut();
-    navigate("/");
+    try {
+      await onSignOut();
+      navigate("/");
+    } catch {
+      toast.error("Could not sign out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   const handleOpenSettings = () => {
@@ -1125,6 +1135,7 @@ function DashboardLayoutContent({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer gap-2 text-sm text-destructive focus:bg-destructive/15 focus:text-destructive"
+                  disabled={isSigningOut}
                   onSelect={() => {
                     void handleSignOut();
                   }}
@@ -1210,6 +1221,7 @@ function DashboardLayoutContent({
                   type="button"
                   variant="outline"
                   className="min-h-11 gap-2"
+                  disabled={isSigningOut}
                   onClick={() => {
                     void handleSignOut();
                   }}

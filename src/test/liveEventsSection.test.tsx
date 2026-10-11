@@ -48,6 +48,26 @@ async function showSection() {
 }
 
 describe("homepage event cards", () => {
+  it("embeds Creators Circuit beneath the quiet state with an accessible full-site link", async () => {
+    vi.mocked(fetchPublishedHackathons).mockResolvedValue([]);
+    vi.mocked(fetchPortalHackathonCatalog).mockResolvedValue([]);
+    await showSection();
+
+    expect(screen.getByText("The next spark is coming.")).toBeInTheDocument();
+    const preview = screen.getByRole("region", { name: "Creators Circuit — live website" });
+    expect(document.getElementById("live-events")).toContainElement(preview);
+    const frame = within(preview).getByTitle("Creators Circuit live website preview");
+    expect(frame).toHaveAttribute("src", "https://www.creatorscircuit.tech/");
+    expect(frame).toHaveAttribute("loading", "lazy");
+    expect(frame).toHaveAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+    expect(document.getElementById(frame.getAttribute("aria-describedby")!)).toHaveTextContent("open Creators Circuit in a new tab");
+    const fullSite = within(preview).getByRole("link", { name: "Open Creators Circuit" });
+    expect(fullSite).toHaveAttribute("href", "https://www.creatorscircuit.tech/");
+    expect(fullSite).toHaveAttribute("target", "_blank");
+    expect(fullSite).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getAllByTitle("Creators Circuit live website preview")).toHaveLength(1);
+  });
+
   it("automatically moves an event from upcoming to live to its finished archive", async () => {
     await showSection();
     expect(screen.getByRole("heading", { name: "Next up" })).toBeInTheDocument();
@@ -55,6 +75,7 @@ describe("homepage event cards", () => {
     expect(screen.getByRole("link", { name: "View event" })).toHaveAttribute("href", getHostedHackathonUrl("test-event"));
     expect(screen.getByRole("heading", { name: "Community meetup" })).toBeInTheDocument();
     expect(document.querySelector("time")).toHaveAttribute("datetime", "2026-10-09T09:01:00Z");
+    expect(screen.getAllByTitle("Creators Circuit live website preview")).toHaveLength(1);
 
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
     expect(screen.getByRole("heading", { name: "Live now" })).toBeInTheDocument();

@@ -7,7 +7,7 @@ import SignIn from "@/pages/SignIn";
 const mocks = vi.hoisted(() => ({
   sessionUser: null as SessionUser | null,
   db: {},
-  auth: {},
+  auth: { currentUser: null as { uid: string } | null },
   fetchEvent: vi.fn(),
   setDoc: vi.fn(),
   popup: vi.fn(),
@@ -21,11 +21,15 @@ vi.mock("firebase/auth", async (importOriginal) => ({ ...await importOriginal<ty
 vi.mock("@/components/AnimatedBackground", () => ({ default: () => null }));
 vi.mock("@/components/BrandLogo", () => ({ default: () => <span>Cognisor</span> }));
 
-const renderSignup = () => render(<MemoryRouter initialEntries={["/signup?hackathon=ended-ideathon"]}><Routes><Route path="/signup" element={<SignIn />} /><Route path="/dashboard/participant" element={<p>Participant workspace</p>} /></Routes></MemoryRouter>);
+const renderSignup = () => {
+  mocks.auth.currentUser = mocks.sessionUser ? { uid: mocks.sessionUser.id } : null;
+  return render(<MemoryRouter initialEntries={["/signup?hackathon=ended-ideathon"]}><Routes><Route path="/signup" element={<SignIn />} /><Route path="/dashboard/participant" element={<p>Participant workspace</p>} /></Routes></MemoryRouter>);
+};
 
 describe("closed-event signup", () => {
   beforeEach(() => {
     mocks.sessionUser = null;
+    mocks.auth.currentUser = null;
     mocks.fetchEvent.mockReset().mockResolvedValue({ id: "ended-ideathon", published: true, status: "past", registrationStatus: "closed" });
     mocks.popup.mockReset();
     mocks.setDoc.mockReset();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ArrowLeft } from "lucide-react";
@@ -12,8 +12,8 @@ import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
-import { formDraftStorageKey } from "@/lib/formDrafts";
-import { getFirestoreDb } from "@/lib/firebaseClient";
+import { draftsDiffer, formDraftStorageKey } from "@/lib/formDrafts";
+import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
 import {
   getHackathonsByIds,
   getUserAllowedHackathonIds,
@@ -123,6 +123,8 @@ const mapUserProfileToForm = (profile: UserProfile | undefined | null): PeoplePr
 
 export default function ParticipantProfilePage() {
   const { sessionUser, loading: authLoading, signOut } = usePortalAuth();
+  const userId = sessionUser?.id;
+  const userRole = sessionUser?.role;
   const db = getFirestoreDb();
   const [eventCatalog, setEventCatalog] = useState<PortalHackathon[]>(PORTAL_HACKATHONS);
   const { selectedHackathonId, setSelectedHackathonId } = useHackathonSelection(
@@ -135,6 +137,8 @@ export default function ParticipantProfilePage() {
   const [profileBaseline, setProfileBaseline] = useState<PeopleProfileFormState>(initialProfileForm);
   const [enrolledHackathonIds, setEnrolledHackathonIds] = useState<HackathonId[]>([]);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
+  const [profileLoadAttempt, setProfileLoadAttempt] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -143,6 +147,20 @@ export default function ParticipantProfilePage() {
   const [coverMessage, setCoverMessage] = useState<string | null>(null);
   const [isUploadingGallery, setIsUploadingGallery] = useState(false);
   const [galleryMessage, setGalleryMessage] = useState<string | null>(null);
+  const activeProfileRef = useRef<string | null>(null);
+  const profileOperationRef = useRef(false);
+  const profileFormRef = useRef(profileForm);
+  profileFormRef.current = profileForm;
+
+  const isActiveProfile = () => Boolean(
+    userId && activeProfileRef.current === userId && getFirebaseAuth().currentUser?.uid === userId
+  );
+
+  const beginProfileOperation = () => {
+    if (profileOperationRef.current || isLoadingProfile || profileLoadError || !isActiveProfile()) return false;
+    profileOperationRef.current = true;
+    return true;
+  };
 
   const profileDraftKey = formDraftStorageKey(["participant-profile", sessionUser?.id]);
 
@@ -154,7 +172,7 @@ export default function ParticipantProfilePage() {
   } = useFormDraftPersistence<PeopleProfileFormState>({
     storageKey: profileDraftKey,
     value: profileForm,
-    enabled: Boolean(sessionUser?.role === "participant") && !isLoadingProfile,
+    enabled: userRole === "participant" && !isLoadingProfile && !profileLoadError,
     baseline: profileBaseline,
     debounceMs: 400,
   });
@@ -203,12 +221,16 @@ export default function ParticipantProfilePage() {
   }, [accessibleHackathonIds, selectedHackathonId, sessionUser, setSelectedHackathonId]);
 
   useEffect(() => {
-    if (!sessionUser || sessionUser.role !== "participant") return;
+    if (!userId || userRole !== "participant") return;
+    let cancelled = false;
+    activeProfileRef.current = userId;
 
     const loadProfile = async () => {
       setIsLoadingProfile(true);
+      setProfileLoadError(null);
       try {
-        const userSnap = await getDoc(doc(db, "users", sessionUser.id));
+        const userSnap = await getDoc(doc(db, "users", userId));
+        if (cancelled) return;
         const userData = userSnap.exists()
           ? (userSnap.data() as Record<string, unknown>)
           : undefined;
@@ -223,29 +245,35 @@ export default function ParticipantProfilePage() {
         setProfileBaseline(mapped);
         setProfileForm(mapped);
       } catch {
-        // keep editable empty form
+        if (!cancelled) setProfileLoadError("Could not load your profile. Please try again before editing.");
       } finally {
-        setIsLoadingProfile(false);
+        if (!cancelled) setIsLoadingProfile(false);
       }
     };
 
     void loadProfile();
-  }, [sessionUser, db]);
+    return () => {
+      cancelled = true;
+      activeProfileRef.current = null;
+    };
+  }, [userId, userRole, db, profileLoadAttempt]);
 
   useEffect(() => {
     if (!pendingProfileRestore) return;
-    const restored = pendingProfileRestore.value as PeopleProfileFormState;
-    setProfileForm(restored);
-    setSaveMessage("Restored unsaved profile draft from this browser.");
+    const restored = pendingProfileRestore.value;
+    if (restored && typeof restored === "object" && !Array.isArray(restored)) {
+      setProfileForm(mapUserProfileToForm(mapUserDocToProfile({ ...profileBaseline, ...restored })));
+      setSaveMessage("Restored unsaved profile draft from this browser.");
+    }
     consumeProfileRestore();
-  }, [pendingProfileRestore, consumeProfileRestore]);
+  }, [pendingProfileRestore, consumeProfileRestore, profileBaseline]);
 
   const persistProfileMedia = async (patch: {
     avatarUrl?: string;
     coverUrl?: string;
     galleryUrls?: string[];
   }) => {
-    if (!sessionUser) return;
+    if (!sessionUser || !isActiveProfile()) return false;
     await setDoc(
       doc(db, "users", sessionUser.id),
       {
@@ -254,38 +282,44 @@ export default function ParticipantProfilePage() {
       },
       { merge: true }
     );
+    if (!isActiveProfile()) return false;
+    setProfileForm((prev) => ({ ...prev, ...patch }));
+    setProfileBaseline((prev) => ({ ...prev, ...patch }));
+    return true;
   };
 
   const handleAvatarSelected = async (file: File) => {
-    if (!sessionUser) return;
+    if (!sessionUser || !beginProfileOperation()) return;
     setIsUploadingAvatar(true);
     setAvatarMessage(null);
     const previousUrl = profileForm.avatarUrl;
+    let uploadedUrl: string | null = null;
     try {
       const avatarUrl = await uploadProfileAvatar(sessionUser.id, file);
-      setProfileForm((prev) => ({ ...prev, avatarUrl }));
-      await persistProfileMedia({ avatarUrl });
+      uploadedUrl = avatarUrl;
+      if (!await persistProfileMedia({ avatarUrl })) return;
       if (previousUrl && previousUrl !== avatarUrl) void deleteStorageImageByUrl(previousUrl);
       setAvatarMessage("Profile photo saved.");
     } catch (error: unknown) {
+      if (uploadedUrl) void deleteStorageImageByUrl(uploadedUrl);
       const message =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
           : "Could not upload photo.";
       setAvatarMessage(message);
     } finally {
+      profileOperationRef.current = false;
       setIsUploadingAvatar(false);
     }
   };
 
   const handleRemoveAvatar = async () => {
-    if (!sessionUser) return;
+    if (!sessionUser || !beginProfileOperation()) return;
     setIsUploadingAvatar(true);
     setAvatarMessage(null);
     const previousUrl = profileForm.avatarUrl;
     try {
-      setProfileForm((prev) => ({ ...prev, avatarUrl: "" }));
-      await persistProfileMedia({ avatarUrl: "" });
+      if (!await persistProfileMedia({ avatarUrl: "" })) return;
       await deleteStorageImageByUrl(previousUrl);
       setAvatarMessage("Profile photo removed.");
     } catch (error: unknown) {
@@ -295,40 +329,43 @@ export default function ParticipantProfilePage() {
           : "Could not remove photo.";
       setAvatarMessage(message);
     } finally {
+      profileOperationRef.current = false;
       setIsUploadingAvatar(false);
     }
   };
 
   const handleCoverSelected = async (file: File) => {
-    if (!sessionUser) return;
+    if (!sessionUser || !beginProfileOperation()) return;
     setIsUploadingCover(true);
     setCoverMessage(null);
     const previousUrl = profileForm.coverUrl;
+    let uploadedUrl: string | null = null;
     try {
       const coverUrl = await uploadProfileImage(sessionUser.id, file, "cover");
-      setProfileForm((prev) => ({ ...prev, coverUrl }));
-      await persistProfileMedia({ coverUrl });
+      uploadedUrl = coverUrl;
+      if (!await persistProfileMedia({ coverUrl })) return;
       if (previousUrl && previousUrl !== coverUrl) void deleteStorageImageByUrl(previousUrl);
       setCoverMessage("Banner saved.");
     } catch (error: unknown) {
+      if (uploadedUrl) void deleteStorageImageByUrl(uploadedUrl);
       const message =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
           : "Could not upload banner.";
       setCoverMessage(message);
     } finally {
+      profileOperationRef.current = false;
       setIsUploadingCover(false);
     }
   };
 
   const handleRemoveCover = async () => {
-    if (!sessionUser) return;
+    if (!sessionUser || !beginProfileOperation()) return;
     setIsUploadingCover(true);
     setCoverMessage(null);
     const previousUrl = profileForm.coverUrl;
     try {
-      setProfileForm((prev) => ({ ...prev, coverUrl: "" }));
-      await persistProfileMedia({ coverUrl: "" });
+      if (!await persistProfileMedia({ coverUrl: "" })) return;
       await deleteStorageImageByUrl(previousUrl);
       setCoverMessage("Banner removed.");
     } catch (error: unknown) {
@@ -338,53 +375,58 @@ export default function ParticipantProfilePage() {
           : "Could not remove banner.";
       setCoverMessage(message);
     } finally {
+      profileOperationRef.current = false;
       setIsUploadingCover(false);
     }
   };
 
   const handleGallerySelected = async (files: File[]) => {
-    if (!sessionUser) return;
+    if (!sessionUser || files.length === 0) return;
     const remainingSlots = 12 - profileForm.galleryUrls.length;
     if (remainingSlots <= 0) {
       setGalleryMessage("Gallery limit is 12 photos.");
       return;
     }
+    if (!beginProfileOperation()) return;
 
     setIsUploadingGallery(true);
     setGalleryMessage(null);
+    const uploadedUrls: string[] = [];
     try {
       const nextUrls = [...profileForm.galleryUrls];
       for (const file of files.slice(0, remainingSlots)) {
+        if (!isActiveProfile()) return;
         const url = await uploadProfileImage(sessionUser.id, file, "gallery");
+        uploadedUrls.push(url);
         nextUrls.push(url);
       }
       const galleryUrls = nextUrls.slice(0, 12);
-      setProfileForm((prev) => ({ ...prev, galleryUrls }));
-      await persistProfileMedia({ galleryUrls });
+      if (!await persistProfileMedia({ galleryUrls })) return;
       setGalleryMessage(
         files.length > remainingSlots
           ? `Added ${remainingSlots} photo${remainingSlots === 1 ? "" : "s"} (gallery limit is 12).`
           : "Gallery photo added."
       );
     } catch (error: unknown) {
+      for (const url of uploadedUrls) void deleteStorageImageByUrl(url);
       const message =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
           : "Could not upload gallery photo.";
       setGalleryMessage(message);
     } finally {
+      profileOperationRef.current = false;
       setIsUploadingGallery(false);
     }
   };
 
   const handleRemoveGalleryImage = async (url: string) => {
-    if (!sessionUser) return;
+    if (!sessionUser || !beginProfileOperation()) return;
     setIsUploadingGallery(true);
     setGalleryMessage(null);
     try {
       const galleryUrls = profileForm.galleryUrls.filter((item) => item !== url);
-      setProfileForm((prev) => ({ ...prev, galleryUrls }));
-      await persistProfileMedia({ galleryUrls });
+      if (!await persistProfileMedia({ galleryUrls })) return;
       await deleteStorageImageByUrl(url);
       setGalleryMessage("Gallery photo removed.");
     } catch (error: unknown) {
@@ -394,12 +436,13 @@ export default function ParticipantProfilePage() {
           : "Could not remove gallery photo.";
       setGalleryMessage(message);
     } finally {
+      profileOperationRef.current = false;
       setIsUploadingGallery(false);
     }
   };
 
   const handleSaveProfile = async () => {
-    if (!sessionUser) return;
+    if (!sessionUser || !beginProfileOperation()) return;
     setIsSaving(true);
     setSaveMessage(null);
     try {
@@ -432,11 +475,19 @@ export default function ParticipantProfilePage() {
         profileUpdatedAt: new Date().toISOString(),
       };
       await setDoc(doc(db, "users", sessionUser.id), payload, { merge: true });
+      if (!isActiveProfile()) return;
       const mapped = mapUserProfileToForm(payload);
+      const hasNewerEdits = draftsDiffer(profileFormRef.current, profileForm);
       setProfileBaseline(mapped);
-      setProfileForm(mapped);
-      clearProfileDraft();
-      setSaveMessage("Profile saved successfully.");
+      setProfileForm((current) => ({
+        ...current,
+        ...Object.fromEntries(Object.entries(mapped).filter(([key]) => {
+          const field = key as keyof PeopleProfileFormState;
+          return !draftsDiffer(current[field], profileForm[field]);
+        })),
+      }));
+      if (!hasNewerEdits) clearProfileDraft();
+      setSaveMessage(hasNewerEdits ? "Profile saved. Your newer edits still need to be saved." : "Profile saved successfully.");
     } catch (error: unknown) {
       const message =
         typeof error === "object" && error && "message" in error
@@ -444,6 +495,7 @@ export default function ParticipantProfilePage() {
           : "Could not save profile.";
       setSaveMessage(message);
     } finally {
+      profileOperationRef.current = false;
       setIsSaving(false);
     }
   };
@@ -491,7 +543,12 @@ export default function ParticipantProfilePage() {
         </Button>
       </div>
 
-      <PeopleProfileSection
+      {profileLoadError ? (
+        <div role="alert" className="space-y-3">
+          <p>{profileLoadError}</p>
+          <Button onClick={() => setProfileLoadAttempt((attempt) => attempt + 1)}>Retry loading profile</Button>
+        </div>
+      ) : <PeopleProfileSection
         form={profileForm}
         setForm={setProfileForm}
         isLoading={isLoadingProfile}
@@ -510,7 +567,7 @@ export default function ParticipantProfilePage() {
         onGallerySelected={handleGallerySelected}
         onRemoveGalleryImage={handleRemoveGalleryImage}
         onSave={handleSaveProfile}
-      />
+      />}
     </DashboardLayout>
   );
 }

@@ -1,0 +1,103 @@
+.elevenlabs-showcase { color: #f4f5f7; font-family: var(--font-sans); scroll-margin-top: 6rem; }
+.elevenlabs-showcase--home { padding: 5rem 1.5rem; background: #080b10; border-top: 1px solid #ffffff0d; }
+.elevenlabs-showcase--event { margin-top: 2rem; }
+.elevenlabs-showcase-inner { max-width: 1440px; margin-inline: auto; }
+.elevenlabs-showcase-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; margin-bottom: 2.5rem; }
+.elevenlabs-showcase-eyebrow { display: flex; align-items: center; gap: .7rem; font-size: .65rem; letter-spacing: .12em; text-transform: uppercase; color: #8cd2fb; }
+.elevenlabs-showcase-eyebrow > span { font-size: 1.5rem; font-weight: 700; letter-spacing: -.2em; padding-right: .3rem; }
+.elevenlabs-showcase-heading h2 { margin-top: 1rem; font-size: clamp(2rem, 3.6vw, 3.5rem); font-weight: 400; line-height: 1.12; letter-spacing: -.045em; }
+.elevenlabs-showcase-heading h2 > span { color: #9ba8b8; }
+.elevenlabs-showcase-heading h2 + p { max-width: 37rem; margin-top: 1.1rem; font-size: .85rem; line-height: 1.8; color: #929aa6; }
+.elevenlabs-showcase-meta { display: flex; flex-shrink: 0; flex-direction: column; align-items: flex-end; gap: 1rem; font-size: .75rem; color: #929aa6; }
+.elevenlabs-showcase-meta strong { color: #f4f5f7; font-size: 1.4rem; font-weight: 500; margin-right: .3rem; }
+.elevenlabs-showcase-meta a { display: inline-flex; align-items: center; gap: .75rem; padding: .75rem 1rem; border: 1px solid #ffffff24; border-radius: .4rem; color: #f4f5f7; }
+.elevenlabs-showcase-meta a:hover { border-color: #8cd2fb; }
+.elevenlabs-showcase-meta svg { width: 16px; height: 16px; }
+.elevenlabs-winners { margin-bottom: 3rem; padding: 1.5rem; border: 1px solid #ffffff1b; border-radius: 1rem; background: linear-gradient(130deg, #14202c, #0b1119 70%); scroll-margin-top: 6rem; }
+.elevenlabs-winners-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 1.5rem; margin-bottom: 1.5rem; }
+.elevenlabs-winners-heading > div > p { display: flex; align-items: center; gap: .5rem; color: #e6c989; font-size: .65rem; letter-spacing: .12em; text-transform: uppercase; }
+.elevenlabs-winners-heading svg { width: 14px; height: 14px; }
+.elevenlabs-winners-heading h3 { margin-top: .6rem; font-size: clamp(1.6rem, 2.5vw, 2.25rem); font-weight: 400; letter-spacing: -.035em; line-height: 1.2; }
+.elevenlabs-winners-heading > p { color: #a3afbd; font-size: .75rem; line-height: 1.7; }
+.elevenlabs-winners-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; padding: 0; list-style: none; }
+.elevenlabs-winner { display: flex; flex-direction: column; min-width: 0; padding: .85rem; border: 1px solid #ffffff14; border-radius: .65rem; background: #141f2b; }
+.elevenlabs-winner > .elevenlabs-submission-preview { width: 100%; border-radius: .35rem; overflow: hidden; }
+.elevenlabs-winner-content { padding: 1.2rem .35rem .35rem; min-width: 0; }
+.elevenlabs-winner--first { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); grid-column: span 2; align-items: center; gap: 1.5rem; padding: 1rem; border-color: #e6c98966; background: radial-gradient(ellipse at 100% 0, #ad81382b, transparent 75%), #1b211f; }
+.elevenlabs-winner--first .elevenlabs-winner-content { padding: .5rem; }
+.elevenlabs-winner-placement { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .8rem; }
+.elevenlabs-winner-rank { color: #b7d4e8; font-size: 1.45rem; font-weight: 500; line-height: 1.1; letter-spacing: -.045em; }
+.elevenlabs-winner-rank > span { font-size: .65rem; letter-spacing: .02em; font-weight: 400; }
+.elevenlabs-winner--first .elevenlabs-winner-rank { font-size: 3.5rem; color: #f0d397; }
+.elevenlabs-winner-placement > svg { width: 24px; height: 24px; color: #e6c989; }
+.elevenlabs-winner-title { font-size: 1rem; font-weight: 500; line-height: 1.45; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.elevenlabs-winner--first .elevenlabs-winner-title { margin-top: 1.1rem; font-size: 1.5rem; }
+.elevenlabs-winner-people { margin-top: .5rem; color: #acb8c4; font-size: .72rem; line-height: 1.7; overflow-wrap: anywhere; }
+.elevenlabs-winner-links { display: flex; flex-wrap: wrap; align-items: center; gap: .85rem 1.25rem; margin-top: 1.15rem; }
+.elevenlabs-winner a { display: inline-flex; align-items: center; gap: .5rem; font-size: .7rem; color: #9ad8ff; }
+.elevenlabs-winner a:hover { text-decoration: underline; }
+.elevenlabs-winner a svg { width: 15px; height: 15px; }
+.elevenlabs-winner--first a { color: #f0d397; }
+.elevenlabs-all-projects-label { margin-bottom: 1.1rem; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: #a5bacb; }
+.elevenlabs-submission-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; align-items: start; }
+.elevenlabs-submission-card { min-width: 0; border: 1px solid #ffffff14; border-radius: .85rem; overflow: hidden; background: #10151d; scroll-margin-top: 6rem; }
+.elevenlabs-submission-card:target { border-color: #8cd2fb99; box-shadow: 0 0 0 2px #8cd2fb24; }
+.elevenlabs-submission-preview { position: relative; aspect-ratio: 16 / 9; background: #05090f; }
+.elevenlabs-submission-preview iframe, .elevenlabs-submission-preview video { display: block; width: 100%; height: 100%; border: 0; }
+.elevenlabs-preview-cover { position: relative; display: flex; align-items: center; justify-content: center; height: 100%; overflow: hidden; background: radial-gradient(ellipse at 50% 100%, #04629645, transparent 75%), linear-gradient(135deg, #111c27, #080e16); }
+.elevenlabs-submission-card:nth-child(3n+2) .elevenlabs-preview-cover { background: radial-gradient(ellipse at 80% 90%, #39706840, transparent 75%), #0c181c; }
+.elevenlabs-submission-card:nth-child(3n) .elevenlabs-preview-cover { background: radial-gradient(ellipse at 50% 100%, #3f477a50, transparent 75%), #101421; }
+.elevenlabs-preview-number { position: absolute; top: 1rem; left: 1rem; font-size: .65rem; letter-spacing: .12em; color: #ffffff66; }
+.elevenlabs-preview-wave { position: absolute; inset: 22% 12%; display: flex; align-items: center; justify-content: center; gap: 3%; opacity: .18; }
+.elevenlabs-preview-wave span { width: 3px; border-radius: 20px; background: #a3deff; }
+.elevenlabs-preview-play { z-index: 1; display: inline-flex; align-items: center; gap: .7rem; padding: .8rem 1rem; border: 1px solid #ffffff38; border-radius: 2rem; background: #101820de; font-size: .75rem; color: #f4f5f7; }
+.elevenlabs-preview-play:hover { background: #173549; border-color: #8cd2fb; }
+.elevenlabs-preview-play svg { width: 15px; height: 15px; fill: currentColor; }
+.elevenlabs-preview-cover > p { position: relative; max-width: 85%; text-align: center; font-size: .75rem; line-height: 1.7; color: #b1c0ce; }
+.elevenlabs-preview-close { position: absolute; top: .5rem; right: .5rem; z-index: 2; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #ffffff55; border-radius: 50%; color: white; background: #080b10ed; }
+.elevenlabs-preview-close svg { width: 16px; height: 16px; }
+.elevenlabs-submission-content { padding: 1.25rem; }
+.elevenlabs-submission-byline { display: flex; align-items: center; gap: .45rem; font-size: .7rem; color: #a5bacb; }
+.elevenlabs-submission-byline > svg { width: 13px; height: 13px; flex-shrink: 0; }
+.elevenlabs-submission-byline > span:first-of-type { overflow-wrap: anywhere; }
+.elevenlabs-submission-type { margin-left: auto; flex-shrink: 0; padding: .2rem .45rem; border: 1px solid #ffffff14; border-radius: .25rem; font-size: .6rem; color: #929aa6; }
+.elevenlabs-submission-content h3 { margin-top: .85rem; font-size: 1.12rem; line-height: 1.45; font-weight: 500; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.elevenlabs-submission-summary { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 4.9em; margin-top: .65rem; font-size: .78rem; line-height: 1.65; color: #929aa6; }
+.elevenlabs-submission-details { margin-top: 1rem; font-size: .75rem; }
+.elevenlabs-submission-details summary { display: flex; align-items: center; justify-content: space-between; padding-block: .65rem; cursor: pointer; color: #bbd8ed; list-style: none; }
+.elevenlabs-submission-details summary::-webkit-details-marker { display: none; }
+.elevenlabs-submission-details summary svg { width: 15px; height: 15px; }
+.elevenlabs-submission-details[open] summary svg { transform: rotate(180deg); }
+.elevenlabs-submission-details dl { padding-block: .4rem .85rem; }
+.elevenlabs-submission-details dt { margin-top: .7rem; font-size: .65rem; letter-spacing: .06em; text-transform: uppercase; color: #c7d3dd; }
+.elevenlabs-submission-details dd { margin-top: .3rem; white-space: pre-line; overflow-wrap: anywhere; color: #a8b2be; line-height: 1.8; }
+.elevenlabs-submission-links { display: grid; gap: .8rem; margin-top: .75rem; padding-top: 1rem; border-top: 1px solid #ffffff10; }
+.elevenlabs-submission-links a { display: flex; flex-direction: column; gap: .3rem; }
+.elevenlabs-link-label { display: flex; align-items: center; gap: .45rem; font-size: .72rem; font-weight: 500; color: #8cd2fb; }
+.elevenlabs-link-label svg { width: 12px; height: 12px; }
+.elevenlabs-link-url { font-size: .65rem; line-height: 1.7; color: #9daebe; overflow-wrap: anywhere; }
+.elevenlabs-submission-links a:hover .elevenlabs-link-url { color: #d5edff; text-decoration: underline; }
+.elevenlabs-link-note, .elevenlabs-preview-help { font-size: .67rem; line-height: 1.7; color: #9daebe; overflow-wrap: anywhere; }
+.elevenlabs-link-note { margin-top: .3rem; }
+.elevenlabs-preview-help { margin-top: 1rem; }
+.elevenlabs-showcase :is(a, button, summary):focus-visible { outline: 2px solid #8cd2fb; outline-offset: 4px; }
+.elevenlabs-showcase--event .elevenlabs-submission-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.elevenlabs-showcase--event .elevenlabs-showcase-heading { align-items: flex-start; flex-direction: column; gap: 1rem; }
+.elevenlabs-showcase--event .elevenlabs-winners-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.elevenlabs-showcase--event .elevenlabs-winner--first { grid-column: span 2; }
+@media (min-width: 1024px) { .elevenlabs-showcase--home { padding-inline: 5%; } }
+@media (max-width: 1050px) {
+  .elevenlabs-submission-grid, .elevenlabs-winners-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .elevenlabs-winner--first { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+}
+@media (max-width: 680px) {
+  .elevenlabs-showcase--home { padding: 3.5rem 1rem; }
+  .elevenlabs-showcase-heading { align-items: flex-start; flex-direction: column; gap: 1.5rem; }
+  .elevenlabs-showcase-meta { align-items: flex-start; }
+  .elevenlabs-submission-grid, .elevenlabs-showcase--event .elevenlabs-submission-grid { grid-template-columns: minmax(0, 1fr); }
+  .elevenlabs-submission-content { padding: 1.1rem; }
+  .elevenlabs-winners { padding: 1rem; }
+  .elevenlabs-winners-heading { align-items: flex-start; flex-direction: column; gap: .75rem; }
+  .elevenlabs-winners-list, .elevenlabs-showcase--event .elevenlabs-winners-list { grid-template-columns: minmax(0, 1fr); }
+  .elevenlabs-winner--first, .elevenlabs-showcase--event .elevenlabs-winner--first { grid-column: auto; }
+}

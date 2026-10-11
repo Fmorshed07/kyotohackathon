@@ -2,13 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Fragment } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { usePortalAuth } from "./hooks/usePortalAuth";
 import {
   canAccessStaffDashboard,
   getDashboardPathForUser,
   participantNeedsOnboarding,
-  safeInternalPath,
 } from "./lib/portalRoutes";
 import Index from "./pages/Index";
 import CommunityWorkPage from "./pages/CommunityWorkPage";
@@ -45,69 +45,43 @@ function FullScreenMessage({ message }: { message: string }) {
   return <div className="flex min-h-svh items-center justify-center bg-background"><p className="text-sm text-muted-foreground">{message}</p></div>;
 }
 
-function PublicOnlyRoute({ children }: { children: JSX.Element }) {
-  const { sessionUser, loading } = usePortalAuth();
-  const location = useLocation();
-  const nextPath = safeInternalPath(new URLSearchParams(location.search).get("next"));
-  if (loading) return <FullScreenMessage message="Loading..." />;
-  // Keep auth-only users (signed into Google, no portal role yet) on signup/signin
-  // so they can finish participant enrollment without admin help.
-  if (!sessionUser?.role) return children;
-  if (nextPath) return <Navigate to={nextPath} replace />;
-  return (
-    <Navigate
-      to={getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus, {
-        needsOnboarding: participantNeedsOnboarding(sessionUser),
-      })}
-      replace
-    />
-  );
-}
-
-function AdminSignInRoute({ children }: { children: JSX.Element }) {
-  const { sessionUser, loading } = usePortalAuth();
-  if (loading) return <FullScreenMessage message="Loading..." />;
-  if (sessionUser?.role === "admin") return <Navigate to="/dashboard/admin" replace />;
-  return children;
-}
-
 function AdminProtectedRoute({ children }: { children: JSX.Element }) {
   const { sessionUser, loading } = usePortalAuth();
   if (loading) return <FullScreenMessage message="Loading..." />;
   if (!sessionUser || sessionUser.role !== "admin") return <Navigate to="/admin" replace />;
-  return children;
+  return <Fragment key={sessionUser.id}>{children}</Fragment>;
 }
 
 function HostProtectedRoute({ children }: { children: JSX.Element }) {
   const { sessionUser, loading } = usePortalAuth();
   if (loading) return <FullScreenMessage message="Loading..." />;
-  if (!sessionUser) return <Navigate to="/host/signin" replace />;
+  if (!sessionUser?.role) return <Navigate to="/host/signin" replace />;
   // Admins can create/manage hosted events; hosts use their own workspace.
   if (sessionUser.role !== "host" && sessionUser.role !== "admin") {
     return <Navigate to={getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus)} replace />;
   }
-  return children;
+  return <Fragment key={sessionUser.id}>{children}</Fragment>;
 }
 
 function StaffProtectedRoute({ children }: { children: JSX.Element }) {
   const { sessionUser, loading } = usePortalAuth();
   if (loading) return <FullScreenMessage message="Loading..." />;
-  if (!sessionUser) return <Navigate to="/signin" replace />;
+  if (!sessionUser?.role) return <Navigate to="/signin" replace />;
   if (!canAccessStaffDashboard(sessionUser.role, sessionUser.judgeApprovalStatus)) return <Navigate to={getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus)} replace />;
-  return children;
+  return <Fragment key={sessionUser.id}>{children}</Fragment>;
 }
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { sessionUser, loading } = usePortalAuth();
   if (loading) return <FullScreenMessage message="Loading..." />;
   if (!sessionUser) return <Navigate to="/signin" replace />;
-  return children;
+  return <Fragment key={sessionUser.id}>{children}</Fragment>;
 }
 
 function ParticipantOnboardingRoute({ children }: { children: JSX.Element }) {
   const { sessionUser, loading } = usePortalAuth();
   if (loading) return <FullScreenMessage message="Loading..." />;
-  if (!sessionUser) return <Navigate to="/signup" replace />;
+  if (!sessionUser?.role) return <Navigate to="/signup" replace />;
   if (sessionUser.role !== "participant") {
     return (
       <Navigate
@@ -116,13 +90,14 @@ function ParticipantOnboardingRoute({ children }: { children: JSX.Element }) {
       />
     );
   }
-  return children;
+  return <Fragment key={sessionUser.id}>{children}</Fragment>;
 }
 
 function ParticipantProtectedRoute({ children }: { children: JSX.Element }) {
   const { sessionUser, loading } = usePortalAuth();
   if (loading) return <FullScreenMessage message="Loading..." />;
   if (!sessionUser) return <Navigate to="/signin" replace />;
+  if (!sessionUser.role) return <Navigate to="/signup" replace />;
   if (sessionUser.role !== "participant") {
     return (
       <Navigate
@@ -134,7 +109,9 @@ function ParticipantProtectedRoute({ children }: { children: JSX.Element }) {
   if (participantNeedsOnboarding(sessionUser)) {
     return <Navigate to="/onboarding" replace />;
   }
-  return children;
+  // Reset forms, pending reads and drafts even when an account change is batched
+  // with the next profile snapshot and no loading screen is rendered in between.
+  return <Fragment key={sessionUser.id}>{children}</Fragment>;
 }
 
 const App = () => (
@@ -151,10 +128,10 @@ const App = () => (
           <Route path="/work" element={<CommunityWorkPage />} />
           <Route path="/hackathons" element={<HackathonsPage />} />
           <Route path="/events/:hackathonId" element={<GeneratedHackathonPage />} />
-          <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
-          <Route path="/signup" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
+          <Route path="/signin" element={<SignIn />} />
+          <Route path="/signup" element={<SignIn />} />
           <Route path="/onboarding" element={<ParticipantOnboardingRoute><ParticipantOnboardingPage /></ParticipantOnboardingRoute>} />
-          <Route path="/admin" element={<AdminSignInRoute><AdminSignIn /></AdminSignInRoute>} />
+          <Route path="/admin" element={<AdminSignIn />} />
           <Route path="/host/signin" element={<HostSignIn />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/dashboard/participant" element={<ParticipantProtectedRoute><ParticipantDashboardPage /></ParticipantProtectedRoute>} />

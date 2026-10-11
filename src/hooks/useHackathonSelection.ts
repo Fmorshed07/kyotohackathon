@@ -89,6 +89,8 @@ export function useHackathonSelection(
 
   /** After a user click, ignore stale URL values until the query matches this id. */
   const pendingUrlWriteRef = useRef<HackathonId | null>(null);
+  const hasChosenWorkspaceRef = useRef(false);
+  const autoSeededUrlRef = useRef<HackathonId | null>(null);
 
   const commitSelection = (hackathonId: HackathonId, writeUrl: boolean) => {
     setSelectedHackathonIdState(hackathonId);
@@ -103,6 +105,8 @@ export function useHackathonSelection(
 
   const setSelectedHackathonId = (hackathonId: HackathonId) => {
     if (!isHackathonId(hackathonId)) return;
+    hasChosenWorkspaceRef.current = true;
+    autoSeededUrlRef.current = null;
     commitSelection(hackathonId, true);
   };
 
@@ -133,13 +137,15 @@ export function useHackathonSelection(
 
   // Prefer live events only when the URL does not pin a workspace.
   useEffect(() => {
-    if (!preferCurrent || urlHackathonId || pendingUrlWriteRef.current) return;
+    const explicitlyPinned = urlHackathonId && urlHackathonId !== autoSeededUrlRef.current;
+    if (!preferCurrent || hasChosenWorkspaceRef.current || explicitlyPinned || pendingUrlWriteRef.current) return;
     const selected = hackathons.find((entry) => entry.id === selectedHackathonId);
     if (selected && isCurrentHackathon(selected)) return;
     if (!selected && selectedHackathonId) return;
     if (switcherHackathons.length === 0) return;
     const nextId = pickDefaultHackathonId(switcherHackathons);
     if (nextId === selectedHackathonId) return;
+    if (syncUrl) autoSeededUrlRef.current = nextId;
     commitSelection(nextId, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -170,6 +176,7 @@ export function useHackathonSelection(
       if (canUpgrade) return;
     }
     pendingUrlWriteRef.current = selectedHackathonId;
+    autoSeededUrlRef.current = selectedHackathonId;
     setSearchParams(replaceHackathonSearchParam(searchParams, selectedHackathonId), {
       replace: true,
     });

@@ -6,6 +6,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
@@ -337,6 +338,8 @@ export async function publishHostEventPublicly(
   const id = (existingId || `${eventSlug(hostEvent.name)}-${Date.now().toString(36).slice(-6)}`) as HackathonId;
 
   let createdAt = now;
+  // Publishing on someone's behalf must not transfer their event to the admin.
+  let listingCreator = hostEvent.owner_id?.trim() || createdBy;
   // Keep active/past lifecycle when re-publishing or updating an existing public listing.
   let lifecycleStatus: HackathonStatus = options?.status ?? "upcoming";
   let storedSubmissionMode: SubmissionMode | undefined;
@@ -344,9 +347,16 @@ export async function publishHostEventPublicly(
     const existing = await getDoc(doc(db, "hackathons", existingId));
     if (existing.exists()) {
       const previous = existing.data() as Partial<HostedHackathon>;
-      if (previous.createdBy && previous.createdBy !== createdBy) {
+      if (
+        (previous.hostEventId && previous.hostEventId !== hostEvent.id)
+        || (previous.createdBy && previous.createdBy !== createdBy
+          && previous.createdBy !== listingCreator && previous.hostEventId !== hostEvent.id)
+      ) {
         throw new Error("This public listing belongs to another host.");
       }
+      // Existing records may name the admin who first published them. The
+      // hostEventId link grants the real owner access; preserve both identities.
+      listingCreator = previous.createdBy || listingCreator;
       createdAt = previous.createdAt?.trim() || now;
       if (!options?.status) {
         if (previous.status === "active" || previous.status === "past" || previous.status === "upcoming") {
@@ -414,7 +424,7 @@ export async function publishHostEventPublicly(
     lumaUrl: externalUrl(hostEvent.registrationUrl),
     published: true,
     createdAt,
-    createdBy,
+    createdBy: listingCreator,
     aiGenerated: false,
     createdManually: true,
     hostEventId: hostEvent.id,
@@ -431,11 +441,15 @@ export async function publishHostEventPublicly(
   // must survive save, republish, and go-live.
   const { submissionMode: _omitSubmissionMode, ...listingFields } = event;
   await setDoc(doc(db, "hackathons", id), listingFields, { merge: Boolean(existingId) });
-  await setDoc(
-    doc(db, "hackathon_criteria", id),
-    { criteria: normalizeCriteria(DEFAULT_HOST_CRITERIA), updated_at: now },
-    { merge: true },
-  );
+  // Seed once, atomically: editing an event must not reset the rubric that
+  // existing judge marks use, including a concurrent organiser rubric edit.
+  const criteriaRef = doc(db, "hackathon_criteria", id);
+  await runTransaction(db, async (transaction) => {
+    const existingCriteria = await transaction.get(criteriaRef);
+    if (!existingCriteria.exists()) {
+      transaction.set(criteriaRef, { criteria: normalizeCriteria(DEFAULT_HOST_CRITERIA), updated_at: now });
+    }
+  });
   await updateDoc(doc(db, "host_events", hostEvent.id), {
     status: "published",
     public_hackathon_id: id,

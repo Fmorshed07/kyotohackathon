@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { collection, deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
 import { getDashboardPathForUser } from "@/lib/portalRoutes";
-import { getFirestoreDb } from "@/lib/firebaseClient";
-import { formDraftStorageKey } from "@/lib/formDrafts";
+import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
+import { draftsDiffer, formDraftStorageKey } from "@/lib/formDrafts";
 import { uploadProfileImage } from "@/lib/profileMedia";
 import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -202,7 +202,7 @@ export default function ParticipantDashboardPage() {
     HACKATHON_STORAGE_KEYS.participant,
     undefined,
     eventCatalog,
-    { preferCurrent: true },
+    { syncUrl: true, preferCurrent: true },
   );
   const selectedHackathon = useMemo(
     () => resolvePortalHackathon(selectedHackathonId, eventCatalog),
@@ -218,15 +218,36 @@ export default function ParticipantDashboardPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [enrolledHackathonIds, setEnrolledHackathonIds] = useState<HackathonId[]>([]);
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [workspaceLoadAttempt, setWorkspaceLoadAttempt] = useState(0);
   const [isJoiningHackathon, setIsJoiningHackathon] = useState(false);
   const [linkedTeamMembers, setLinkedTeamMembers] = useState<TeamMemberRecord[]>([]);
   const [memberProfiles, setMemberProfiles] = useState<Record<string, UserProfile>>({});
   const [autosaveStatus, setAutosaveStatus] = useState<string | null>(null);
   const suppressFormSyncRef = useRef(false);
   const firestoreAutosaveTimerRef = useRef<number | null>(null);
-  const isAutosavingRef = useRef(false);
+  const isSavingProjectRef = useRef(false);
+  const failedAutosaveRef = useRef<{ workspaceKey: string; value: ParticipantProjectDraft } | null>(null);
+  const pendingSubmissionRefs = useRef(new Map<string, { reference: ReturnType<typeof doc>; createdAt: string }>());
   const selectedHackathonRef = useRef(selectedHackathon);
   selectedHackathonRef.current = selectedHackathon;
+  const isMountedRef = useRef(false);
+  const workspaceKey = `${sessionUser?.id}:${selectedHackathonId}:${activeSubmissionId ?? "new"}`;
+  const workspaceKeyRef = useRef(workspaceKey);
+  workspaceKeyRef.current = workspaceKey;
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // An account switch can happen while Firestore is resolving a save.
+  const isCurrentAccount = () =>
+    Boolean(sessionUser && getFirebaseAuth().currentUser?.uid === sessionUser.id);
+  const isCurrentWorkspace = () =>
+    isMountedRef.current && isCurrentAccount() && workspaceKeyRef.current === workspaceKey;
 
   const mapSubmissionToForm = (data: Submission): ParticipantProjectDraft => ({
     title: data.title ?? "",
@@ -348,11 +369,8 @@ export default function ParticipantDashboardPage() {
     if (isLoadingWorkspace) return;
     if (accessibleHackathonIds.length === 0) return;
 
-    if (requestedHackathonId) {
+    if (requestedHackathonId && accessibleHackathonIds.includes(requestedHackathonId)) {
       didApplyPreferredEvent.current = true;
-      if (selectedHackathonId !== requestedHackathonId) {
-        setSelectedHackathonId(requestedHackathonId);
-      }
       return;
     }
 
@@ -389,9 +407,11 @@ export default function ParticipantDashboardPage() {
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
+    let cancelled = false;
 
     const loadParticipantWorkspace = async () => {
       setIsLoadingWorkspace(true);
+      setWorkspaceError(null);
       try {
         const userSnap = await getDoc(doc(db, "users", sessionUser.id));
         const userData = userSnap.exists()
@@ -404,27 +424,29 @@ export default function ParticipantDashboardPage() {
           hackathon_ids: userData?.hackathon_ids,
         });
 
-        setUserProfile(profile ?? null);
-        setEnrolledHackathonIds(allowedIds);
-
         const submissions = sortSubmissionsNewestFirst(
           await listAccessibleSubmissions(db, sessionUser.id)
         );
-
+        if (cancelled) return;
+        setUserProfile(profile ?? null);
+        setEnrolledHackathonIds(allowedIds);
         setAllParticipantSubmissions(submissions);
         setParticipantForm((current) => ({
           ...current,
           ...mapUserProfileToForm(profile),
         }));
       } catch {
-        // ignore load errors and keep editable form state
+        if (!cancelled) setWorkspaceError("Could not load your projects. Retry before making changes.");
       } finally {
-        setIsLoadingWorkspace(false);
+        if (!cancelled) setIsLoadingWorkspace(false);
       }
     };
 
     void loadParticipantWorkspace();
-  }, [sessionUser, db]);
+    return () => { cancelled = true; };
+    // Profile snapshots for this account must not replace a project being edited.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionUser?.id, sessionUser?.role, db, workspaceLoadAttempt]);
 
   useEffect(() => {
     if (!activeSubmissionId) {
@@ -433,6 +455,8 @@ export default function ParticipantDashboardPage() {
       return;
     }
     let cancelled = false;
+    setLinkedTeamMembers(participantSubmission?.team_members ?? []);
+    setMemberProfiles({});
     const loadMembers = async () => {
       try {
         const fromSubmission = participantSubmission?.team_members ?? [];
@@ -499,6 +523,8 @@ export default function ParticipantDashboardPage() {
     () => pickProjectDraft(participantForm),
     [participantForm]
   );
+  const projectDraftValueRef = useRef(projectDraftValue);
+  projectDraftValueRef.current = projectDraftValue;
 
   const projectDraftBaseline = useMemo(
     () => (participantSubmission ? mapSubmissionToForm(participantSubmission) : emptyProjectFields),
@@ -522,7 +548,7 @@ export default function ParticipantDashboardPage() {
   } = useFormDraftPersistence<ParticipantProjectDraft>({
     storageKey: projectDraftKey,
     value: projectDraftValue,
-    enabled: Boolean(sessionUser?.role === "participant") && !isLoadingWorkspace,
+    enabled: Boolean(sessionUser?.role === "participant") && !isLoadingWorkspace && !workspaceError,
     baseline: projectDraftBaseline,
     debounceMs: 400,
   });
@@ -539,8 +565,10 @@ export default function ParticipantDashboardPage() {
 
   useEffect(() => {
     if (!draftSavedAt || !isProjectDraftDirty) return;
+    if (failedAutosaveRef.current?.workspaceKey === workspaceKey &&
+        !draftsDiffer(failedAutosaveRef.current.value, projectDraftValue)) return;
     setAutosaveStatus("Draft saved on this device.");
-  }, [draftSavedAt, isProjectDraftDirty]);
+  }, [draftSavedAt, isProjectDraftDirty, projectDraftValue, workspaceKey]);
 
   const handleSelectSubmission = (submissionId: string) => {
     const selectedSubmission = participantSubmissions.find(
@@ -568,8 +596,9 @@ export default function ParticipantDashboardPage() {
     announce?: boolean;
     queueEmail?: boolean;
   }) => {
-    if (!sessionUser) return null;
+    if (!sessionUser || !isCurrentWorkspace() || isLoadingWorkspace || workspaceError) return null;
     await assertSubmissionsWritable(db, selectedHackathonId);
+    if (!isCurrentWorkspace()) return null;
     if (!areSubmissionsWritable(selectedHackathonRef.current)) {
       throw new Error(
         getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathonRef.current)) ??
@@ -581,6 +610,7 @@ export default function ParticipantDashboardPage() {
       participantSubmission &&
       activeSubmissionId &&
       getSubmissionHackathonId(participantSubmission) === selectedHackathonId;
+    const pendingCreation = hasScopedSubmission ? undefined : pendingSubmissionRefs.current.get(workspaceKey);
 
     const ownerId = hasScopedSubmission ? participantSubmission.user_id : sessionUser.id;
     const ownerName =
@@ -622,7 +652,7 @@ export default function ParticipantDashboardPage() {
       role: "participant",
       created_at: hasScopedSubmission
         ? (participantSubmission?.created_at ?? now)
-        : now,
+        : (pendingCreation?.createdAt ?? now),
       updated_at: now,
     };
     if (ownerId === sessionUser.id) {
@@ -651,14 +681,32 @@ export default function ParticipantDashboardPage() {
 
     const submissionRef = hasScopedSubmission
       ? doc(db, "submissions", activeSubmissionId!)
-      : doc(collection(db, "submissions"));
+      : pendingCreation?.reference ?? doc(collection(db, "submissions"));
+    if (!hasScopedSubmission && !pendingCreation) {
+      pendingSubmissionRefs.current.set(workspaceKey, { reference: submissionRef, createdAt: now });
+    }
     const userRef = doc(db, "users", sessionUser.id);
+    const publicProjectRef = doc(db, "public_projects", submissionRef.id);
 
-    if (hasScopedSubmission) {
+    // Remove an existing public preview before reporting withdrawn consent as saved.
+    // Missing projections need no delete (their owner cannot be checked by Firestore rules).
+    if (!participantForm.allowPublicPreview && (hasScopedSubmission || pendingCreation)) {
+      try {
+        const publicSnapshot = await getDoc(publicProjectRef);
+        if (!isCurrentWorkspace()) return null;
+        if (publicSnapshot.exists()) await deleteDoc(publicProjectRef);
+      } catch {
+        throw new Error("Could not remove the public preview. Your project may still be public. Please retry saving.");
+      }
+      if (!isCurrentWorkspace()) return null;
+    }
+
+    if (hasScopedSubmission || pendingCreation) {
       await setDoc(submissionRef, payload, { merge: true });
     } else {
       await setDoc(submissionRef, payload);
     }
+    if (!isCurrentWorkspace()) return null;
     await setDoc(
       userRef,
       {
@@ -667,8 +715,8 @@ export default function ParticipantDashboardPage() {
       },
       { merge: true }
     );
+    if (!isCurrentWorkspace()) return null;
 
-    const publicProjectRef = doc(db, "public_projects", submissionRef.id);
     if (participantForm.allowPublicPreview) {
       await setDoc(publicProjectRef, {
         owner_id: ownerId,
@@ -698,19 +746,20 @@ export default function ParticipantDashboardPage() {
         updated_at: payload.updated_at,
         public_preview_consent: true,
       }, { merge: true });
-    } else {
-      await deleteDoc(publicProjectRef).catch(() => undefined);
     }
 
+    if (!isCurrentWorkspace()) return null;
     setEnrolledHackathonIds(nextHackathonIds);
 
     const submissionSnap = await getDoc(submissionRef);
+    if (!isCurrentWorkspace()) return null;
     if (!submissionSnap.exists()) return null;
 
     const data = {
       id: submissionSnap.id,
       ...(submissionSnap.data() as Omit<Submission, "id">),
     } as Submission;
+    pendingSubmissionRefs.current.delete(workspaceKey);
 
     suppressFormSyncRef.current = true;
     setActiveSubmissionId(data.id);
@@ -725,10 +774,11 @@ export default function ParticipantDashboardPage() {
       return updated;
     });
 
-    clearProjectDraft();
+    const hasNewerEdits = draftsDiffer(projectDraftValueRef.current, projectDraftValue);
+    if (!hasNewerEdits) clearProjectDraft();
 
     if (options.announce !== false) {
-      setSubmissionMessage("Submission saved successfully.");
+      setSubmissionMessage(hasNewerEdits ? "Submission saved. Your newer edits still need to be saved." : "Submission saved successfully.");
     } else {
       setAutosaveStatus("Draft saved to cloud.");
     }
@@ -736,9 +786,6 @@ export default function ParticipantDashboardPage() {
     if (options.queueEmail) {
       const emailTitle = data.title ?? participantForm.title;
       const emailTeamName = data.team_name ?? participantForm.teamName;
-      // #region agent log
-      fetch('http://127.0.0.1:7752/ingest/e37c9ea6-3a22-4110-a9e4-4334f1ef0ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'608977'},body:JSON.stringify({sessionId:'608977',runId:'post-fix',hypothesisId:'A',location:'ParticipantDashboardPage.tsx:queueEmail',message:'submission email payload types',data:{titleType:typeof emailTitle,teamNameType:typeof emailTeamName,titleIsString:typeof emailTitle==='string',teamNameIsString:typeof emailTeamName==='string'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       queueParticipantEmail({
         type: hasScopedSubmission ? "submission_updated" : "submission_created",
         title: emailTitle,
@@ -751,7 +798,7 @@ export default function ParticipantDashboardPage() {
   };
 
   const handleJoinHackathon = async (hackathonId: HackathonId) => {
-    if (!sessionUser) return;
+    if (!sessionUser || !isCurrentAccount() || isLoadingWorkspace || workspaceError) return;
     const joinable = liveJoinableHackathons.some((entry) => entry.id === hackathonId);
     if (!joinable) {
       setSubmissionMessage("That event is not open for new participants.");
@@ -770,6 +817,7 @@ export default function ParticipantDashboardPage() {
         },
         { merge: true }
       );
+      if (!isMountedRef.current || !isCurrentAccount()) return;
       setEnrolledHackathonIds(nextHackathonIds);
       setSelectedHackathonId(hackathonId);
       setSubmissionMessage(
@@ -787,19 +835,24 @@ export default function ParticipantDashboardPage() {
   };
 
   const handleParticipantSubmit = async () => {
-    if (!sessionUser) return;
+    if (!sessionUser || isSavingProjectRef.current) return;
 
+    isSavingProjectRef.current = true;
+    failedAutosaveRef.current = null;
     setIsSubmittingProject(true);
     setSubmissionMessage(null);
     try {
       await persistParticipantProject({ announce: true, queueEmail: true });
     } catch (error: unknown) {
+      failedAutosaveRef.current = { workspaceKey, value: projectDraftValue };
+      flushProjectDraft();
       const message =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
           : "An error occurred while saving your submission.";
       setSubmissionMessage(message);
     } finally {
+      isSavingProjectRef.current = false;
       setIsSubmittingProject(false);
     }
   };
@@ -808,7 +861,7 @@ export default function ParticipantDashboardPage() {
   // Host pause/close must cancel this — never keep writing in the background.
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
-    if (isLoadingWorkspace || !areSubmissionsWritable(selectedHackathon)) {
+    if (isLoadingWorkspace || workspaceError || !areSubmissionsWritable(selectedHackathon)) {
       if (firestoreAutosaveTimerRef.current) {
         window.clearTimeout(firestoreAutosaveTimerRef.current);
         firestoreAutosaveTimerRef.current = null;
@@ -816,7 +869,9 @@ export default function ParticipantDashboardPage() {
       return;
     }
     if (!isProjectDraftDirty || !projectDraftHasContent(projectDraftValue)) return;
-    if (isSubmittingProject || isAutosavingRef.current) return;
+    if (isSubmittingProject || isSavingProjectRef.current) return;
+    if (failedAutosaveRef.current?.workspaceKey === workspaceKey &&
+        !draftsDiffer(failedAutosaveRef.current.value, projectDraftValue)) return;
 
     if (firestoreAutosaveTimerRef.current) {
       window.clearTimeout(firestoreAutosaveTimerRef.current);
@@ -824,21 +879,25 @@ export default function ParticipantDashboardPage() {
 
     firestoreAutosaveTimerRef.current = window.setTimeout(() => {
       void (async () => {
-        if (isAutosavingRef.current || isSubmittingProject) return;
+        if (isSavingProjectRef.current || isSubmittingProject) return;
         if (!areSubmissionsWritable(selectedHackathonRef.current)) return;
-        isAutosavingRef.current = true;
+        isSavingProjectRef.current = true;
+        setIsSubmittingProject(true);
         try {
           await persistParticipantProject({ announce: false, queueEmail: false });
-        } catch {
+        } catch (error: unknown) {
+          failedAutosaveRef.current = { workspaceKey, value: projectDraftValue };
+          flushProjectDraft();
           if (!areSubmissionsWritable(selectedHackathonRef.current)) {
             setAutosaveStatus(
               getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathonRef.current)),
             );
           } else {
-            setAutosaveStatus("Draft saved on this device (cloud sync pending).");
+            setAutosaveStatus(error instanceof Error ? error.message : "Draft saved on this device. Retry saving to sync your changes.");
           }
         } finally {
-          isAutosavingRef.current = false;
+          isSavingProjectRef.current = false;
+          setIsSubmittingProject(false);
         }
       })();
     }, 2500);
@@ -854,10 +913,12 @@ export default function ParticipantDashboardPage() {
   }, [
     sessionUser,
     isLoadingWorkspace,
+    workspaceError,
     selectedHackathon,
     isProjectDraftDirty,
     projectDraftValue,
     isSubmittingProject,
+    workspaceKey,
   ]);
 
   if (authLoading) {
@@ -896,13 +957,19 @@ export default function ParticipantDashboardPage() {
       selectedHackathonId={selectedHackathonId}
       onHackathonChange={setSelectedHackathonId}
     >
+      {workspaceError ? (
+        <div role="alert" className="mb-4 rounded-lg border border-destructive/40 p-4">
+          <p>{workspaceError}</p>
+          <button type="button" className="mt-2 underline" onClick={() => setWorkspaceLoadAttempt((attempt) => attempt + 1)}>Retry loading projects</button>
+        </div>
+      ) : null}
       <ParticipantDashboard
         selectedHackathon={selectedHackathon}
         hackathonSummaries={hackathonSummaries}
         joinableHackathons={joinableHackathons}
         publicSiteUrl={getHackathonPublicUrl(selectedHackathonId)}
         isLoadingWorkspace={isLoadingWorkspace}
-        isReadOnly={isReadOnly}
+        isReadOnly={isReadOnly || Boolean(workspaceError)}
         isJoiningHackathon={isJoiningHackathon}
         onSelectHackathon={setSelectedHackathonId}
         onJoinHackathon={handleJoinHackathon}

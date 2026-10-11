@@ -105,7 +105,9 @@ function applyJudgeWorkspaceDraft(
     const entry = draft.scoresBySubmission[submission.id];
     const finalEntry = draft.finalScoresBySubmission?.[submission.id];
     if (!entry && !finalEntry) return submission;
-    const totalScore = entry ? calculateTotalFromCriteria(entry.criteria, criteria) : submission.judge_score;
+    const totalScore = entry
+      ? Object.keys(entry.criteria ?? {}).length > 0 ? calculateTotalFromCriteria(entry.criteria, criteria) : null
+      : submission.judge_score;
     const finalScore = finalEntry
       ? Object.keys(finalEntry.criteria ?? {}).length > 0
         ? calculateTotalFromCriteria(finalEntry.criteria, criteria)
@@ -114,7 +116,7 @@ function applyJudgeWorkspaceDraft(
     return {
       ...submission,
       judge_notes: entry?.notes ?? submission.judge_notes,
-      judge_criteria_scores: entry?.criteria ?? submission.judge_criteria_scores,
+      judge_criteria_scores: entry ? entry.criteria : submission.judge_criteria_scores,
       judge_score: totalScore,
       judge_notes_by_judge: {
         ...(submission.judge_notes_by_judge ?? {}),
@@ -207,7 +209,9 @@ export default function JudgeDashboardPage() {
 
   const [judgeSubmissions, setJudgeSubmissions] = useState<Submission[]>([]);
   const [judgeSubmissionsBaseline, setJudgeSubmissionsBaseline] = useState<Submission[]>([]);
-  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(true);
+  const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null);
+  const [loadRetry, setLoadRetry] = useState(0);
   const [judgeMessage, setJudgeMessage] = useState<string | null>(null);
   const [savingSubmissionId, setSavingSubmissionId] = useState<string | null>(null);
   const [savingFinalSubmissionId, setSavingFinalSubmissionId] = useState<string | null>(null);
@@ -222,6 +226,34 @@ export default function JudgeDashboardPage() {
   }, [judgeSubmissions]);
 
   const judgeId = sessionUser?.id ?? "";
+  const judgeRole = sessionUser?.role;
+  const workspaceScope = useMemo(
+    () => ({ judgeId, selectedHackathonId, judgingCriteria }),
+    [judgeId, selectedHackathonId, judgingCriteria],
+  );
+  const workspaceScopeRef = useRef<typeof workspaceScope | null>(workspaceScope);
+  workspaceScopeRef.current = workspaceScope;
+  const [loadedWorkspaceScope, setLoadedWorkspaceScope] = useState<typeof workspaceScope | null>(null);
+  const isWorkspaceLoading = isLoadingSubmissions || isLoadingCriteria || loadedWorkspaceScope !== workspaceScope;
+  useEffect(() => {
+    workspaceScopeRef.current = workspaceScope;
+    return () => { workspaceScopeRef.current = null; };
+  }, [workspaceScope]);
+  const pendingScoreWritesRef = useRef(new Map<string, Promise<void>>());
+  const queueScoreWrite = useCallback(async (submissionId: string, write: () => Promise<void>) => {
+    const key = `${judgeId}:${selectedHackathonId}:${submissionId}`;
+    const writes = pendingScoreWritesRef.current;
+    const previous = writes.get(key) ?? Promise.resolve();
+    const next = previous.catch(() => {}).then(async () => {
+      if (workspaceScopeRef.current === workspaceScope) await write();
+    });
+    writes.set(key, next);
+    try {
+      await next;
+    } finally {
+      if (writes.get(key) === next) writes.delete(key);
+    }
+  }, [judgeId, selectedHackathonId, workspaceScope]);
 
   const judgeDraftValue = useMemo(
     () => buildJudgeWorkspaceDraft(judgeSubmissions, top3Ranks, judgeId),
@@ -241,13 +273,12 @@ export default function JudgeDashboardPage() {
 
   const {
     isDirty: isJudgeDraftDirty,
-    clearDraft: clearJudgeDraft,
     pendingRestore: pendingJudgeRestore,
     consumePendingRestore: consumeJudgeRestore,
   } = useFormDraftPersistence<JudgeWorkspaceDraft>({
     storageKey: judgeDraftKey,
     value: judgeDraftValue,
-    enabled: Boolean(judgeId) && canAccessSelectedHackathon && !isLoadingSubmissions,
+    enabled: Boolean(judgeId) && canAccessSelectedHackathon && !isWorkspaceLoading,
     baseline: judgeDraftBaseline,
     debounceMs: 400,
   });
@@ -255,10 +286,14 @@ export default function JudgeDashboardPage() {
   useUnsavedChangesGuard(isJudgeDraftDirty);
 
   useEffect(() => {
-    if (!sessionUser || (sessionUser.role !== "judge" && sessionUser.role !== "mentor")) return;
+    let current = true;
+    if (!judgeId || (judgeRole !== "judge" && judgeRole !== "mentor")) return;
     if (!canAccessSelectedHackathon) {
       setJudgeSubmissions([]);
+      setJudgeSubmissionsBaseline([]);
       setTop3Ranks(createEmptyTop3Ranks());
+      setTop3RanksBaseline(createEmptyTop3Ranks());
+      setLoadedWorkspaceScope(null);
       setTop3SavedAt(null);
       setIsLoadingSubmissions(false);
       setJudgeMessage(
@@ -271,18 +306,27 @@ export default function JudgeDashboardPage() {
 
     const loadHackathonSubmissions = async () => {
       setIsLoadingSubmissions(true);
+      setWorkspaceLoadError(null);
       setJudgeMessage(null);
+      setSavingSubmissionId(null);
+      setSavingFinalSubmissionId(null);
+      setIsSavingTop3(false);
+      setLoadedWorkspaceScope(null);
+      setJudgeSubmissions([]);
+      setJudgeSubmissionsBaseline([]);
       setTop3Ranks(createEmptyTop3Ranks());
+      setTop3RanksBaseline(createEmptyTop3Ranks());
       setTop3SavedAt(null);
       try {
         const submissions = await fetchSubmissionsForHackathon(db, selectedHackathonId);
+        if (!current) return;
         const mappedSubmissions: Submission[] = submissions.map((data) =>
           mapSubmissionForJudge(
             {
               id: data.id,
               ...data,
             },
-            sessionUser.id,
+            judgeId,
             judgingCriteria
           )
         );
@@ -293,50 +337,62 @@ export default function JudgeDashboardPage() {
           const rankingRef = doc(
             db,
             "judge_rankings",
-            buildJudgeRankingDocId(sessionUser.id, selectedHackathonId)
+            buildJudgeRankingDocId(judgeId, selectedHackathonId)
           );
           const rankingSnap = await getDoc(rankingRef);
+          if (!current) return;
           const ranking = parseTop3RankingFromFirestore(
             rankingSnap.exists() ? (rankingSnap.data() as Record<string, unknown>) : undefined,
-            sessionUser.id,
+            judgeId,
             selectedHackathonId
           );
           setTop3Ranks(ranking.ranks);
           setTop3RanksBaseline(ranking.ranks);
           setTop3SavedAt(ranking.updated_at);
+          setLoadedWorkspaceScope(workspaceScope);
         } catch (rankingError: unknown) {
+          if (!current) return;
           const rankingMessage =
             typeof rankingError === "object" && rankingError && "message" in rankingError
               ? String((rankingError as { message?: string }).message)
               : "Failed to load your top 3 ranking.";
           setJudgeMessage(rankingMessage);
+          setWorkspaceLoadError(rankingMessage);
         }
       } catch (error: unknown) {
+        if (!current) return;
         const message =
           typeof error === "object" && error && "message" in error
             ? String((error as { message?: string }).message)
             : "Failed to load submissions.";
         setJudgeMessage(message);
+        setWorkspaceLoadError(message);
       } finally {
-        setIsLoadingSubmissions(false);
+        if (current) {
+          setIsLoadingSubmissions(false);
+        }
       }
     };
 
     if (!isLoadingCriteria) {
       void loadHackathonSubmissions();
     }
+    return () => { current = false; };
   }, [
-    sessionUser,
+    judgeId,
+    judgeRole,
     db,
     judgingCriteria,
     isLoadingCriteria,
     selectedHackathonId,
     canAccessSelectedHackathon,
     allowedHackathonIds.length,
+    workspaceScope,
+    loadRetry,
   ]);
 
   useEffect(() => {
-    if (!pendingJudgeRestore || !judgeId || isLoadingSubmissions) return;
+    if (!pendingJudgeRestore || !judgeId || isWorkspaceLoading) return;
     const draft = pendingJudgeRestore.value as JudgeWorkspaceDraft;
     setJudgeSubmissions((current) =>
       applyJudgeWorkspaceDraft(current, draft, judgeId, judgingCriteria)
@@ -348,19 +404,21 @@ export default function JudgeDashboardPage() {
     pendingJudgeRestore,
     consumeJudgeRestore,
     judgeId,
-    isLoadingSubmissions,
+    isWorkspaceLoading,
     judgingCriteria,
   ]);
 
   // Persist partial score progress to Firestore so sudden closes don't lose mid-scoring work.
   useEffect(() => {
-    if (!sessionUser || !canAccessSelectedHackathon || isLoadingSubmissions) return;
+    if (!sessionUser || !canAccessSelectedHackathon || isWorkspaceLoading) return;
+    if (savingSubmissionId || savingFinalSubmissionId) return;
     if (!isJudgeDraftDirty) return;
 
     const timer = window.setTimeout(() => {
       void (async () => {
         const updates = judgeSubmissionsRef.current;
-        let wroteAnything = false;
+        const savedSubmissions = new Map<string, Submission>();
+        let failedCount = 0;
         await Promise.all(
           updates.map(async (submission) => {
             const baseline = judgeSubmissionsBaseline.find((item) => item.id === submission.id);
@@ -397,7 +455,7 @@ export default function JudgeDashboardPage() {
               : null;
 
             try {
-              await updateDoc(
+              await queueScoreWrite(submission.id, () => updateDoc(
                 doc(db, "submissions", submission.id),
                 {
                   ...(notesChanged || criteriaChanged
@@ -412,18 +470,23 @@ export default function JudgeDashboardPage() {
                       )
                     : {}),
                 }
-              );
-              wroteAnything = true;
+              ));
+              if (workspaceScopeRef.current !== workspaceScope) return;
+              savedSubmissions.set(submission.id, submission);
+              setJudgeSubmissionsBaseline((current) => current.map((item) => item.id === submission.id ? submission : item));
             } catch {
               // Local draft remains.
+              failedCount += 1;
             }
           })
         );
 
-        if (wroteAnything) {
-          setJudgeSubmissionsBaseline(updates);
-          setTop3RanksBaseline(top3Ranks);
-          setJudgeMessage("Scores draft autosaved.");
+        if (workspaceScopeRef.current !== workspaceScope) return;
+        if (savedSubmissions.size > 0) {
+          // The ballot is saved separately; scoring writes never acknowledge it.
+          setJudgeMessage(failedCount > 0 ? "Some scores could not be saved. Your unsaved draft is still in this browser." : "Scores draft autosaved.");
+        } else if (failedCount > 0) {
+          setJudgeMessage("Scores could not be autosaved. Your draft is still in this browser.");
         }
       })();
     }, 3000);
@@ -432,13 +495,17 @@ export default function JudgeDashboardPage() {
   }, [
     sessionUser,
     canAccessSelectedHackathon,
-    isLoadingSubmissions,
+    isWorkspaceLoading,
+    savingSubmissionId,
+    savingFinalSubmissionId,
     isJudgeDraftDirty,
     judgeSubmissions,
     judgeSubmissionsBaseline,
     judgingCriteria,
     top3Ranks,
     db,
+    workspaceScope,
+    queueScoreWrite,
   ]);
 
   const filteredJudgeSubmissions = judgeSubmissions;
@@ -602,7 +669,7 @@ export default function JudgeDashboardPage() {
 
   const handleJudgeSave = useCallback(
     async (submissionId: string) => {
-      if (!sessionUser || !canAccessSelectedHackathon) return;
+      if (!sessionUser || !canAccessSelectedHackathon || isWorkspaceLoading) return;
 
       const submission = judgeSubmissionsRef.current.find((item) => item.id === submissionId);
       if (!submission) {
@@ -626,96 +693,43 @@ export default function JudgeDashboardPage() {
       try {
         const submissionRef = doc(db, "submissions", submission.id);
 
-        await updateDoc(
+        await queueScoreWrite(submission.id, () => updateDoc(
           submissionRef,
           buildJudgeScoreFirestoreUpdate(sessionUser.id, score, notes, cleanedCriteriaScores)
-        );
+        ));
 
-        const savedSnap = await getDoc(submissionRef);
-        if (savedSnap.exists()) {
-          const remapped = mapSubmissionForJudge(
-            { id: savedSnap.id, ...(savedSnap.data() as Omit<Submission, "id">) },
-            sessionUser.id,
-            judgingCriteria
-          );
-          setJudgeSubmissions((current) =>
-            current.map((item) => (item.id === submissionId ? remapped : item))
-          );
-          setJudgeSubmissionsBaseline((current) => {
-            const exists = current.some((item) => item.id === submissionId);
-            if (!exists) return [...current, remapped];
-            return current.map((item) => (item.id === submissionId ? remapped : item));
-          });
-        } else {
-          setJudgeSubmissions((current) =>
-            current.map((item) =>
-              item.id === submission.id
-                ? {
-                    ...item,
-                    judge_score: score,
-                    judge_notes: notes,
-                    judge_scores: {
-                      ...(item.judge_scores ?? {}),
-                      [sessionUser.id]: score,
-                    },
-                    judge_notes_by_judge: {
-                      ...(item.judge_notes_by_judge ?? {}),
-                      [sessionUser.id]: notes,
-                    },
-                    judge_criteria_scores: cleanedCriteriaScores,
-                    judge_criteria_scores_by_judge: {
-                      ...(item.judge_criteria_scores_by_judge ?? {}),
-                      [sessionUser.id]: cleanedCriteriaScores,
-                    },
-                  }
-                : item
-            )
-          );
-          setJudgeSubmissionsBaseline((current) =>
-            current.map((item) =>
-              item.id === submission.id
-                ? {
-                    ...item,
-                    judge_score: score,
-                    judge_notes: notes,
-                    judge_scores: {
-                      ...(item.judge_scores ?? {}),
-                      [sessionUser.id]: score,
-                    },
-                    judge_notes_by_judge: {
-                      ...(item.judge_notes_by_judge ?? {}),
-                      [sessionUser.id]: notes,
-                    },
-                    judge_criteria_scores: cleanedCriteriaScores,
-                    judge_criteria_scores_by_judge: {
-                      ...(item.judge_criteria_scores_by_judge ?? {}),
-                      [sessionUser.id]: cleanedCriteriaScores,
-                    },
-                  }
-                : item
-            )
-          );
-        }
-
-        // Keep local draft for other unsaved submissions; rewrite snapshot after this save.
-        clearJudgeDraft();
+        if (workspaceScopeRef.current !== workspaceScope) return;
+        // Acknowledging the submitted snapshot must not overwrite edits typed
+        // while the network request was pending, or other unsaved scoring rounds.
+        setJudgeSubmissionsBaseline((current) => current.map((item) =>
+          item.id === submissionId ? {
+            ...item,
+            judge_score: score,
+            judge_notes: notes,
+            judge_criteria_scores: cleanedCriteriaScores,
+            judge_scores: { ...(item.judge_scores ?? {}), [sessionUser.id]: score },
+            judge_notes_by_judge: { ...(item.judge_notes_by_judge ?? {}), [sessionUser.id]: notes },
+            judge_criteria_scores_by_judge: { ...(item.judge_criteria_scores_by_judge ?? {}), [sessionUser.id]: cleanedCriteriaScores },
+          } : item,
+        ));
         setJudgeMessage("Scores saved. You can still edit or redo them anytime.");
       } catch (error: unknown) {
+        if (workspaceScopeRef.current !== workspaceScope) return;
         const message =
           typeof error === "object" && error && "message" in error
             ? String((error as { message?: string }).message)
             : "An error occurred while saving scores.";
         setJudgeMessage(message);
       } finally {
-        setSavingSubmissionId(null);
+        if (workspaceScopeRef.current === workspaceScope) setSavingSubmissionId(null);
       }
     },
-    [sessionUser, db, judgingCriteria, canAccessSelectedHackathon, clearJudgeDraft]
+    [sessionUser, db, judgingCriteria, canAccessSelectedHackathon, isWorkspaceLoading, workspaceScope, queueScoreWrite]
   );
 
   const handleFinalJudgeSave = useCallback(
     async (submissionId: string) => {
-      if (!sessionUser || !canAccessSelectedHackathon) return;
+      if (!sessionUser || !canAccessSelectedHackathon || isWorkspaceLoading) return;
 
       const submission = judgeSubmissionsRef.current.find((item) => item.id === submissionId);
       if (!submission) {
@@ -754,7 +768,7 @@ export default function JudgeDashboardPage() {
       setJudgeMessage(null);
       setSavingFinalSubmissionId(submissionId);
       try {
-        await updateDoc(
+        await queueScoreWrite(submission.id, () => updateDoc(
           doc(db, "submissions", submission.id),
           buildFinalJudgeScoreFirestoreUpdate(
             sessionUser.id,
@@ -762,22 +776,22 @@ export default function JudgeDashboardPage() {
             notes,
             cleanedCriteriaScores
           )
-        );
-        setJudgeSubmissions((current) => current.map(applySavedFinalMark));
+        ));
+        if (workspaceScopeRef.current !== workspaceScope) return;
         setJudgeSubmissionsBaseline((current) => current.map(applySavedFinalMark));
-        clearJudgeDraft();
         setJudgeMessage("Final-round marks saved separately from the overall score.");
       } catch (error: unknown) {
+        if (workspaceScopeRef.current !== workspaceScope) return;
         const message =
           typeof error === "object" && error && "message" in error
             ? String((error as { message?: string }).message)
             : "An error occurred while saving final-round marks.";
         setJudgeMessage(message);
       } finally {
-        setSavingFinalSubmissionId(null);
+        if (workspaceScopeRef.current === workspaceScope) setSavingFinalSubmissionId(null);
       }
     },
-    [sessionUser, db, judgingCriteria, canAccessSelectedHackathon, clearJudgeDraft]
+    [sessionUser, db, judgingCriteria, canAccessSelectedHackathon, isWorkspaceLoading, workspaceScope, queueScoreWrite]
   );
 
   const handleTop3RankChange = (slot: Top3RankSlot, submissionId: string | null) => {
@@ -789,7 +803,7 @@ export default function JudgeDashboardPage() {
   };
 
   const handleSaveTop3Ranking = useCallback(async () => {
-    if (!sessionUser || !canAccessSelectedHackathon) return;
+    if (!sessionUser || !canAccessSelectedHackathon || isWorkspaceLoading) return;
 
     const finalistIds = judgeSubmissionsRef.current
       .filter((submission) => submission.final_shortlisted)
@@ -819,20 +833,21 @@ export default function JudgeDashboardPage() {
       );
 
       await setDoc(rankingRef, payload, { merge: true });
+      if (workspaceScopeRef.current !== workspaceScope) return;
       setTop3SavedAt(payload.updated_at);
       setTop3RanksBaseline(top3Ranks);
-      clearJudgeDraft();
       setJudgeMessage("Top 3 ranking saved.");
     } catch (error: unknown) {
+      if (workspaceScopeRef.current !== workspaceScope) return;
       const message =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
           : "An error occurred while saving your top 3 ranking.";
       setJudgeMessage(message);
     } finally {
-      setIsSavingTop3(false);
+      if (workspaceScopeRef.current === workspaceScope) setIsSavingTop3(false);
     }
-  }, [sessionUser, db, top3Ranks, selectedHackathonId, canAccessSelectedHackathon, clearJudgeDraft]);
+  }, [sessionUser, db, top3Ranks, selectedHackathonId, canAccessSelectedHackathon, isWorkspaceLoading, workspaceScope]);
 
   if (authLoading) {
     return (
@@ -873,6 +888,14 @@ export default function JudgeDashboardPage() {
         allowedHackathons.length > 0 ? setSelectedHackathonId : undefined
       }
     >
+      {workspaceLoadError ? (
+        <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+          <p>Could not load the scoring workspace: {workspaceLoadError}</p>
+          <button type="button" className="mt-3 font-medium underline underline-offset-4" onClick={() => setLoadRetry((current) => current + 1)}>
+            Retry loading scores
+          </button>
+        </div>
+      ) : null}
       {allowedHackathons.length === 0 ? (
         <section className={sectionClass}>
           <p className="dash-eyebrow">Event access</p>
@@ -896,7 +919,7 @@ export default function JudgeDashboardPage() {
             selectedHackathon={selectedHackathon}
             judgingCriteria={judgingCriteria}
             submissions={finalRoundSubmissions}
-            isLoading={isLoadingSubmissions || isLoadingCriteria}
+            isLoading={isWorkspaceLoading}
             onCriterionScoreChange={handleFinalCriterionScoreChange}
             onNotesChange={handleFinalJudgeNotesChange}
             onSave={handleFinalJudgeSave}
@@ -913,7 +936,7 @@ export default function JudgeDashboardPage() {
           selectedHackathon={selectedHackathon}
           judgingCriteria={judgingCriteria}
           submissions={filteredJudgeSubmissions}
-          isLoadingSubmissions={isLoadingSubmissions || isLoadingCriteria}
+          isLoadingSubmissions={isWorkspaceLoading}
           judgeMessage={judgeMessage}
           summary={judgeSummary}
           finalSummary={finalJudgeSummary}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import {
@@ -31,7 +31,7 @@ import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { formDraftStorageKey } from "@/lib/formDrafts";
-import { getFirestoreDb } from "@/lib/firebaseClient";
+import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
 import {
   fetchAiHackathon,
   fetchJoinablePortalHackathons,
@@ -58,6 +58,7 @@ import { cn } from "@/lib/utils";
 type OnboardingStep = 1 | 2 | 3;
 
 type OnboardingForm = {
+  customRole?: string;
   fullName: string;
   headline: string;
   publicRole: string;
@@ -212,10 +213,19 @@ export default function ParticipantOnboardingPage() {
   );
   const [form, setForm] = useState<OnboardingForm>(emptyForm);
   const [formBaseline, setFormBaseline] = useState<OnboardingForm>(emptyForm);
-  const [customRole, setCustomRole] = useState("");
+  const customRole = form.customRole ?? "";
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+  const isCurrentAccount = () => mountedRef.current &&
+    Boolean(sessionUser && getFirebaseAuth().currentUser?.uid === sessionUser.id);
 
   const selectedHackathon = useMemo(
     () => resolvePortalHackathon(hackathonId, joinableHackathons),
@@ -237,7 +247,7 @@ export default function ParticipantOnboardingPage() {
   } = useFormDraftPersistence<OnboardingForm>({
     storageKey: onboardingDraftKey,
     value: form,
-    enabled: Boolean(sessionUser?.role === "participant") && !isLoading && !authLoading,
+    enabled: Boolean(sessionUser?.role === "participant") && !isLoading && !authLoading && !loadError,
     baseline: formBaseline,
     debounceMs: 400,
   });
@@ -257,6 +267,7 @@ export default function ParticipantOnboardingPage() {
     let cancelled = false;
     const load = async () => {
       setIsLoading(true);
+      setLoadError(null);
       try {
         const [joinable, snap] = await Promise.all([
           fetchJoinablePortalHackathons(db).catch(() => [] as PortalHackathon[]),
@@ -307,6 +318,7 @@ export default function ParticipantOnboardingPage() {
           setJoinableHackathons(nextJoinable);
           setHackathonId(nextId);
           const nextForm: OnboardingForm = {
+            customRole: loadedRole && !knownRoleIds.has(loadedRole as (typeof ROLE_OPTIONS)[number]["id"]) ? loadedRole : "",
             fullName: typeof data.fullName === "string" ? data.fullName : "",
             headline: typeof data.headline === "string" ? data.headline : "",
             publicRole: loadedRole,
@@ -329,10 +341,9 @@ export default function ParticipantOnboardingPage() {
           };
           setForm(nextForm);
           setFormBaseline(nextForm);
-          if (loadedRole && !knownRoleIds.has(loadedRole as (typeof ROLE_OPTIONS)[number]["id"])) {
-            setCustomRole(loadedRole);
-          }
         }
+      } catch {
+        if (!cancelled) setLoadError("Could not load your profile. Retry before continuing onboarding.");
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -342,7 +353,9 @@ export default function ParticipantOnboardingPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, db, knownRoleIds, preferredHackathonId, sessionUser]);
+    // Same-account profile notifications must not reset fields while onboarding.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, db, knownRoleIds, preferredHackathonId, sessionUser?.id, sessionUser?.role, loadAttempt]);
 
   useEffect(() => {
     if (!pendingOnboardingRestore) return;
@@ -372,8 +385,17 @@ export default function ParticipantOnboardingPage() {
     );
   }
 
-  if (!participantNeedsOnboarding(sessionUser)) {
+  if (!isSaving && !participantNeedsOnboarding(sessionUser)) {
     return <Navigate to="/dashboard/participant" replace />;
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-background p-6">
+        <p role="alert">{loadError}</p>
+        <Button type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Retry loading profile</Button>
+      </div>
+    );
   }
 
   const updateField = <K extends keyof OnboardingForm>(key: K, value: OnboardingForm[K]) => {
@@ -382,10 +404,10 @@ export default function ParticipantOnboardingPage() {
   };
 
   const selectRole = (roleId: string) => {
-    setCustomRole("");
     updateField("publicRole", roleId);
     setForm((prev) => ({
       ...prev,
+      customRole: "",
       publicRole: roleId,
       headline: prev.headline.trim()
         ? prev.headline
@@ -448,6 +470,7 @@ export default function ParticipantOnboardingPage() {
   };
 
   const finishOnboarding = async (options?: { skip?: boolean }) => {
+    if (!isCurrentAccount() || isLoading || loadError || isSaving) return;
     const skip = options?.skip === true;
     if (!skip) {
       const message = validateStep(step);
@@ -480,6 +503,7 @@ export default function ParticipantOnboardingPage() {
     setError(null);
     try {
       await checkParticipantEventEnrollment(db, hackathonId, sessionUser.hackathonIds, sessionUser.hackathonId);
+      if (!isCurrentAccount()) return;
       const githubUsername = normalizeGithubUsername(form.githubUsername);
       const role = resolvedRole();
       const now = new Date().toISOString();
@@ -516,6 +540,7 @@ export default function ParticipantOnboardingPage() {
         },
         { merge: true }
       );
+      if (!isCurrentAccount()) return;
       queueParticipantEmail({
         type: "welcome",
         hackathonName: selectedHackathon.name,
@@ -717,8 +742,8 @@ export default function ParticipantOnboardingPage() {
                       className="mt-3"
                       value={customRole}
                       onChange={(e) => {
-                        setCustomRole(e.target.value);
-                        updateField("publicRole", "Other");
+                        setForm((current) => ({ ...current, customRole: e.target.value, publicRole: "Other" }));
+                        setError(null);
                       }}
                       placeholder="Describe your role (optional)"
                     />

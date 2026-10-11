@@ -1,0 +1,42 @@
+{
+  "score": 1,
+  "summary": "Scoped submission and score-write regressions are fixed and emulator-tested locally. This is not an overall security approval: existing authentication and event-isolation risks require a separate migration before a broad rollout. Live rules could not be inspected because the CLI account lacks project permissions.",
+  "findings": [
+    {
+      "check": "Automatic host workflow and ownership continuity",
+      "severity": "major",
+      "issue": "Fixed locally: admin-assisted publishing could lock the original host out of republishing, legacy linked listings could fail on missing creator metadata, and republishing reset the judging rubric.",
+      "recommendation": "Deploy the ownership-preserving publishing change and rules after review. Full host, participant, invite/approval and judging workflows are now tested with arbitrary new event IDs; keep approval and pause/close restrictions in place."
+    },
+    {
+      "check": "Business logic and optional fields",
+      "severity": "major",
+      "issue": "Fixed locally: the ElevenLabs document omits submissionMode and the previous direct field read denied legitimate submissions. A teammate array query also failed when evaluating an unrelated missing owner field.",
+      "recommendation": "Review and deploy the patched rules; retain the emulator regressions for participant and teammate queries and writes."
+    },
+    {
+      "check": "Create/update bypass and judge ownership",
+      "severity": "major",
+      "issue": "Fixed locally: participants could inject preliminary marks, and approved staff could overwrite another judge's maps or project content.",
+      "recommendation": "Keep score fields organiser/judge-controlled and enforce per-UID map diffs, with separate final-round shortlist validation."
+    },
+    {
+      "check": "Authentication authority",
+      "severity": "critical",
+      "issue": "Existing code trusts a portal-admin email pattern without requiring verified email or an admin custom claim. This bootstrap was not changed during the submission patch.",
+      "recommendation": "Migrate the existing internal administrator to a server-managed identity/claim before removing the bootstrap; do not lock out the organiser with an unplanned role change."
+    },
+    {
+      "check": "Event isolation and role integrity",
+      "severity": "major",
+      "issue": "Existing approved staff/host reads are broad, staff event assignments can be self-edited, and invite/membership authority needs a coordinated review. The patch protects judge-owned map entries, not event-level authorization.",
+      "recommendation": "Move event assignments under organiser authority and validate invite/membership bindings before enforcing matching event-scoped queries."
+    },
+    {
+      "check": "Types, sizes and mixed-content data",
+      "severity": "moderate",
+      "issue": "New score-map writes have score, note-length and criteria-map bounds, but dynamic criterion values/totals need server-side validation. Submission owners still read the existing mixed submission/marks document.",
+      "recommendation": "Validate each criterion and computed total against organiser criteria in a trusted service, and separate private judging notes if they must be hidden from participants."
+    }
+  ]
+}

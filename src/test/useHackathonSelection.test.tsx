@@ -187,4 +187,34 @@ describe("useHackathonSelection url sync", () => {
       expect(result.current.selectedHackathon.name).toBe("Impact Kyoto 2026");
     });
   });
+
+  it("keeps a manually selected past event when URL synchronization is disabled", async () => {
+    const { result } = renderHook(
+      () => useHackathonSelection("test_participant", undefined, catalogWithIdeathon, { preferCurrent: true }),
+      { wrapper: wrapperFor("/dashboard/participant") },
+    );
+    expect(result.current.selectedHackathonId).toBe(hostedIdeathonId);
+
+    act(() => result.current.setSelectedHackathonId(SITE_HACKATHON_ID));
+
+    await waitFor(() => expect(result.current.selectedHackathonId).toBe(SITE_HACKATHON_ID));
+    expect(window.localStorage.getItem("test_participant")).toBe(SITE_HACKATHON_ID);
+  });
+
+  it("upgrades its automatically seeded fallback when the live event catalog loads", async () => {
+    const { result, rerender } = renderHook(
+      ({ catalog }) => {
+        const selection = useHackathonSelection("test_participant", undefined, catalog, { preferCurrent: true, syncUrl: true });
+        const [params] = useSearchParams();
+        return { ...selection, urlHackathon: params.get("hackathon") };
+      },
+      { initialProps: { catalog: PORTAL_HACKATHONS }, wrapper: wrapperFor("/dashboard/participant") },
+    );
+    await waitFor(() => expect(result.current.urlHackathon).toBe(SITE_HACKATHON_ID));
+
+    rerender({ catalog: catalogWithIdeathon });
+
+    await waitFor(() => expect(result.current.selectedHackathonId).toBe(hostedIdeathonId));
+    expect(result.current.urlHackathon).toBe(hostedIdeathonId);
+  });
 });

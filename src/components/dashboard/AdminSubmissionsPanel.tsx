@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -359,12 +359,6 @@ export function AdminSubmissionsPanel({
   onSetSubmissionPublic,
 }: AdminSubmissionsPanelProps) {
   const [eventFilter, setEventFilter] = useState<HackathonId | "all">("all");
-
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7752/ingest/e37c9ea6-3a22-4110-a9e4-4334f1ef0ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'608977'},body:JSON.stringify({sessionId:'608977',runId:'post-fix',hypothesisId:'B',location:'AdminSubmissionsPanel.tsx:mount',message:'make-public props wired',data:{hasHandler:typeof onSetSubmissionPublic==='function',publishingSubmissionId,submissionCount:submissions.length,publicCount:submissions.filter((s)=>s.isPublic).length,missingIsPublic:submissions.filter((s)=>typeof s.isPublic!=='boolean').length},timestamp:Date.now()})}).catch(()=>{});
-  }, [onSetSubmissionPublic, publishingSubmissionId, submissions]);
-  // #endregion
 
   const eventGroups = useMemo(
     () =>

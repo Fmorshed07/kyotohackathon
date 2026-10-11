@@ -4,6 +4,7 @@ import HeroSection from "@/components/sections/HeroSection";
 import JapanHeroSection from "@/components/ecosystem/JapanHeroSection";
 import PartnersSection from "@/components/ecosystem/PartnersSection";
 import EventShowcase from "@/components/ecosystem/EventShowcase";
+import ElevenLabsParticipantShowcase from "@/components/hackathons/ElevenLabsParticipantShowcase";
 import CommunityFooter from "@/components/ecosystem/CommunityFooter";
 import LiveEventsSection from "@/components/sections/LiveEventsSection";
 import HostSection from "@/components/sections/HostSection";
@@ -27,6 +28,7 @@ const Index = () => {
       <PartnersSection />
       <LiveEventsSection showPastEvents={false} />
       <EventShowcase />
+      <ElevenLabsParticipantShowcase />
       <FeaturePreviewSection />
       <HostSection />
       <AboutSection />

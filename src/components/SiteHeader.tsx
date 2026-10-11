@@ -1,6 +1,7 @@
 import { Menu, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import GoogleTranslate from "@/components/GoogleTranslate";
@@ -55,6 +56,8 @@ const SiteHeader = () => {
       await signOut();
       closeMobileNav();
       navigate("/");
+    } catch {
+      toast.error("Could not sign out. Please try again.");
     } finally {
       setIsSigningOut(false);
     }

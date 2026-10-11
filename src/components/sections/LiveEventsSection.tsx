@@ -4,6 +4,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, CalendarDays, CalendarP
 import { useEventPreviews } from "@/hooks/useEventPreviews";
 import PastEventsSection from "@/components/sections/PastEventsSection";
 import CommunityAtmosphere from "@/components/CommunityAtmosphere";
+import CreatorsCircuitLivePreview from "@/components/CreatorsCircuitLivePreview";
 import { useAmbientMotion } from "@/hooks/useAmbientMotion";
 import { getHostedHackathonUrl, type HostedHackathon } from "@/lib/aiHackathons";
 import { downloadEventCalendar } from "@/lib/eventCalendar";
@@ -188,6 +189,7 @@ export default function LiveEventsSection({ showPastEvents = true }: { showPastE
           </div>
         )}
 
+        <CreatorsCircuitLivePreview />
         {showPastEvents && <PastEventsSection events={past} />}
         <div className="event-section-footer"><span className="event-kicker">Real connections. New possibilities.</span><a href="#host">Create a moment of your own <ArrowUpRight aria-hidden="true" /></a></div>
       </div>

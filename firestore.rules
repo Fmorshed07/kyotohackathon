@@ -15,7 +15,7 @@ service cloud.firestore {
     }
 
     function currentUserRole() {
-      return userDocExists() ? get(userDocPath()).data.role : null;
+      return userDocExists() ? get(userDocPath()).data.get("role", null) : null;
     }
 
     // Built-in portal admin account (username/password login — hidden Firebase email).
@@ -26,19 +26,21 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      let role = currentUserRole();
       return isSignedIn() && (
         isPortalAdminAccount()
-        || currentUserRole() == "admin"
-        || currentUserRole() == "admins"
+        || role == "admin"
+        || role == "admins"
       );
     }
 
     function isStaff() {
+      let role = currentUserRole();
       return isSignedIn() && (
-        currentUserRole() == "judge"
-        || currentUserRole() == "judges"
-        || currentUserRole() == "mentor"
-        || currentUserRole() == "mentors"
+        role == "judge"
+        || role == "judges"
+        || role == "mentor"
+        || role == "mentors"
       );
     }
 
@@ -47,8 +49,9 @@ service cloud.firestore {
     }
 
     function isHost() {
+      let role = currentUserRole();
       return isSignedIn() && (
-        currentUserRole() == "host" || currentUserRole() == "hosts"
+        role == "host" || role == "hosts"
       );
     }
 
@@ -174,8 +177,10 @@ service cloud.firestore {
     }
 
     function ownsHostEvent(eventId) {
-      return exists(/databases/$(database)/documents/host_events/$(eventId))
-        && get(/databases/$(database)/documents/host_events/$(eventId)).data.owner_id == request.auth.uid;
+      return isSignedIn()
+        && eventId is string && eventId.size() > 0
+        && exists(/databases/$(database)/documents/host_events/$(eventId))
+        && get(/databases/$(database)/documents/host_events/$(eventId)).data.get("owner_id", "") == request.auth.uid;
     }
 
     function ownsHackathon(hackathonId) {
@@ -183,11 +188,11 @@ service cloud.firestore {
         && hackathonId.size() > 0
         && exists(/databases/$(database)/documents/hackathons/$(hackathonId))
         && (
-          get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.createdBy == request.auth.uid
+          get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.get("createdBy", "") == request.auth.uid
           || (
-            get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.hostEventId is string
+            get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.get("hostEventId", "") is string
             && ownsHostEvent(
-              get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.hostEventId
+              get(/databases/$(database)/documents/hackathons/$(hackathonId)).data.get("hostEventId", "")
             )
           )
         );
@@ -216,19 +221,19 @@ service cloud.firestore {
       return !(hackathonId is string && hackathonId.size() > 0)
         || !exists(hackathonPath(hackathonId))
         || (
-          get(hackathonPath(hackathonId)).data.submissionMode != "paused"
-          && get(hackathonPath(hackathonId)).data.submissionMode != "closed"
+          get(hackathonPath(hackathonId)).data.get("submissionMode", "open") != "paused"
+          && get(hackathonPath(hackathonId)).data.get("submissionMode", "open") != "closed"
         );
     }
 
     function requestHackathonId() {
-      return request.resource.data.hackathon_id is string
+      return request.resource.data.get("hackathon_id", null) is string
         ? request.resource.data.hackathon_id
         : "";
     }
 
     function existingHackathonId() {
-      return resource.data.hackathon_id is string ? resource.data.hackathon_id : "";
+      return resource.data.get("hackathon_id", null) is string ? resource.data.hackathon_id : "";
     }
 
     // Approved hosts may approve pending judges/mentors for events they own.
@@ -351,26 +356,29 @@ service cloud.firestore {
     }
 
     match /submissions/{submissionId} {
+      // Participant payloads contain project/team fields only. All preliminary,
+      // legacy and final scoring fields belong to judges or organisers.
       function isSubmissionOwner() {
-        return isSignedIn() && resource.data.user_id == request.auth.uid;
+        return isSignedIn() && resource.data.get("user_id", "") == request.auth.uid;
       }
 
       function isSubmissionTeammate() {
         return isSignedIn()
           && (
-            (
-              resource.data.member_user_ids is list
-              && request.auth.uid in resource.data.member_user_ids
-            )
+            request.auth.uid in resource.data.get("member_user_ids", [])
             || exists(/databases/$(database)/documents/team_memberships/$(submissionId + '_' + request.auth.uid))
           );
       }
 
       function submissionCoreUnchanged() {
+        let beforeEvent = resource.data.get("hackathon_id", null);
+        let afterEvent = request.resource.data.get("hackathon_id", null);
         return request.resource.data.user_id == resource.data.user_id
           && (
-            !("hackathon_id" in resource.data)
-            || request.resource.data.hackathon_id == resource.data.hackathon_id
+            afterEvent == beforeEvent
+            // The portal maps old event-less records to Impact Tokyo. Its save
+            // flow backfills this id; that is not a transfer to another event.
+            || (beforeEvent in [null, ""] && afterEvent == "impact-tokyo")
           );
       }
 
@@ -378,27 +386,58 @@ service cloud.firestore {
         return !("team_leader_id" in request.resource.data)
           || request.resource.data.team_leader_id == resource.data.user_id
           || (
-            resource.data.member_user_ids is list
-            && request.resource.data.team_leader_id in resource.data.member_user_ids
+            resource.data.get("member_user_ids", []) is list
+            && request.resource.data.team_leader_id in resource.data.get("member_user_ids", [])
           )
           || request.resource.data.team_leader_id == request.auth.uid;
       }
 
-      function finalShortlistFieldsUnchanged() {
-        return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          "final_shortlisted",
-          "final_shortlisted_at"
-        ]);
-      }
-
-      function finalRoundFieldsUnchanged() {
-        return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+      function judgingFields() {
+        return [
+          "judge_id",
+          "judge_score",
+          "judge_notes",
+          "judge_criteria_scores",
+          "judge_scores",
+          "judge_notes_by_judge",
+          "judge_criteria_scores_by_judge",
           "final_shortlisted",
           "final_shortlisted_at",
           "final_judge_scores",
           "final_judge_notes_by_judge",
           "final_judge_criteria_scores_by_judge"
-        ]);
+        ];
+      }
+
+      // Dotted SDK updates must preserve every other judge's entry. Check both
+      // additions and removals, including replacing an entire map.
+      function validOwnJudgeMapChange(field, valueType) {
+        let before = resource.data.get(field, {});
+        let after = request.resource.data.get(field, {});
+        let value = after is map ? after.get(request.auth.uid, null) : null;
+        return after is map
+          && after.diff(before is map ? before : {}).affectedKeys().hasOnly([request.auth.uid])
+          && (
+            (valueType == "score" && value is number && value >= 0 && value <= 10000)
+            || (valueType == "notes" && value is string && value.size() <= 10000)
+            || (valueType == "criteria" && value is map && value.size() > 0 && value.size() <= 50)
+          );
+      }
+
+      function validJudgeRoundUpdate(prefix) {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        let scores = prefix + "_scores";
+        let notes = prefix + "_notes_by_judge";
+        let criteria = prefix + "_criteria_scores_by_judge";
+        return changed.hasOnly([scores, notes, criteria])
+          && (!changed.hasAny([scores]) || validOwnJudgeMapChange(scores, "score"))
+          && (!changed.hasAny([notes]) || validOwnJudgeMapChange(notes, "notes"))
+          && (!changed.hasAny([criteria]) || validOwnJudgeMapChange(criteria, "criteria"));
+      }
+
+      function canUpdateOwnJudgeMarks() {
+        return validJudgeRoundUpdate("judge")
+          || (resource.data.get("final_shortlisted", false) == true && validJudgeRoundUpdate("final_judge"));
       }
 
       function teammateEditableKeys() {
@@ -450,36 +489,34 @@ service cloud.firestore {
         )
         || (
           request.auth.uid == request.resource.data.user_id
-          && !request.resource.data.keys().hasAny([
-            "final_shortlisted",
-            "final_shortlisted_at",
-            "final_judge_scores",
-            "final_judge_notes_by_judge",
-            "final_judge_criteria_scores_by_judge"
-          ])
+          && !request.resource.data.keys().hasAny(judgingFields())
           && hackathonAllowsParticipantProjectWrites(requestHackathonId())
         )
       );
       allow update: if isSignedIn() && (
-        (isApprovedStaff() && finalShortlistFieldsUnchanged())
-        || isAdmin()
+        isAdmin()
         || (
           isApprovedHost()
           && resource.data.hackathon_id is string
           && ownsHackathon(resource.data.hackathon_id)
         )
-        || isInviteJoinUpdate()
         || (
-          isSubmissionOwner()
-          && finalRoundFieldsUnchanged()
-          && hackathonAllowsParticipantProjectWrites(existingHackathonId())
-        )
-        || (
-          isSubmissionTeammate()
-          && submissionCoreUnchanged()
-          && teammateEditableKeys()
-          && validTeamLeader()
-          && hackathonAllowsParticipantProjectWrites(existingHackathonId())
+          isApprovedStaff() ? canUpdateOwnJudgeMarks() : (
+            isInviteJoinUpdate()
+            || (
+              isSubmissionOwner()
+              && submissionCoreUnchanged()
+              && !request.resource.data.diff(resource.data).affectedKeys().hasAny(judgingFields())
+              && hackathonAllowsParticipantProjectWrites(existingHackathonId())
+            )
+            || (
+              isSubmissionTeammate()
+              && submissionCoreUnchanged()
+              && teammateEditableKeys()
+              && validTeamLeader()
+              && hackathonAllowsParticipantProjectWrites(existingHackathonId())
+            )
+          )
         )
       );
       allow delete: if isAdmin()
@@ -853,6 +890,15 @@ service cloud.firestore {
     // Public pages load published events. Approved hosts can publish/update their own listings,
     // including pausing or closing submissions on events they own.
     match /hackathons/{hackathonId} {
+      function preservesListingCreator() {
+        return request.resource.data.get("createdBy", "") == resource.data.get("createdBy", "")
+          || (
+            !("createdBy" in resource.data)
+            && request.resource.data.createdBy == request.auth.uid
+            && ownsHostEvent(resource.data.get("hostEventId", ""))
+          );
+      }
+
       allow get: if resource.data.published == true
         || canManageHackathon(hackathonId);
       allow list: if resource.data.published == true || isAdmin();
@@ -871,7 +917,7 @@ service cloud.firestore {
         || (
           isApprovedHost()
           && ownsHackathon(hackathonId)
-          && request.resource.data.createdBy == resource.data.createdBy
+          && preservesListingCreator()
           && (
             !("hostEventId" in resource.data)
             || request.resource.data.hostEventId == resource.data.hostEventId

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import {
   ArrowLeft,
@@ -18,6 +18,7 @@ import { EventRichText } from "@/components/EventRichText";
 import SiteHeader from "@/components/SiteHeader";
 import { HackathonSubscribeForm } from "@/components/hackathons/HackathonSubscribeForm";
 import ImportedEventDetails from "@/components/hackathons/ImportedEventDetails";
+import ElevenLabsParticipantShowcase from "@/components/hackathons/ElevenLabsParticipantShowcase";
 import { eventRegistrationClosedMessage, eventRegistrationLabel, isEventRegistrationClosed } from "@/lib/eventRegistration";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ import {
 } from "@/lib/eventBranding";
 import { getHackathonSubmissionMode } from "@/lib/hackathons";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { getBundledHackathon } from "@/lib/elevenLabsMeetup";
+import { ELEVENLABS_MEETUP_ID, getBundledHackathon } from "@/lib/elevenLabsMeetup";
 import { cn } from "@/lib/utils";
 
 type PublicCriterion = { id: string; title: string; weight: number; questions: string[] };
@@ -37,7 +38,9 @@ type PublicCriterion = { id: string; title: string; weight: number; questions: s
 const participantSignupHref = (eventId: string) =>
   `/signup?role=participant&hackathon=${encodeURIComponent(eventId)}`;
 
-const eventProjectsHref = (eventId: string) => `/projects?event=${encodeURIComponent(eventId)}`;
+const eventProjectsHref = (eventId: string) => eventId === ELEVENLABS_MEETUP_ID
+  ? "#participants"
+  : `/projects?event=${encodeURIComponent(eventId)}`;
 
 const normalizeCriteria = (value: unknown): PublicCriterion[] => {
   if (!Array.isArray(value)) return [];
@@ -446,10 +449,12 @@ function EventHero({
 
 export default function GeneratedHackathonPage() {
   const { hackathonId } = useParams<{ hackathonId: string }>();
+  const { hash } = useLocation();
   const [event, setEvent] = useState<HostedHackathon | null>(() => getBundledHackathon(hackathonId ?? ""));
   const [criteria, setCriteria] = useState<PublicCriterion[]>([]);
   const [isLoading, setIsLoading] = useState(() => !getBundledHackathon(hackathonId ?? ""));
   const [copied, setCopied] = useState(false);
+  const displayedEventId = event?.id;
 
   useEffect(() => {
     if (!hackathonId) {
@@ -483,6 +488,17 @@ export default function GeneratedHackathonPage() {
       isCurrent = false;
     };
   }, [hackathonId]);
+
+  useEffect(() => {
+    if (isLoading || !displayedEventId || !hash) return;
+    let sectionId: string;
+    try { sectionId = decodeURIComponent(hash.slice(1)); }
+    catch { return; }
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ block: "start", behavior: "instant" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [displayedEventId, hash, isLoading]);
 
   const themeStyle = useMemo(
     () =>
@@ -563,6 +579,7 @@ export default function GeneratedHackathonPage() {
                     { href: "#about", label: "About", show: Boolean(event.summary) },
                     { href: "#guests", label: "Guests", show: event.guests.length > 0 },
                     { href: "#gallery", label: "Gallery", show: event.galleryUrls.length > 0 },
+                    { href: "#participants", label: "Participant projects", show: event.id === ELEVENLABS_MEETUP_ID },
                     { href: "#schedule", label: "Schedule", show: true },
                     { href: "#judging", label: "Judging", show: true },
                     { href: "#requirements", label: "Requirements", show: true },
@@ -585,6 +602,7 @@ export default function GeneratedHackathonPage() {
 
               <div>
                 <ImportedEventDetails event={event} />
+                {event.id === ELEVENLABS_MEETUP_ID ? <ElevenLabsParticipantShowcase variant="event" /> : null}
                 {event.summary ? (
                   <section
                     id="about"

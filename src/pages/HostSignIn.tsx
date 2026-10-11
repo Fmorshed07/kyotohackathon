@@ -44,10 +44,10 @@ export default function HostSignIn() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && sessionUser?.role === "host") {
+    if (!loading && !isLoading && sessionUser?.role === "host") {
       navigate("/dashboard/host", { replace: true });
     }
-  }, [loading, navigate, sessionUser]);
+  }, [loading, isLoading, navigate, sessionUser]);
 
   const continueWithGoogle = async () => {
     setError(null);
@@ -66,9 +66,14 @@ export default function HostSignIn() {
       }
     }
     setIsLoading(true);
+    let accountId: string | undefined;
     try {
-      const result = await signInWithPopup(auth, new GoogleAuthProvider());
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      accountId = user.uid;
+      if (auth.currentUser?.uid !== user.uid) return;
       if (!user.email) {
         await firebaseSignOut(auth);
         setError("Your Google account does not have an email address.");
@@ -77,7 +82,9 @@ export default function HostSignIn() {
 
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
-      const existingRole = userSnap.data()?.role;
+      if (auth.currentUser?.uid !== user.uid) return;
+      const rawRole = userSnap.data()?.role;
+      const existingRole = typeof rawRole === "string" ? rawRole.trim().toLowerCase().replace(/s$/, "") : undefined;
 
       if (mode === "signin") {
         if (existingRole !== "host") {
@@ -109,8 +116,10 @@ export default function HostSignIn() {
         );
       }
 
+      if (auth.currentUser?.uid !== user.uid) return;
       navigate("/dashboard/host", { replace: true });
     } catch (authError: unknown) {
+      if (accountId && auth.currentUser?.uid !== accountId) return;
       setError(
         typeof authError === "object" && authError && "message" in authError
           ? String((authError as { message?: string }).message)
@@ -124,7 +133,7 @@ export default function HostSignIn() {
   if (loading) {
     return <div className="flex min-h-svh items-center justify-center bg-background text-sm text-muted-foreground">Loading...</div>;
   }
-  if (sessionUser?.role === "host") return <Navigate to="/dashboard/host" replace />;
+  if (!isLoading && sessionUser?.role === "host") return <Navigate to="/dashboard/host" replace />;
 
   const updateApplication = (field: keyof HostApplicationDraft, value: string) => {
     setApplication((current) => ({ ...current, [field]: value }));

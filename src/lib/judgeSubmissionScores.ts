@@ -162,7 +162,7 @@ export function sanitizeCriteriaScores(
 ): Record<string, number> {
   return Object.fromEntries(
     Object.entries(criteriaScores).filter(
-      (entry): entry is [string, number] => typeof entry[1] === "number"
+      (entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])
     )
   );
 }
@@ -171,7 +171,10 @@ export function areAllCriteriaScored(
   criteriaScores: Record<string, number | null | undefined>,
   criteria: JudgingCriterion[]
 ): boolean {
-  return criteria.every((criterion) => typeof criteriaScores[criterion.id] === "number");
+  return criteria.length > 0 && criteria.every((criterion) => {
+    const score = criteriaScores[criterion.id];
+    return typeof score === "number" && Number.isFinite(score) && score >= 0 && score <= criterion.weight;
+  });
 }
 
 export function buildJudgeScoreFirestoreUpdate(

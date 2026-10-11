@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { assertSubmissionsWritable, fetchPortalHackathonCatalog, hostedToPortalHackathon, subscribeHackathon } from "@/lib/aiHackathons";
-import { getFirestoreDb } from "@/lib/firebaseClient";
+import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
 import { buildInviteUrl } from "@/lib/inviteTokens";
 import {
   collectAccessibleHackathonIds,
@@ -38,7 +38,6 @@ import {
   setTeamLeader,
 } from "@/lib/portalInvites";
 import { getDashboardPathForUser } from "@/lib/portalRoutes";
-import { buildTeamRoster, rosterDisplayNames } from "@/lib/teamRoster";
 import {
   closeOwnOpenPosts,
   createTeammatePost,
@@ -96,7 +95,7 @@ export default function ParticipantTeamPage() {
     HACKATHON_STORAGE_KEYS.participant,
     undefined,
     eventCatalog,
-    { preferCurrent: true }
+    { syncUrl: true, preferCurrent: true }
   );
   const selectedHackathon = useMemo(
     () => resolvePortalHackathon(selectedHackathonId, eventCatalog),
@@ -108,6 +107,8 @@ export default function ParticipantTeamPage() {
   const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
   const [activeSubmissionId, setActiveSubmissionId] = useState<string | null>(null);
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [workspaceLoadAttempt, setWorkspaceLoadAttempt] = useState(0);
   const [teamName, setTeamName] = useState("");
   const [isSavingTeam, setIsSavingTeam] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -168,13 +169,21 @@ export default function ParticipantTeamPage() {
 
   const savedTeamName = activeSubmission?.team_name ?? "";
   const isTeamNameDirty = teamName.trim() !== savedTeamName.trim();
-  const isReadOnly = !areSubmissionsWritable(selectedHackathon);
-  const isTeamNameDirtyRef = useRef(isTeamNameDirty);
+  const isReadOnly = !areSubmissionsWritable(selectedHackathon) || Boolean(workspaceError);
   const isAutosavingTeamRef = useRef(false);
   const teamNameAutosaveTimerRef = useRef<number | null>(null);
   const selectedHackathonRef = useRef(selectedHackathon);
   selectedHackathonRef.current = selectedHackathon;
-  isTeamNameDirtyRef.current = isTeamNameDirty;
+  const workspaceKey = `${sessionUser?.id}:${selectedHackathonId}:${activeSubmissionId ?? "new"}`;
+  const workspaceKeyRef = useRef(workspaceKey);
+  workspaceKeyRef.current = workspaceKey;
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+  const isCurrentWorkspace = () => mountedRef.current &&
+    getFirebaseAuth().currentUser?.uid === sessionUser?.id && workspaceKeyRef.current === workspaceKey;
 
   useEffect(() => {
     const id = location.hash.replace(/^#/, "").trim();
@@ -240,9 +249,11 @@ export default function ParticipantTeamPage() {
 
   useEffect(() => {
     if (!sessionUser || sessionUser.role !== "participant") return;
+    let cancelled = false;
 
     const loadWorkspace = async () => {
       setIsLoadingWorkspace(true);
+      setWorkspaceError(null);
       try {
         const userSnap = await getDoc(doc(db, "users", sessionUser.id));
         const userData = userSnap.exists()
@@ -254,21 +265,25 @@ export default function ParticipantTeamPage() {
             typeof userData?.hackathon_id === "string" ? userData.hackathon_id : null,
           hackathon_ids: userData?.hackathon_ids,
         });
-        setUserProfile(profile ?? null);
-        setEnrolledHackathonIds(allowedIds);
         const submissions = sortSubmissionsNewestFirst(
           await listAccessibleSubmissions(db, sessionUser.id)
         );
+        if (cancelled) return;
+        setUserProfile(profile ?? null);
+        setEnrolledHackathonIds(allowedIds);
         setAllSubmissions(submissions);
       } catch {
-        // keep empty workspace
+        if (!cancelled) setWorkspaceError("Could not load your teams. Retry before making changes.");
       } finally {
-        setIsLoadingWorkspace(false);
+        if (!cancelled) setIsLoadingWorkspace(false);
       }
     };
 
     void loadWorkspace();
-  }, [sessionUser, db]);
+    return () => { cancelled = true; };
+    // Live profile updates must not replace an in-progress team edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionUser?.id, sessionUser?.role, db, workspaceLoadAttempt]);
 
   useEffect(() => {
     if (participantSubmissions.length === 0) {
@@ -287,14 +302,13 @@ export default function ParticipantTeamPage() {
     const nextName =
       participantSubmissions.find((submission) => submission.id === activeSubmissionId)?.team_name ??
       "";
-    if (!isTeamNameDirtyRef.current) {
-      setTeamName(nextName);
-    }
+    setTeamName(nextName);
+    setSaveMessage(null);
     setTeamInviteUrl(null);
     setTeamInviteToken(null);
-    // Don't clobber a name the participant is still typing.
+    // A different team always gets its own name, even if the previous team was dirty.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSubmissionId]);
+  }, [activeSubmissionId, selectedHackathonId]);
 
   useEffect(() => {
     if (!activeSubmissionId) {
@@ -303,6 +317,8 @@ export default function ParticipantTeamPage() {
       return;
     }
     let cancelled = false;
+    setLinkedTeamMembers(activeSubmission?.team_members ?? []);
+    setMemberProfiles({});
     const loadMembers = async () => {
       try {
         const fromSubmission = activeSubmission?.team_members ?? [];
@@ -351,8 +367,9 @@ export default function ParticipantTeamPage() {
   }, [sessionUser, db, selectedHackathonId]);
 
   const persistTeamName = async (nextName = teamName) => {
-    if (!sessionUser) return null;
+    if (!sessionUser || !isCurrentWorkspace() || isLoadingWorkspace || workspaceError) return null;
     await assertSubmissionsWritable(db, selectedHackathonId);
+    if (!isCurrentWorkspace()) return null;
     if (!areSubmissionsWritable(selectedHackathonRef.current)) {
       throw new Error(
         getSubmissionLockCopy(getHackathonSubmissionMode(selectedHackathonRef.current)) ??
@@ -363,34 +380,17 @@ export default function ParticipantTeamPage() {
     if (!trimmed) return null;
 
     if (activeSubmissionId && activeSubmission) {
-      const ownerId = activeSubmission.user_id;
-      const ownerName =
-        ownerId === sessionUser.id
-          ? displayName
-          : activeSubmission.owner_name?.trim() || trimmed || "Team creator";
-      const ownerEmail =
-        ownerId === sessionUser.id
-          ? sessionUser.email
-          : activeSubmission.owner_email?.trim() || "";
-      const leaderId = activeSubmission.team_leader_id?.trim() || ownerId;
-      const roster = buildTeamRoster({
-        owner: { user_id: ownerId, name: ownerName, email: ownerEmail },
-        linkedMembers: linkedTeamMembers,
-        teamLeaderId: leaderId,
-        currentUserId: sessionUser.id,
-      });
-      const memberNames = rosterDisplayNames(roster);
       const now = new Date().toISOString();
       const payload = {
         team_name: trimmed,
-        member_names: memberNames.join("\n"),
-        member_name_list: memberNames,
         updated_at: now,
       };
       await setDoc(doc(db, "submissions", activeSubmissionId), payload, { merge: true });
+      if (!isCurrentWorkspace()) return null;
       if (activeSubmission.public_preview_consent) {
         await setDoc(doc(db, "public_projects", activeSubmissionId), payload, { merge: true });
       }
+      if (!isCurrentWorkspace()) return null;
       const updated = { ...activeSubmission, ...payload };
       setAllSubmissions((current) =>
         current.map((submission) =>
@@ -423,6 +423,7 @@ export default function ParticipantTeamPage() {
     };
     const submissionRef = doc(collection(db, "submissions"));
     await setDoc(submissionRef, payload);
+    if (!isCurrentWorkspace()) return null;
     const nextHackathonIds = nextEnrolledHackathonIds(enrolledHackathonIds, selectedHackathonId);
     await setDoc(
       doc(db, "users", sessionUser.id),
@@ -432,9 +433,11 @@ export default function ParticipantTeamPage() {
       },
       { merge: true }
     );
+    if (!isCurrentWorkspace()) return null;
     setEnrolledHackathonIds(nextHackathonIds);
 
     const submissionSnap = await getDoc(submissionRef);
+    if (!isCurrentWorkspace()) return null;
     const created = (
       submissionSnap.exists()
         ? { id: submissionSnap.id, ...(submissionSnap.data() as Omit<Submission, "id">) }
@@ -447,12 +450,12 @@ export default function ParticipantTeamPage() {
 
   const handleSaveTeam = async (nextName = teamName) => {
     const trimmed = nextName.trim();
-    if (!trimmed || isReadOnly || isAutosavingTeamRef.current) return;
+    if (!trimmed || isReadOnly || isLoadingWorkspace || !isCurrentWorkspace() || isAutosavingTeamRef.current) return;
     isAutosavingTeamRef.current = true;
     setIsSavingTeam(true);
     try {
-      await persistTeamName(trimmed);
-      setSaveMessage("Saved");
+      const saved = await persistTeamName(trimmed);
+      if (saved && isCurrentWorkspace()) setSaveMessage("Saved");
     } catch (error: unknown) {
       setSaveMessage(error instanceof Error ? error.message : "Unable to save team name.");
     } finally {
@@ -488,7 +491,7 @@ export default function ParticipantTeamPage() {
     };
     // persistTeamName closes over the latest roster/submission on purpose.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoadingWorkspace, isReadOnly, isSavingTeam, isTeamNameDirty, teamName]);
+  }, [isLoadingWorkspace, isReadOnly, isSavingTeam, isTeamNameDirty, teamName, selectedHackathonId, activeSubmissionId]);
 
   const handleSelectSubmission = (submissionId: string) => {
     const selected = participantSubmissions.find((submission) => submission.id === submissionId);
@@ -501,11 +504,12 @@ export default function ParticipantTeamPage() {
   };
 
   const handleAssignTeamLeader = async (userId: string) => {
-    if (!activeSubmissionId || !sessionUser) return;
+    if (!activeSubmissionId || !sessionUser || !isCurrentWorkspace() || isLoadingWorkspace || workspaceError) return;
     setIsTeamInviteBusy(true);
     setSaveMessage(null);
     try {
       await setTeamLeader(db, activeSubmissionId, userId);
+      if (!isCurrentWorkspace()) return;
       setAllSubmissions((current) =>
         current.map((submission) =>
           submission.id === activeSubmissionId
@@ -522,6 +526,7 @@ export default function ParticipantTeamPage() {
   };
 
   const handleGenerateTeamInvite = async () => {
+    if (!isCurrentWorkspace() || isLoadingWorkspace || workspaceError) return;
     if (!sessionUser || !activeSubmissionId) {
       setSaveMessage("Save a team name first, then create an invite link.");
       return;
@@ -531,9 +536,11 @@ export default function ParticipantTeamPage() {
     try {
       if (isTeamNameDirty) {
         await persistTeamName();
+        if (!isCurrentWorkspace()) return;
       }
       if (teamInviteToken) {
         await revokeTeamInvite(db, teamInviteToken).catch(() => undefined);
+        if (!isCurrentWorkspace()) return;
       }
       const invite = await createTeamInvite(db, {
         submissionId: activeSubmissionId,
@@ -543,6 +550,7 @@ export default function ParticipantTeamPage() {
         ownerName: displayName,
         ownerEmail: sessionUser.email,
       });
+      if (!isCurrentWorkspace()) return;
       setTeamInviteToken(invite.token);
       setTeamInviteUrl(buildInviteUrl("team", invite.token));
       setSaveMessage("Team invite link ready — share it with teammates.");
@@ -554,10 +562,11 @@ export default function ParticipantTeamPage() {
   };
 
   const handleRevokeTeamInvite = async () => {
-    if (!teamInviteToken) return;
+    if (!teamInviteToken || !isCurrentWorkspace()) return;
     setIsTeamInviteBusy(true);
     try {
       await revokeTeamInvite(db, teamInviteToken);
+      if (!isCurrentWorkspace()) return;
       setTeamInviteToken(null);
       setTeamInviteUrl(null);
       setSaveMessage("Team invite link revoked.");
@@ -575,7 +584,7 @@ export default function ParticipantTeamPage() {
     author_name: string;
     author_email: string;
   }) => {
-    if (!sessionUser || selectedHackathon.status === "past") return;
+    if (!sessionUser || !isCurrentWorkspace() || selectedHackathon.status === "past") return;
     if (!input.looking_for.trim() || !input.author_email.trim()) {
       setTeammatePostMessage("Looking-for and email are required.");
       return;
@@ -584,6 +593,7 @@ export default function ParticipantTeamPage() {
     setTeammatePostMessage(null);
     try {
       await closeOwnOpenPosts(db, sessionUser.id, selectedHackathonId);
+      if (!isCurrentWorkspace()) return;
       const post = await createTeammatePost(db, sessionUser.id, {
         hackathon_id: selectedHackathonId,
         author_name: input.author_name || displayName || sessionUser.email,
@@ -592,6 +602,7 @@ export default function ParticipantTeamPage() {
         message: input.message,
         skills: input.skills,
       });
+      if (!isCurrentWorkspace()) return;
       setTeammatePosts((prev) => [post, ...prev.filter((entry) => entry.user_id !== sessionUser.id)]);
       setTeammatePostMessage("Your teammate request is live for all participants.");
     } catch (error: unknown) {
@@ -604,9 +615,11 @@ export default function ParticipantTeamPage() {
   };
 
   const handleCloseTeammatePost = async (postId: string) => {
+    if (!isCurrentWorkspace()) return;
     setIsSavingTeammatePost(true);
     try {
       await updateTeammatePost(db, postId, { status: "closed" });
+      if (!isCurrentWorkspace()) return;
       setTeammatePosts((prev) => prev.filter((post) => post.id !== postId));
       setTeammatePostMessage("Request closed.");
     } catch (error: unknown) {
@@ -617,9 +630,11 @@ export default function ParticipantTeamPage() {
   };
 
   const handleDeleteTeammatePost = async (postId: string) => {
+    if (!isCurrentWorkspace()) return;
     setIsSavingTeammatePost(true);
     try {
       await deleteTeammatePost(db, postId);
+      if (!isCurrentWorkspace()) return;
       setTeammatePosts((prev) => prev.filter((post) => post.id !== postId));
       setTeammatePostMessage("Request deleted.");
     } catch (error: unknown) {
@@ -672,6 +687,12 @@ export default function ParticipantTeamPage() {
         </Button>
       </div>
 
+      {workspaceError ? (
+        <div role="alert" className="mb-4 rounded-lg border border-destructive/40 p-4">
+          <p>{workspaceError}</p>
+          <button type="button" className="mt-2 underline" onClick={() => setWorkspaceLoadAttempt((attempt) => attempt + 1)}>Retry loading teams</button>
+        </div>
+      ) : null}
       <TeamManagementWorkspace
         selectedHackathon={selectedHackathon}
         publicSiteUrl={getHackathonPublicUrl(selectedHackathonId)}

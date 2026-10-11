@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import BrandLogo from "@/components/BrandLogo";
@@ -71,6 +71,15 @@ const pathForSession = (user: Pick<SessionUser, "role" | "judgeApprovalStatus" |
   getDashboardPathForUser(user.role, user.judgeApprovalStatus, {
     needsOnboarding: participantNeedsOnboarding(user),
   });
+
+const nextPathFromSearch = (search: string) => {
+  const nextPath = safeInternalPath(new URLSearchParams(search).get("next"));
+  if (!nextPath) return null;
+  const pathname = new URL(nextPath, "https://portal.invalid").pathname.replace(/\/$/, "").toLowerCase();
+  // A signed-in user cannot complete a redirect back into an auth-only screen.
+  if (["/signin", "/signup", "/admin", "/host/signin"].includes(pathname)) return null;
+  return nextPath;
+};
 
 const GoogleIcon = () => (
   <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
@@ -155,6 +164,7 @@ export default function SignIn() {
   const [authErrorAction, setAuthErrorAction] = useState<"signup" | "signin" | null>(null);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   const [checkingRegistration, setCheckingRegistration] = useState(false);
+  const enrollmentAttemptRef = useRef<string | null>(null);
   const pendingEventId = searchHackathon && isHackathonId(searchHackathon)
     ? searchHackathon
     : readPendingHackathon();
@@ -213,8 +223,9 @@ export default function SignIn() {
   }, [authRole, db, mode, pendingEventId, sessionUser]);
 
   const enrollForPendingEvent = async (userId: string, existingIds?: unknown, primaryEventId?: unknown) => {
-    if (!pendingEventId) return null;
+    if (!pendingEventId || auth.currentUser?.uid !== userId) return null;
     const outcome = await checkParticipantEventEnrollment(db, pendingEventId, existingIds, primaryEventId);
+    if (auth.currentUser?.uid !== userId) return null;
     if (outcome === "new") {
       const priorIds = Array.isArray(existingIds) ? existingIds : [];
       const nextIds = enrollPendingHackathonIds(
@@ -223,12 +234,15 @@ export default function SignIn() {
       );
       await setDoc(doc(db, "users", userId), { hackathon_id: pendingEventId, hackathon_ids: nextIds }, { merge: true });
     }
+    if (auth.currentUser?.uid !== userId) return null;
     clearPendingHackathon();
     return pendingEventId;
   };
 
   useEffect(() => {
-    if (authLoading) return;
+    // This page owns redirects so Firebase's auth/profile notifications cannot
+    // unmount an in-flight Google login before its account checks finish.
+    if (authLoading || isAuthLoading) return;
     if (
       sessionUser?.role === "participant" ||
       sessionUser?.role === "mentor" ||
@@ -243,9 +257,10 @@ export default function SignIn() {
         return;
       }
 
-      navigate(pathForSession(sessionUser), { replace: true });
+      const nextPath = nextPathFromSearch(location.search);
+      navigate(nextPath ?? pathForSession(sessionUser), { replace: true });
     }
-  }, [authLoading, sessionUser, navigate, searchHackathon, isSignupPath, pendingEventId]);
+  }, [authLoading, isAuthLoading, sessionUser, navigate, location.search, searchHackathon, isSignupPath, pendingEventId]);
 
   const enrollExistingParticipantForPendingEvent = async () => {
     if (!sessionUser || sessionUser.role !== "participant") return;
@@ -259,13 +274,15 @@ export default function SignIn() {
     setAuthError(null);
     try {
       await enrollForPendingEvent(sessionUser.id, sessionUser.hackathonIds, sessionUser.hackathonId);
+      if (auth.currentUser?.uid !== sessionUser.id) return;
       navigate(
-        participantNeedsOnboarding(sessionUser)
+        nextPathFromSearch(location.search) ?? (participantNeedsOnboarding(sessionUser)
           ? onboardingPath(pendingHackathon)
-          : "/dashboard/participant",
+          : "/dashboard/participant"),
         { replace: true }
       );
     } catch (error: unknown) {
+      if (auth.currentUser?.uid !== sessionUser.id) return;
       const message =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
@@ -278,35 +295,44 @@ export default function SignIn() {
 
   useEffect(() => {
     if (authLoading || isAuthLoading) return;
-    if (!sessionUser || sessionUser.role !== "participant") return;
     const pendingHackathon = pendingEventId;
-    if (!pendingHackathon) return;
-    if (!(isSignupPath || searchHackathon)) return;
+    if (sessionUser?.role !== "participant" || !pendingHackathon || !(isSignupPath || searchHackathon)) {
+      enrollmentAttemptRef.current = null;
+      return;
+    }
+    const attemptKey = `${sessionUser.id}:${pendingHackathon}`;
+    if (enrollmentAttemptRef.current === attemptKey) return;
+    enrollmentAttemptRef.current = attemptKey;
     void enrollExistingParticipantForPendingEvent();
-    // Intentionally run when a deep-linked event is present for an already-signed-in participant.
+    // Try once per account/event. A new account can continue after the old request
+    // settles, while a failed enrollment remains visible without a retry loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, sessionUser, searchHackathon, isSignupPath, pendingEventId]);
+  }, [authLoading, isAuthLoading, sessionUser, searchHackathon, isSignupPath, pendingEventId]);
 
   const handleGoogleAuth = async () => {
     setIsAuthLoading(true);
     setAuthError(null);
     setAuthErrorAction(null);
+    let accountId: string | undefined;
     try {
       if (mode === "signup" && authRole === "participant" && pendingEventId && !sessionUser) {
         await checkParticipantEventEnrollment(db, pendingEventId);
       }
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      const user = auth.currentUser;
-      if (!user) return;
+      provider.setCustomParameters({ prompt: "select_account" });
+      const { user } = await signInWithPopup(auth, provider);
+      accountId = user.uid;
+      const isCurrentAccount = () => auth.currentUser?.uid === user.uid;
 
-      const nextPath = safeInternalPath(new URLSearchParams(location.search).get("next"));
+      const nextPath = nextPathFromSearch(location.search);
       const finish = (fallback: string) => {
+        if (!isCurrentAccount()) return;
         navigate(nextPath ?? fallback, { replace: true });
       };
 
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
+      if (!isCurrentAccount()) return;
       const existingData = userSnap.data() ?? {};
       const existingRole = normalizePortalRole(existingData.role);
       const existingJudgeApprovalStatus = normalizeJudgeApprovalStatus(
@@ -319,6 +345,7 @@ export default function SignIn() {
       }
 
       const hasAdminGrant = await hasPendingAdminGrant(db, user.email);
+      if (!isCurrentAccount()) return;
 
       if (mode === "signin" && !existingRole && !hasAdminGrant) {
         await firebaseSignOut(auth);
@@ -366,12 +393,14 @@ export default function SignIn() {
               email: user.email ?? "",
               existingHackathonIds: existingIds,
             });
+            if (!isCurrentAccount()) return;
             clearPendingInvite("judge");
             navigate(getJudgeDashboardPathAfterInvite(redeemResult.primaryHackathonId), {
               replace: true,
             });
             return;
           } catch {
+            if (!isCurrentAccount()) return;
             // Fall through to normal dashboard routing.
           }
         }
@@ -409,7 +438,7 @@ export default function SignIn() {
             joinedEventId = await enrollForPendingEvent(user.uid, existingData.hackathon_ids, existingData.hackathon_id);
           } catch {
             // A closed stale event selection must not block a returning account's login.
-            clearPendingHackathon();
+            if (isCurrentAccount()) clearPendingHackathon();
           }
           finish(needsOnboarding ? onboardingPath(joinedEventId) : "/dashboard/participant");
           return;
@@ -435,7 +464,8 @@ export default function SignIn() {
         return;
       }
 
-      if (mode === "signup" && existingRole && existingRole !== authRole && !hasAdminGrant) {
+      const existingRoleMatchesSelection = existingRole === authRole || (existingRole === "mentor" && authRole === "judge");
+      if (mode === "signup" && existingRole && !existingRoleMatchesSelection && !hasAdminGrant) {
         await firebaseSignOut(auth);
         setAuthError(
           `This Google account is already registered as a ${existingRole}. Use Log In instead.`
@@ -446,7 +476,7 @@ export default function SignIn() {
 
       // Already registered for this role — skip role writes (Firestore blocks self-updating
       // judgeApprovalStatus) and route like a normal login, including invite redeem.
-      if (mode === "signup" && existingRole && (existingRole === authRole || existingRole === "mentor") && !hasAdminGrant) {
+      if (mode === "signup" && existingRole && existingRoleMatchesSelection && !hasAdminGrant) {
         const pendingJudgeInviteExisting =
           readPendingInvite("judge") ||
           (searchInvite?.trim() && authRole === "judge" ? searchInvite.trim() : null);
@@ -465,12 +495,14 @@ export default function SignIn() {
               email: user.email ?? "",
               existingHackathonIds: existingIds,
             });
+            if (!isCurrentAccount()) return;
             clearPendingInvite("judge");
             navigate(getJudgeDashboardPathAfterInvite(redeemResult.primaryHackathonId), {
               replace: true,
             });
             return;
           } catch (inviteError) {
+            if (!isCurrentAccount()) return;
             setAuthError(
               inviteError instanceof Error
                 ? inviteError.message
@@ -539,9 +571,10 @@ export default function SignIn() {
         try {
           await checkParticipantEventEnrollment(db, pendingEventId);
         } catch (error) {
-          await firebaseSignOut(auth);
+          if (isCurrentAccount()) await firebaseSignOut(auth);
           throw error;
         }
+        if (!isCurrentAccount()) return;
       }
 
       await setDoc(
@@ -565,9 +598,11 @@ export default function SignIn() {
         },
         { merge: true }
       );
+      if (!isCurrentAccount()) return;
 
       if (hasAdminGrant) {
         await consumePendingAdminGrant(db, user.email);
+        if (!isCurrentAccount()) return;
       }
 
       if (pendingJudgeInvite && (targetRole === "judge" || creatingApprovedJudgeViaInvite)) {
@@ -580,12 +615,14 @@ export default function SignIn() {
             email: user.email ?? "",
             existingHackathonIds: existingIds,
           });
+          if (!isCurrentAccount()) return;
           clearPendingInvite("judge");
           navigate(getJudgeDashboardPathAfterInvite(redeemResult.primaryHackathonId), {
             replace: true,
           });
           return;
         } catch (inviteError) {
+          if (!isCurrentAccount()) return;
           setAuthError(
             inviteError instanceof Error
               ? inviteError.message
@@ -654,6 +691,7 @@ export default function SignIn() {
         }),
       );
     } catch (error: unknown) {
+      if (accountId && auth.currentUser && auth.currentUser.uid !== accountId) return;
       const message =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)

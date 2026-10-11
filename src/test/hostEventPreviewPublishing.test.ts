@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getDoc, setDoc, type Firestore } from "firebase/firestore";
+import { getDoc, runTransaction, setDoc, type Firestore, type Transaction } from "firebase/firestore";
 import { publishHostEventPublicly } from "@/lib/aiHackathons";
 import { mapHostEventFromFirestore } from "@/lib/hostEvents";
 import { getEventPreviews } from "@/lib/eventPreviews";
@@ -10,9 +10,11 @@ vi.mock("firebase/firestore", async (original) => ({
   getDoc: vi.fn(),
   setDoc: vi.fn().mockResolvedValue(undefined),
   updateDoc: vi.fn().mockResolvedValue(undefined),
+  runTransaction: vi.fn(),
 }));
 
 const db = {} as Firestore;
+const transactionSet = vi.fn();
 const host = (patch: Record<string, unknown> = {}) => mapHostEventFromFirestore("host-event", {
   owner_id: "host-id", name: "Hosted meetup", location: "Tokyo",
   start_at: "2026-10-09T18:00:00+09:00", end_at: "2026-10-09T22:00:00+09:00",
@@ -22,6 +24,9 @@ const host = (patch: Record<string, unknown> = {}) => mapHostEventFromFirestore(
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getDoc).mockResolvedValue({ exists: () => false } as Awaited<ReturnType<typeof getDoc>>);
+  vi.mocked(runTransaction).mockImplementation(async (_db, update) => update({
+    get: getDoc, set: transactionSet,
+  } as unknown as Transaction));
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -54,5 +59,46 @@ describe("public host event dates", () => {
     const published = await publishHostEventPublicly(db, host({ end_at: "" }), "host-id");
     expect(published.endAt).toBe("");
     expect(getEventPreviews([published], Date.parse("2026-10-09T10:00:00Z")).live).toEqual([]);
+  });
+
+  it("automatically assigns a newly published event to its host even when an admin publishes it", async () => {
+    const published = await publishHostEventPublicly(db, host(), "admin-id");
+    expect(published).toMatchObject({ createdBy: "host-id", hostEventId: "host-event" });
+    expect(transactionSet).toHaveBeenCalledWith(
+      { path: `hackathon_criteria/${published.id}` },
+      expect.objectContaining({ criteria: expect.any(Array) }),
+    );
+  });
+
+  it("lets the original host republish an admin-created linked listing without transferring ownership", async () => {
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({ createdBy: "admin-id", hostEventId: "host-event", status: "active", submissionMode: "closed" }),
+    } as Awaited<ReturnType<typeof getDoc>>);
+    const published = await publishHostEventPublicly(db, host({ public_hackathon_id: "existing-listing" }), "host-id");
+    expect(published).toMatchObject({ createdBy: "admin-id", hostEventId: "host-event", submissionMode: "closed" });
+    expect(vi.mocked(setDoc).mock.calls[0][1]).not.toHaveProperty("submissionMode");
+    expect(transactionSet).not.toHaveBeenCalled();
+  });
+
+  it("lets an admin republish an existing host listing and preserves its rubric", async () => {
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({ createdBy: "host-id", hostEventId: "host-event", status: "active", criteria: [{ id: "creativity", weight: 100 }] }),
+    } as Awaited<ReturnType<typeof getDoc>>);
+    const published = await publishHostEventPublicly(db, host({ public_hackathon_id: "existing-listing" }), "admin-id");
+    expect(published.createdBy).toBe("host-id");
+    expect(transactionSet).not.toHaveBeenCalled();
+    expect(vi.mocked(setDoc).mock.calls.every(([ref]) => !ref.path.startsWith("hackathon_criteria/"))).toBe(true);
+  });
+
+  it("rejects a listing linked to another event before writing anything", async () => {
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({ createdBy: "host-id", hostEventId: "another-event" }),
+    } as Awaited<ReturnType<typeof getDoc>>);
+    await expect(publishHostEventPublicly(db, host({ public_hackathon_id: "other-listing" }), "host-id"))
+      .rejects.toThrow("belongs to another host");
+    expect(setDoc).not.toHaveBeenCalled();
   });
 });
