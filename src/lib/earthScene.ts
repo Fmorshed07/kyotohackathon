@@ -8,7 +8,7 @@ interface LandFeature {
   geometry: { type: string; coordinates: LandPolygon | LandPolygon[] };
 }
 
-interface EarthOptions {
+export interface EarthOptions {
   progress: () => number;
   running: () => boolean;
   reduced: () => boolean;
@@ -49,7 +49,7 @@ function insideRing(longitude: number, latitude: number, ring: Coordinate[]) {
 
 // Geometry is shared by React strict-mode mounts and reused when the viewport changes.
 let cachedGeometry: { land: Float32Array; detail: Float32Array; coastline: Float32Array } | undefined;
-function createLandGeometry() {
+export function createLandGeometry() {
   if (cachedGeometry) return cachedGeometry;
   const polygons = (JSON.parse(landSource) as { features: LandFeature[] }).features.flatMap((feature) =>
     feature.geometry.type === "Polygon"
@@ -254,7 +254,7 @@ function randomGenerator() {
   };
 }
 
-function createRoutes() {
+export function createRoutes() {
   const locations: Coordinate[] = [[TOKYO.longitude, TOKYO.latitude], [-122.42, 37.77],
     [103.82, 1.35], [-0.12, 51.51], [13.41, 52.52], [77.21, 28.61], [151.21, -33.87], [-74.01, 40.71]];
   const arcs: number[] = [];
@@ -281,7 +281,7 @@ function createRoutes() {
   return { arcs: new Float32Array(arcs), tokyoPin, cities, travelers };
 }
 
-function createOrbits() {
+export function createOrbits() {
   const lines: number[] = [];
   for (let orbit = 0; orbit < 2; orbit++) {
     const angle = orbit === 0 ? 0.52 : -0.84;
@@ -305,6 +305,9 @@ export function createEarthScene(canvas: HTMLCanvasElement, options: EarthOption
   }
   if (!gl) return null;
   const context = gl;
+  // Fragment high precision is optional in WebGL 1. Keep both shader stages
+  // consistent on devices that only expose medium precision in fragments.
+  const fragmentHighPrecision = (context.getShaderPrecisionFormat(context.FRAGMENT_SHADER, context.HIGH_FLOAT)?.precision ?? 0) > 0;
   const programs: WebGLProgram[] = [];
   const buffers: WebGLBuffer[] = [];
   const shaders: WebGLShader[] = [];
@@ -312,7 +315,7 @@ export function createEarthScene(canvas: HTMLCanvasElement, options: EarthOption
     const shader = context.createShader(type);
     if (!shader) throw new Error("Could not allocate an Earth shader");
     shaders.push(shader);
-    context.shaderSource(shader, source);
+    context.shaderSource(shader, fragmentHighPrecision ? source : source.replace(/\bhighp\b/g, "mediump"));
     context.compileShader(shader);
     if (!context.getShaderParameter(shader, context.COMPILE_STATUS)) throw new Error("Could not compile an Earth shader");
     return shader;

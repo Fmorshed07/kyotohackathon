@@ -32,7 +32,7 @@ describe("Peer Portal campaign", () => {
     expect(container).not.toHaveTextContent(/live[\s-]*(?:website[\s-]*)?preview|preview is unavailable/i);
   });
 
-  it("integrates one campaign into the accessible Get Hired section without the old embed", () => {
+  it("keeps the campaign and embeds the live website in the accessible Get Hired section", () => {
     render(<LookingForJobsSection />);
 
     const section = screen.getByRole("region", { name: "Get hired with Peer Portal" });
@@ -40,8 +40,14 @@ describe("Peer Portal campaign", () => {
     expect(within(section).getByRole("heading", { name: "Get hired with Peer Portal" })).toBeInTheDocument();
     expect(within(section).getAllByRole("img", { name: /Peer Portal/i })).toHaveLength(1);
     expect(within(section).getAllByRole("link", { name: "Explore Peer Portal" })).toHaveLength(1);
-    expect(section.querySelector("iframe")).not.toBeInTheDocument();
-    expect(section).not.toHaveTextContent(/live[\s-]*(?:website[\s-]*)?preview|preview is unavailable/i);
+    const preview = within(section).getByRole("region", { name: "Peer Portal — live website" });
+    expect(preview).toHaveAttribute("id", "peer-portal-preview");
+    const frame = within(preview).getByTitle("Peer Portal live website preview");
+    expect(frame).toHaveAttribute("src", "https://www.peerportal.app/");
+    expect(frame).toHaveAttribute("loading", "lazy");
+    expect(frame).toHaveAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+    expect(document.getElementById(frame.getAttribute("aria-describedby")!)).toHaveTextContent("open Peer Portal in a new tab");
+    expect(within(preview).getByRole("link", { name: "Open Peer Portal" })).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("lets visitors open and close the retained six-step career guide using native details", () => {

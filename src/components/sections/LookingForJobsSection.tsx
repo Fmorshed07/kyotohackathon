@@ -1,5 +1,6 @@
 import { ArrowDown, Briefcase, FileSearch, MessageSquare, Sparkles, Target, Upload } from "lucide-react";
 import PeerPortalCampaign from "@/components/PeerPortalCampaign";
+import PeerPortalLivePreview from "@/components/PeerPortalLivePreview";
 import "./peer-careers.css";
 
 const PROMO_CODE = "PEER@STT";
@@ -75,6 +76,7 @@ const LookingForJobsSection = () => (
       </div>
 
       <PeerPortalCampaign />
+      <PeerPortalLivePreview />
 
       <details className="peer-careers-guide">
         <summary>
