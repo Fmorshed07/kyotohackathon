@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Gavel,
-  ScanSearch,
   Star,
   Users,
 } from "lucide-react";
@@ -15,7 +14,6 @@ import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { JudgeScoringWorkspace } from "@/components/dashboard/JudgeScoringWorkspace";
 import { JudgeMarksChartPanel } from "@/components/dashboard/JudgeMarksChartPanel";
-import { ProjectThemeMarksPanel } from "@/components/dashboard/ProjectThemeMarksPanel";
 import {
   getSubmissionAccentStyle,
   getTeamAccentStyle,
@@ -36,7 +34,6 @@ import { getFinalShortlist } from "@/lib/finalShortlist";
 const JUDGE_JUMP_LINKS = [
   { href: "#teams", label: "1. Teams", icon: Users },
   { href: "#submissions", label: "2. Score", icon: ClipboardList },
-  { href: "#project-marks", label: "3. Theme marks", icon: ScanSearch },
 ] as const;
 
 type TeamSummary = {
@@ -658,13 +655,7 @@ export function JudgeDashboard({
         judgeSubmissions={submissions}
         isLoading={isLoadingSubmissions}
         scoreHeading="Your mark"
-        subtitle="Your judge scores only. Project agent theme marks are on a separate chart below."
-      />
-
-      <ProjectThemeMarksPanel
-        hackathon={selectedHackathon}
-        submissions={submissions}
-        isLoading={isLoadingSubmissions}
+        subtitle="Your saved judge scores for this event."
       />
 
     </div>

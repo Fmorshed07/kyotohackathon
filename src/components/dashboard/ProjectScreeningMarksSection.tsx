@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { usePortalAuth } from "@/hooks/usePortalAuth";
 import {
   CartesianGrid,
   ReferenceLine,
@@ -205,7 +206,13 @@ function ScatterTooltip({
   );
 }
 
-export function ProjectScreeningMarksSection({
+export function ProjectScreeningMarksSection(props: ProjectScreeningMarksSectionProps) {
+  const { sessionUser, loading } = usePortalAuth();
+  if (loading || sessionUser?.role !== "admin") return null;
+  return <AdminProjectScreeningMarksSection {...props} />;
+}
+
+function AdminProjectScreeningMarksSection({
   rows,
   activeId,
   onSelect,

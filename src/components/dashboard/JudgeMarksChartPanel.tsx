@@ -100,7 +100,7 @@ export function JudgeMarksChartPanel({
   submissions,
   judgeSubmissions,
   scoreHeading = "Avg judge mark",
-  subtitle = "Ranked by judge scores only. Project agent theme marks are on a separate chart.",
+  subtitle = "Ranked by saved judge scores for this event.",
 }: JudgeMarksChartPanelProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const inputs = useMemo(

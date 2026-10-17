@@ -159,11 +159,7 @@ export default function ProjectScreeningPage() {
             </Button>
           </>
         )}
-        {isJudgePortal ? (
-          <Button asChild variant="outline" size="sm" className="gap-1.5">
-            <Link to={withHackathonQuery("/dashboard/judge#project-marks", ops.selectedHackathonId)}>Theme marks</Link>
-          </Button>
-        ) : !isHostPortal ? (
+        {!isJudgePortal && (!isHostPortal ? (
           <Button asChild variant="outline" size="sm" className="gap-1.5">
             <Link to="/dashboard/admin/events">
               <CalendarCheck2 className="h-4 w-4" />
@@ -177,7 +173,7 @@ export default function ProjectScreeningPage() {
               Event details
             </Link>
           </Button>
-        )}
+        ))}
       </div>
 
       <section className={sectionClass}>

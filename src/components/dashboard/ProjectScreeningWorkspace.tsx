@@ -12,6 +12,7 @@ import type { UserProfile } from "@/types/portal";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ProjectScreeningMarksSection } from "@/components/dashboard/ProjectScreeningMarksSection";
+import { usePortalAuth } from "@/hooks/usePortalAuth";
 
 export type ProjectScreeningParticipant = {
   id: string;
@@ -81,6 +82,8 @@ export function ProjectScreeningWorkspace({
   onRunAll,
   onSetStatus,
 }: ProjectScreeningWorkspaceProps) {
+  const { sessionUser, loading: authLoading } = usePortalAuth();
+  const canViewMarks = !authLoading && sessionUser?.role === "admin";
   const [activeId, setActiveId] = useState<string | null>(null);
   const profileById = useMemo(
     () => Object.fromEntries(participants.map((person) => [person.id, person.profile])),
@@ -144,10 +147,15 @@ export function ProjectScreeningWorkspace({
             <p className="dash-eyebrow">Project screening agent</p>
             <h1 className="dash-title">Score concepts against the theme</h1>
             <p className="dash-subtitle">
-              {hackathon.name} · {reviewed}/{rankedQueue.length} decided · {shortlisted} shortlisted ·{" "}
-              <a href="#marks-chart" className="text-primary hover:underline">
-                Ranked marks
-              </a>
+              {hackathon.name} · {reviewed}/{rankedQueue.length} decided · {shortlisted} shortlisted
+              {canViewMarks && (
+                <>
+                  {" · "}
+                  <a href="#marks-chart" className="text-primary hover:underline">
+                    Ranked marks
+                  </a>
+                </>
+              )}
             </p>
           </div>
         </div>

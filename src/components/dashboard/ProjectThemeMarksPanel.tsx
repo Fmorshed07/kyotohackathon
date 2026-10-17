@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { getFirestoreDb } from "@/lib/firebaseClient";
 import { fetchPlatformOps, type PlatformOpsState } from "@/lib/platformOps";
 import { evaluateProjectConcept, applyPersistedProjectScreen } from "@/lib/projectScreening";
@@ -34,7 +35,13 @@ type ProjectThemeMarksPanelProps = {
   isLoading?: boolean;
 };
 
-export function ProjectThemeMarksPanel({
+export function ProjectThemeMarksPanel(props: ProjectThemeMarksPanelProps) {
+  const { sessionUser, loading } = usePortalAuth();
+  if (loading || sessionUser?.role !== "admin") return null;
+  return <AdminProjectThemeMarksPanel {...props} />;
+}
+
+function AdminProjectThemeMarksPanel({
   hackathon,
   submissions,
   isLoading,

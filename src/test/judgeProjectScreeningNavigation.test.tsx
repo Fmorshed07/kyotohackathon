@@ -64,10 +64,7 @@ function CurrentLocation() {
 afterEach(cleanup);
 
 describe("judge project screening navigation", () => {
-  it.each([
-    ["Judge overview", ""],
-    ["Theme marks", "#project-marks"],
-  ])("keeps the assigned past hackathon when opening %s", async (label, hash) => {
+  it("keeps the assigned past hackathon when opening Judge overview", async () => {
     render(
       <MemoryRouter
         initialEntries={[`/dashboard/judge/project-screening?hackathon=${mocks.event.id}`]}
@@ -78,12 +75,30 @@ describe("judge project screening navigation", () => {
       </MemoryRouter>,
     );
     await screen.findByText("Project screening workspace");
-    const link = screen.getByRole("link", { name: label });
-    const destination = `/dashboard/judge?hackathon=${mocks.event.id}${hash}`;
+    const link = screen.getByRole("link", { name: "Judge overview" });
+    const destination = `/dashboard/judge?hackathon=${mocks.event.id}`;
     expect(link).toHaveAttribute("href", destination);
 
     fireEvent.click(link);
 
     expect(screen.getByTestId("screening-location")).toHaveTextContent(destination);
+  });
+
+  it("keeps the screening workspace available without a shortcut to admin theme marks", async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[`/dashboard/judge/project-screening?hackathon=${mocks.event.id}`]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <ProjectScreeningPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Project screening workspace")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Theme marks" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Judge overview" })).toHaveAttribute(
+      "href",
+      `/dashboard/judge?hackathon=${mocks.event.id}`,
+    );
   });
 });

@@ -12,6 +12,7 @@ import type { JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import type { AdminJudgingStatistics } from "@/lib/judgingStatistics";
 import type { AdminTop3RankingSummary } from "@/lib/judgeTop3Rankings";
 import type { PortalHackathon } from "@/lib/hackathons";
+import { usePortalAuth } from "@/hooks/usePortalAuth";
 
 const JUDGING_JUMP_LINKS = [
   { href: "#marking-criteria", label: "1. Criteria", icon: ListChecks },
@@ -77,6 +78,12 @@ export function AdminJudgingSection({
   isLoadingTop3Rankings,
   top3SubmissionLookup,
 }: AdminJudgingSectionProps) {
+  const { sessionUser, loading: authLoading } = usePortalAuth();
+  const canViewAgentMarks = !authLoading && sessionUser?.role === "admin";
+  const jumpLinks = JUDGING_JUMP_LINKS.filter(
+    ({ href }) => href !== "#project-marks" || canViewAgentMarks,
+  );
+
   return (
     <div id="judging" className="scroll-mt-24 space-y-6 sm:space-y-8 md:space-y-10">
       <header className={`${sectionClass} !py-5`}>
@@ -100,7 +107,7 @@ export function AdminJudgingSection({
           aria-label="Judging sections"
           className="mt-4 flex flex-wrap gap-1.5 border-t border-white/10 pt-4"
         >
-          {JUDGING_JUMP_LINKS.map(({ href, label, icon: Icon }) => (
+          {jumpLinks.map(({ href, label, icon: Icon }) => (
             <a
               key={href}
               href={href}
@@ -196,11 +203,13 @@ export function AdminJudgingSection({
         />
       </section>
 
-      <ProjectThemeMarksPanel
-        hackathon={selectedHackathon}
-        submissions={submissions}
-        isLoading={isLoadingSubmissions}
-      />
+      {canViewAgentMarks && (
+        <ProjectThemeMarksPanel
+          hackathon={selectedHackathon}
+          submissions={submissions}
+          isLoading={isLoadingSubmissions}
+        />
+      )}
 
       <AdminTop3MarksPanel
         selectedHackathon={selectedHackathon}

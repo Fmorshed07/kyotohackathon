@@ -329,7 +329,6 @@ const hostScoringNav: NavItem[] = [
   { href: "/dashboard/host#judge-marks", label: "Mark check", icon: ClipboardCheck },
   { href: "/dashboard/host#judge-marks-chart", label: "Judge chart", icon: BarChart3 },
   { href: "/dashboard/host#analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/host#project-marks", label: "Theme marks", icon: ScanSearch },
   { href: "/dashboard/host#top-3-marks", label: "Top 3 by score", icon: Medal },
   { href: "/dashboard/host#top-3-ranking", label: "Top 3 ballots", icon: Trophy },
 ];
@@ -348,7 +347,6 @@ const judgeDashboardNav: NavItem[] = [
 const judgeScoringNav: NavItem[] = [
   { href: "#submissions", label: "Submissions", icon: ClipboardList },
   { href: "#judge-marks-chart", label: "My marks", icon: BarChart3 },
-  { href: "#project-marks", label: "Theme marks", icon: ScanSearch },
   { href: "/dashboard/judge/final-shortlist", label: "Final shortlist", icon: Star },
   {
     href: "/dashboard/judge/final-shortlist#top-3-ranking",
