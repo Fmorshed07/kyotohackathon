@@ -234,35 +234,45 @@
 
   .dash-sidebar {
     font-family: var(--font-sans);
-    @apply text-[15px] md:text-base;
-    background: hsl(var(--sidebar-background));
+    @apply text-base;
+    background-color: hsl(var(--sidebar-background));
+    background-image: linear-gradient(165deg, hsl(var(--sidebar-accent) / .45), transparent 45%);
   }
 
   .dash-sidebar [data-sidebar="sidebar"] {
     border-right-color: hsl(var(--border));
+    background: transparent;
+  }
+
+  .dash-sidebar-header,
+  .dash-sidebar-footer {
+    flex-shrink: 0;
+    @apply p-3;
   }
 
   .dash-sidebar-scroll {
     scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / .25) transparent;
   }
 
   .dash-nav-section {
-    @apply relative mt-1;
+    @apply relative mt-0 p-1;
   }
 
   .dash-nav-section + .dash-nav-section,
   .dash-nav-section + [data-sidebar="group"],
   [data-sidebar="group"] + .dash-nav-section {
-    @apply mt-2 border-t border-white/[0.05] pt-2;
+    @apply mt-3 border-t border-white/[0.06] pt-4;
   }
 
   .dash-nav-label {
     font-family: var(--font-sans);
-    @apply mb-2 px-2.5 text-xs font-medium tracking-normal text-muted-foreground;
+    @apply mb-2 h-7 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground;
   }
 
   .dash-nav-item {
-    @apply relative min-h-10 cursor-pointer gap-2.5 rounded-md px-2.5 font-display text-[14px] font-medium tracking-[-0.01em] text-sidebar-foreground/80 transition-all duration-200 sm:min-h-11 sm:gap-3 sm:px-3 sm:text-[15px];
+    @apply relative min-h-12 cursor-pointer gap-3 rounded-xl border border-transparent px-3 font-sans text-[15px] font-medium tracking-[-0.01em] text-sidebar-foreground/80 transition-colors duration-200;
   }
 
   .dash-nav-item:hover {
@@ -274,9 +284,8 @@
   }
 
   .dash-nav-item[data-active="true"] {
-    @apply bg-primary/15 text-primary;
-    /* Inset-only active cue — outer glow + overflow:visible painted a neon frame that
-       clipped against the sidebar and looked like a crash on click. */
+    @apply border-primary/20 text-primary;
+    background: linear-gradient(90deg, hsl(var(--primary) / .17), hsl(var(--primary) / .06));
     box-shadow: inset 2px 0 0 hsl(199 100% 50%);
   }
 
@@ -286,11 +295,36 @@
 
   .dash-nav-meta {
     font-family: var(--font-sans);
-    @apply truncate text-xs font-normal text-muted-foreground;
+    @apply text-[13px] font-normal leading-relaxed text-muted-foreground;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .dash-nav-event {
+    min-height: 5.25rem;
+    @apply gap-3 border-white/[0.07] bg-white/[0.025];
+  }
+
+  .dash-nav-event-title {
+    @apply w-full text-[15px] font-semibold leading-snug;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .dash-nav-icon {
     @apply h-5 w-5 shrink-0 text-muted-foreground/70 transition-colors;
+  }
+
+  .dash-nav-item > .dash-nav-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .dash-nav-event > .dash-event-icon {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+    @apply rounded-lg border border-primary/15 bg-primary/[0.06] text-primary/80;
   }
 
   .group\/nav:hover .dash-nav-icon,

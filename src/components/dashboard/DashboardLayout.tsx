@@ -39,7 +39,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState, type ReactNode } from "react";
+import { forwardRef, useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
@@ -133,36 +133,30 @@ const roleThemes: Record<
 };
 
 const menuButtonClass =
-  "group/nav dash-nav-item h-10 sm:h-11 hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/15 data-[active=true]:font-medium data-[active=true]:text-primary";
+  "group/nav dash-nav-item h-12 gap-3 rounded-xl p-3 text-[15px] hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/10 data-[active=true]:font-medium data-[active=true]:text-primary";
 
 /**
- * Multi-line sidebar rows: SidebarMenuButton defaults to overflow-hidden +
- * [&>span:last-child]:truncate (nowrap). Keep overflow clipped (no neon bleed) but
- * allow the label stack to wrap so dates stay readable.
+ * Event cards keep the entire name and schedule visible within the sidebar.
  */
 const multiLineMenuButtonClass =
-  `${menuButtonClass} !h-auto min-h-11 items-center py-2.5 [&>span:last-child]:!overflow-hidden [&>span:last-child]:!whitespace-normal [&>span:last-child]:min-w-0`;
+  `${menuButtonClass} dash-nav-event !h-auto items-start py-3 [&>span:last-child]:!whitespace-normal [&>span:last-child]:min-w-0`;
 
 const navIconClass = "dash-nav-icon group-hover/nav:text-primary";
 
-/** Keep long hosted-event ranges readable in the narrow sidebar. */
-const formatNavEventDate = (eventDate: string) => {
-  const trimmed = eventDate.trim();
-  if (!trimmed) return "";
-  const parts = trimmed.split(/\s+[–—-]\s+/);
-  if (parts.length < 2) return trimmed;
-  const start = parts[0] ?? "";
-  const end = parts[1] ?? "";
-  const startDay = start.match(/^([A-Za-z]{3}\s+\d{1,2})/);
-  const endDay = end.match(/^([A-Za-z]{3}\s+\d{1,2})/);
-  const year = end.match(/\b(20\d{2})\b/)?.[1] ?? start.match(/\b(20\d{2})\b/)?.[1];
-  if (startDay && endDay && year) {
-    return `${startDay[1]}–${endDay[1]}, ${year}`;
-  }
-  return start;
-};
+function NavEventSchedule({ date }: { date: string }) {
+  return (
+    <span className="dash-nav-meta w-full">
+      {date.split(" · ").map((part, index) => (
+        <span key={index} className="block">
+          {index > 0 && <span className="sr-only"> · </span>}
+          {part}
+        </span>
+      ))}
+    </span>
+  );
+}
 
-const groupLabelClass = "dash-nav-label !text-muted-foreground";
+const groupLabelClass = "dash-nav-label h-7 px-3 text-xs font-semibold uppercase tracking-[0.12em] !text-muted-foreground";
 
 const ADMIN_HOME = "/dashboard/admin";
 
@@ -419,28 +413,37 @@ function MobileMenuTrigger() {
 const DISCORD_URL = "https://discord.gg/cQEFjQDFm";
 const PEER_PORTAL_URL = "https://peerportal.app";
 
-function DashboardNavLink({
+const DashboardNavLink = forwardRef<HTMLAnchorElement, React.ComponentPropsWithoutRef<"a"> & {
+  href: string;
+  onNavigate: () => void;
+  external?: boolean;
+}>(function DashboardNavLink({
   href,
   children,
   onNavigate,
   external,
-}: {
-  href: string;
-  children: React.ReactNode;
-  onNavigate: () => void;
-  external?: boolean;
-}) {
+  className,
+  onClick,
+  ...linkProps
+}, ref) {
   const navigate = useNavigate();
   const location = useLocation();
+  const linkClassName = cn("flex w-full items-center gap-3", className);
+  const handleNavigate = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    onClick?.(event);
+    if (!event.defaultPrevented) onNavigate();
+  };
 
   if (external) {
     return (
       <a
+        {...linkProps}
+        ref={ref}
         href={href}
         target="_blank"
-        rel="noreferrer"
-        className="flex w-full items-center gap-2"
-        onClick={onNavigate}
+        rel="noopener noreferrer"
+        className={linkClassName}
+        onClick={handleNavigate}
       >
         {children}
       </a>
@@ -456,6 +459,8 @@ function DashboardNavLink({
   // In-page section links (and /dashboard/admin/people#section from other admin routes).
   if (hasHash && hashId) {
     const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+      onClick?.(event);
+      if (event.defaultPrevented) return;
       event.preventDefault();
       const targetPath = pathOnly || location.pathname;
       const onTargetPage = targetPath === location.pathname;
@@ -480,18 +485,18 @@ function DashboardNavLink({
     };
 
     return (
-      <a href={href} className="flex w-full items-center gap-2" onClick={handleClick}>
+      <a {...linkProps} ref={ref} href={href} className={linkClassName} onClick={handleClick}>
         {children}
       </a>
     );
   }
 
   return (
-    <Link to={href} className="flex w-full items-center gap-2" onClick={onNavigate}>
+    <Link {...linkProps} ref={ref} to={href} className={linkClassName} onClick={handleNavigate}>
       {children}
     </Link>
   );
-}
+});
 
 /** When landing on /dashboard/admin#judging (legacy) or in-page hashes, scroll or redirect. */
 function AdminHashScroll() {
@@ -636,10 +641,10 @@ function NavSection({
   className?: string;
 }) {
   return (
-    <SidebarGroup className={cn("dash-nav-section", className)}>
+    <SidebarGroup className={cn("dash-nav-section p-1", className)}>
       <SidebarGroupLabel className={groupLabelClass}>{label}</SidebarGroupLabel>
       <SidebarGroupContent>
-        <SidebarMenu className="gap-0.5">{children}</SidebarMenu>
+        <SidebarMenu className="gap-1.5">{children}</SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
   );
@@ -660,7 +665,7 @@ function CollapsibleNavSection({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="dash-nav-section group/collapsible">
-      <SidebarGroup>
+      <SidebarGroup className="p-1">
         <SidebarGroupLabel asChild className={cn(groupLabelClass, "h-8 cursor-pointer")}>
           <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 outline-none ring-sidebar-ring transition-colors hover:text-primary focus-visible:ring-2">
             <span>{label}</span>
@@ -675,7 +680,7 @@ function CollapsibleNavSection({
         </SidebarGroupLabel>
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
           <SidebarGroupContent>
-            <SidebarMenu className="gap-0.5">
+            <SidebarMenu className="gap-1.5">
               <NavMenuItems items={items} onNavigate={onNavigate} />
             </SidebarMenu>
           </SidebarGroupContent>
@@ -771,23 +776,23 @@ function DashboardLayoutContent({
   return (
     <>
       <Sidebar side="left" className="dash-sidebar border-r border-sidebar-border">
-        <SidebarHeader className="border-b border-white/[0.06]">
-          <div className="flex h-14 items-center gap-2 px-3 sm:h-16 sm:gap-2.5">
-            <SidebarTrigger className="hidden text-sidebar-foreground/80 hover:text-primary md:inline-flex" />
+        <SidebarHeader className="dash-sidebar-header border-b border-white/[0.06]">
+          <div className="flex min-h-16 items-center gap-3 px-2">
             <BrandLogo
-              size="sm"
+              size="md"
               showWordmark
               wordmark="COGNISOR"
               sublabel="Hackathons"
               href="/"
               className="min-w-0 flex-1"
-              wordmarkClassName="text-[14px] tracking-[0.2em] text-white sm:text-[15px]"
-              sublabelClassName="mt-1.5 text-[0.7rem] tracking-[0.24em] text-primary/70 sm:text-xs"
+              wordmarkClassName="text-[17px] tracking-[0.1em] text-sidebar-foreground"
+              sublabelClassName="mt-2 text-[11px] tracking-[0.16em] text-primary/80"
             />
+            <SidebarTrigger className="ml-auto hidden h-9 w-9 shrink-0 rounded-lg border border-white/10 text-sidebar-foreground/70 hover:text-primary md:inline-flex" />
             <MobileSidebarClose />
           </div>
         </SidebarHeader>
-        <SidebarContent className="dash-sidebar-scroll overscroll-contain px-1.5 pb-3">
+        <SidebarContent className="dash-sidebar-scroll overscroll-contain px-3 py-3">
           {role === "admin" ? (
             <>
               <NavSection label="Operate">
@@ -965,12 +970,10 @@ function DashboardLayoutContent({
                     href={getEventBoardPath(hackathon.id)}
                     onNavigate={closeMobileNav}
                   >
-                    <CalendarRange className={navIconClass} />
-                    <span className="flex min-w-0 flex-col items-start gap-0.5">
-                      <span className="w-full truncate">{hackathon.shortName} Board</span>
-                      <span className="dash-nav-meta w-full">
-                        {formatNavEventDate(hackathon.eventDate)}
-                      </span>
+                    <CalendarRange className={cn(navIconClass, "dash-event-icon")} />
+                    <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                      <span className="dash-nav-event-title">{hackathon.shortName} Board</span>
+                      <NavEventSchedule date={hackathon.eventDate} />
                     </span>
                   </DashboardNavLink>
                 </SidebarMenuButton>
@@ -1009,14 +1012,12 @@ function DashboardLayoutContent({
                         className={multiLineMenuButtonClass}
                         onClick={() => handleHackathonChange(hackathon.id)}
                       >
-                        <CalendarRange className={navIconClass} />
-                        <span className="flex min-w-0 flex-col items-start gap-0.5">
-                          <span className="w-full truncate font-medium tracking-tight">
+                        <CalendarRange className={cn(navIconClass, "dash-event-icon")} />
+                        <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                          <span className="dash-nav-event-title">
                             {hackathon.shortName}
                           </span>
-                          <span className="dash-nav-meta w-full">
-                            {formatNavEventDate(hackathon.eventDate)}
-                          </span>
+                          <NavEventSchedule date={hackathon.eventDate} />
                         </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -1077,7 +1078,7 @@ function DashboardLayoutContent({
             </SidebarMenuItem>
           </NavSection>
         </SidebarContent>
-        <SidebarFooter className="border-t border-white/[0.06]">
+        <SidebarFooter className="dash-sidebar-footer border-t border-white/[0.06]">
           <div className="p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
