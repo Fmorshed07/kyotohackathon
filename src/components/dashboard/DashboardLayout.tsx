@@ -205,19 +205,14 @@ const buildAdminPeopleNav: AdminNavBuilder = (hackathonId) => [
     icon: Users,
   },
   {
-    href: withHackathonQuery("/dashboard/admin/people#audience-analytics", hackathonId),
-    label: "Website analytics",
-    icon: BarChart3,
+    href: withHackathonQuery("/dashboard/admin/people#manage-judge-approvals", hackathonId),
+    label: "Access requests",
+    icon: ShieldCheck,
   },
   {
-    href: withHackathonQuery("/dashboard/admin/people#newsletter", hackathonId),
-    label: "Newsletter",
-    icon: Mail,
-  },
-  {
-    href: withHackathonQuery("/dashboard/admin/people#manage-participants", hackathonId),
-    label: "Participants",
-    icon: Users,
+    href: withHackathonQuery("/dashboard/admin/people#judge-invites", hackathonId),
+    label: "Invite & access",
+    icon: UserCog,
   },
   {
     href: withHackathonQuery("/dashboard/admin/people#event-teams", hackathonId),
@@ -225,24 +220,14 @@ const buildAdminPeopleNav: AdminNavBuilder = (hackathonId) => [
     icon: Users,
   },
   {
-    href: withHackathonQuery("/dashboard/admin/people#manage-judges", hackathonId),
-    label: "Judges",
-    icon: Scale,
-  },
-  {
-    href: withHackathonQuery("/dashboard/admin/people#manage-hosts", hackathonId),
-    label: "Host approvals",
-    icon: UserCog,
-  },
-  {
-    href: withHackathonQuery("/dashboard/admin/people#manage-judge-approvals", hackathonId),
-    label: "Judge approvals",
-    icon: ShieldCheck,
-  },
-  {
-    href: withHackathonQuery("/dashboard/admin/people#judge-invites", hackathonId),
-    label: "Judge invites",
+    href: withHackathonQuery("/dashboard/admin/people#newsletter", hackathonId),
+    label: "Messages",
     icon: Mail,
+  },
+  {
+    href: withHackathonQuery("/dashboard/admin/people#audience-analytics", hackathonId),
+    label: "Insights",
+    icon: BarChart3,
   },
 ];
 
@@ -473,6 +458,13 @@ const DashboardNavLink = forwardRef<HTMLAnchorElement, React.ComponentPropsWitho
       event.preventDefault();
       const targetPath = pathOnly || location.pathname;
       const onTargetPage = targetPath === location.pathname;
+
+      // People views mount on demand; let the router activate the view before scrolling.
+      if (onTargetPage && targetPath === "/dashboard/admin/people") {
+        navigate(`${location.pathname}${location.search}#${hashId}`);
+        onNavigate();
+        return;
+      }
 
       if (onTargetPage && scrollToHashId(hashId)) {
         window.history.replaceState(null, "", `${location.pathname}${location.search}#${hashId}`);
@@ -1044,6 +1036,14 @@ function DashboardLayoutContent({
             )}
 
           <NavSection label="Resources">
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild className={menuButtonClass} isActive={location.pathname === "/community"}>
+                <DashboardNavLink href="/community" onNavigate={closeMobileNav}>
+                  <MessageCircle className={navIconClass} />
+                  <span>Community chat</span>
+                </DashboardNavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild className={menuButtonClass}>
                 <DashboardNavLink href={withHackathonQuery("/resources", selectedHackathonId)} onNavigate={closeMobileNav}>

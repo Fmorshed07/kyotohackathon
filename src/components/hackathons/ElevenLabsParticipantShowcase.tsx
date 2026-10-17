@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ArrowDownRight, ArrowUpRight, ChevronDown, ExternalLink, Play, Trophy, Users, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import ActivityIndicator from "@/components/ActivityIndicator";
+import SectionReveal from "@/components/SectionReveal";
 import { ELEVENLABS_SUBMISSIONS, ELEVENLABS_WINNERS, type ElevenLabsSubmission } from "@/data/elevenLabsSubmissions";
 import { ELEVENLABS_MEETUP_ID } from "@/lib/elevenLabsMeetup";
 import { getProjectFeedVideo, projectFeedEmbedUrl, projectFeedHttpUrl } from "@/lib/projectFeedMedia";
@@ -8,6 +10,42 @@ import "./elevenLabsParticipantShowcase.css";
 
 const WEBSITE_PREVIEW_URL = "https://action-changes-the-future.vercel.app/";
 const WINNER_PLACES = ["1st", "2nd", "3rd", "4th", "5th"];
+
+function SubmissionMedia({ video, embedUrl, previewTitle, onError }: {
+  video: ReturnType<typeof getProjectFeedVideo>;
+  embedUrl: string;
+  previewTitle: string;
+  onError: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <div className="elevenlabs-preview-media" data-loaded={loaded}>
+      {video?.kind === "native" ? (
+        <video controls playsInline preload="metadata" src={video.url}
+          aria-label={previewTitle} aria-busy={!loaded} onLoadedData={() => setLoaded(true)} onError={onError} />
+      ) : (
+        <iframe
+          title={previewTitle}
+          aria-busy={!loaded}
+          src={embedUrl}
+          loading="lazy"
+          allow="encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+          sandbox={video ? "allow-scripts allow-same-origin allow-presentation allow-popups" : "allow-scripts allow-forms allow-popups"}
+          onLoad={() => setLoaded(true)}
+          onErrorCapture={onError}
+        />
+      )}
+      {!loaded ? (
+        <div className="elevenlabs-preview-loading">
+          <ActivityIndicator label={`Loading ${video ? "video" : "website"} preview`} compact />
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function SubmissionPreview({ submission, index, active, onToggle, mode = "gallery" }: {
   submission: ElevenLabsSubmission;
@@ -29,21 +67,8 @@ function SubmissionPreview({ submission, index, active, onToggle, mode = "galler
   return (
     <div className="elevenlabs-submission-preview">
       {active && canPreview && !failed ? (
-        video?.kind === "native" ? (
-          <video controls playsInline preload="metadata" src={video.url}
-            aria-label={previewTitle} onError={() => setFailed(true)} />
-        ) : (
-          <iframe
-            title={previewTitle}
-            src={embedUrl}
-            loading="lazy"
-            allow="encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-            sandbox={video ? "allow-scripts allow-same-origin allow-presentation allow-popups" : "allow-scripts allow-forms allow-popups"}
-            onErrorCapture={() => setFailed(true)}
-          />
-        )
+        <SubmissionMedia key={embedUrl} video={video} embedUrl={embedUrl} previewTitle={previewTitle}
+          onError={() => setFailed(true)} />
       ) : (
         <div className="elevenlabs-preview-cover">
           <span className="elevenlabs-preview-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
@@ -147,7 +172,8 @@ export default function ElevenLabsParticipantShowcase({ variant = "home", submis
               ...submission.additionalLinks.map(link => ({ ...link, url: projectFeedHttpUrl(link.url) })).filter(link => link.url),
             ];
             return (
-              <article key={submission.id} id={cardId(submission.id)} className="elevenlabs-submission-card" aria-labelledby={`${cardId(submission.id)}-title`}>
+              <SectionReveal key={submission.id} className="elevenlabs-submission-arrival" delay={(index % 3) * .07}>
+              <article id={cardId(submission.id)} className="elevenlabs-submission-card" aria-labelledby={`${cardId(submission.id)}-title`}>
                 <SubmissionPreview submission={submission} index={index} active={activePreview === submission.id}
                   onToggle={() => setActivePreview(current => current === submission.id ? null : submission.id)} />
                 <div className="elevenlabs-submission-content">
@@ -179,6 +205,7 @@ export default function ElevenLabsParticipantShowcase({ variant = "home", submis
                   {activePreview === submission.id ? <p className="elevenlabs-preview-help">If the preview is blocked or asks you to sign in, open the original link above.</p> : null}
                 </div>
               </article>
+              </SectionReveal>
             );
           })}
         </div>

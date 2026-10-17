@@ -1,0 +1,42 @@
+{
+  "score": 1,
+  "summary": "Scoped community chat rules passed 35 new emulator tests plus all 42 existing submission/judge/host permission tests. The new schema, ownership, atomic rate limit and authenticated access checks passed. The rules were deployed to hackathon-tokyo on 2026-10-18 JST and read back with an exact match to the tested source (ruleset 4e1cfd5a-9769-49a5-b870-2918734ff281). The overall repository score remains 1 because previously documented administrator bootstrap and role-authority risks remain outside this additive feature. This is not an overall security approval. No production messages or user records were modified for testing.",
+  "findings": [
+    {
+      "check": "Authority source and inherited privilege escalation",
+      "severity": "critical",
+      "issue": "The existing portal-admin email bootstrap lacks an email-verification/custom-claim requirement. Existing staff assignment and invitation authority risks remain documented in submission-permissions-audit.json. Chat role labels use those existing profiles and are not independently verified identity credentials.",
+      "recommendation": "Migrate administrator authority and event/role assignments to trusted server-managed identities in a separate coordinated change. Do not treat a chat name or role label as authorization. This feature deliberately adds no admin bypass for message editing or deletion."
+    },
+    {
+      "check": "Public list, authentication and application query compatibility",
+      "severity": "minor",
+      "issue": "No scoped bypass found: registered roles including unapproved staff can use all three rooms; unauthenticated, anonymous and missing-role accounts are denied. Unknown rooms and unbounded queries are denied. The app's ordered limit-100 listener is allowed. Rooms are virtual; missing parent documents are intentional.",
+      "recommendation": "Retain role, query and unknown-room emulator tests. Membership in the shared community must not grant access to event submissions or judging data."
+    },
+    {
+      "check": "Create/update consistency, immutable ownership and deletion",
+      "severity": "minor",
+      "issue": "No scoped bypass found: forged UID or profile-inconsistent role labels are denied on create, and every message update is denied, including ownership, timestamp, content and schema modifications. Only the author can delete; other members and administrators cannot delete another author's message through these rules.",
+      "recommendation": "Preserve these regressions. Any future moderation feature needs an audited trusted authority path rather than reusing the existing broad admin bootstrap."
+    },
+    {
+      "check": "Types, bounds, timestamps, required fields and schema pollution",
+      "severity": "minor",
+      "issue": "No scoped bypass found: nonblank bounded names/body, exact required schemas, UID/role constraints and server timestamps are validated. Missing/extra fields, wrong types, oversized text and timestamp manipulation are denied. There are no numeric counters, editable workflow status fields or user-defined storage paths in this model.",
+      "recommendation": "Keep validators on both limiter create and update; messages remain immutable. Repeat the attack matrix for any new field, editing or upload capability."
+    },
+    {
+      "check": "Atomic pairing, replay and resource abuse",
+      "severity": "moderate",
+      "issue": "The emulator blocked unpaired/mismatched writes, limiter replay/reset/deletion and rapid cross-room messages. The three-second limit is per UID only. Multiple accounts, repeated reads and unbounded long-term storage remain potential abuse and cost vectors.",
+      "recommendation": "Before broad launch, add appropriate App Check, trusted abuse controls, monitoring and a documented retention policy. Avoid describing the per-account cooldown as comprehensive spam prevention."
+    },
+    {
+      "check": "Mixed-content privacy and moderation",
+      "severity": "moderate",
+      "issue": "The chat model copies no account email/private profile fields and renders text without HTML interpretation. All registered members can nevertheless read message bodies and user-chosen names, and can voluntarily post sensitive data or abusive content. Reports and moderator removal are not yet implemented.",
+      "recommendation": "Keep the visible shared-audience and no-private-scores guidance. Add reviewed moderation/reporting before broad rollout. Do not expose private user documents to resolve chat profiles."
+    }
+  ]
+}

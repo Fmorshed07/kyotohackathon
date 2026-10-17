@@ -1,4 +1,4 @@
-import { CalendarDays, ExternalLink, MapPin, Ticket, Users } from "lucide-react";
+import { CalendarDays, ChevronDown, ExternalLink, MapPin, Ticket, Users } from "lucide-react";
 import type { HostedHackathon } from "@/lib/aiHackathons";
 import { downloadEventCalendar } from "@/lib/eventCalendar";
 import { eventRegistrationLabel } from "@/lib/eventRegistration";
@@ -44,7 +44,17 @@ export default function ImportedEventDetails({ event }: { event: HostedHackathon
           {event.cooperationNote ? <p className="mt-5 border-t border-white/10 pt-4 text-sm text-muted-foreground">{event.cooperationNote}</p> : null}
         </div>
       ) : null}
-      {event.sourceDescription ? <details className="rounded-2xl border border-white/10 bg-card/70 p-5 sm:p-7"><summary className="cursor-pointer font-display text-lg font-semibold">Full event details</summary><EventRichText content={event.sourceDescription} className="mt-5" /></details> : null}
+      {event.sourceDescription?.trim() ? (
+        <details className="group min-w-0 rounded-2xl border border-white/10 bg-card/70 p-5 sm:p-7">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+            <h2 className="font-display text-xl font-semibold tracking-tight">Full event details</h2>
+            <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" />
+          </summary>
+          <div className="mt-5 border-t border-white/10 pt-6 sm:pt-8">
+            <EventRichText content={event.sourceDescription} />
+          </div>
+        </details>
+      ) : null}
       <p className="text-xs text-muted-foreground">Event information from <a href={event.sourceUrl} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-4">the official Luma listing</a>{importedDate ? `, checked ${importedDate}` : ""}.</p>
     </section>
   );

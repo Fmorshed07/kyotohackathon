@@ -14,19 +14,31 @@ export function ScrollRevealMotion({
   initial,
   visible,
   transition,
+  style,
   ...rest
 }: ScrollRevealMotionProps) {
-  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({
+  const { ref, isVisible, reducedMotion } = useScrollReveal<HTMLDivElement>({
     threshold: revealThreshold,
     rootMargin: revealRootMargin,
   });
+  const instant = { type: false, duration: 0, delay: 0, repeat: 0 } as const;
+  const finalTarget: TargetAndTransition | undefined = reducedMotion && visible
+    ? {
+      ...Object.fromEntries(Object.entries(visible).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? [...value].reverse().find(item => item !== null) : value,
+      ])),
+      transition: instant,
+    }
+    : visible;
 
   return (
     <motion.div
       ref={ref}
-      initial={initial}
-      animate={isVisible ? visible : {}}
-      transition={transition}
+      initial={reducedMotion ? false : initial}
+      animate={isVisible ? finalTarget : {}}
+      transition={reducedMotion ? instant : transition}
+      style={reducedMotion ? { ...style, transition: "none" } : style}
       {...rest}
     >
       {children}

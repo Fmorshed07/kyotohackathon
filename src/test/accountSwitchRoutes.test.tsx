@@ -55,7 +55,7 @@ vi.mock("@/lib/participantEventEnrollment", () => ({
 vi.mock("@/components/AnimatedBackground", () => ({ default: () => null }));
 vi.mock("@/components/BrandLogo", () => ({ default: () => <span>Cognisor</span> }));
 vi.mock("@/components/WebsiteAnalyticsTracker", () => ({ WebsiteAnalyticsTracker: () => null }));
-vi.mock("@/components/AiIdeathonStarNotice", () => ({ AiIdeathonStarNotice: () => null }));
+vi.mock("@/components/OngoingEventNotice", () => ({ OngoingEventNotice: () => null }));
 vi.mock("@/components/ui/toaster", () => ({ Toaster: () => null }));
 vi.mock("@/components/ui/sonner", () => ({ Toaster: () => null }));
 vi.mock("@/pages/ParticipantDashboardPage", async () => {

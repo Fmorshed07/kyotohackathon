@@ -53,8 +53,8 @@ export function JudgeInvitePanel({
             Judge invite links
           </h2>
           <p className="dash-subtitle">
-            Share a link so judges can join with Google and open that event&apos;s judge dashboard
-            immediately.
+            Share one link. Judges click Continue with Google to sign up or log in and enter
+            the assigned event immediately. No form or separate approval is needed.
           </p>
         </div>
       </div>
@@ -96,14 +96,14 @@ export function JudgeInvitePanel({
             onClick={() => void onGenerate()}
           >
             <Link2 className="mr-1.5 h-4 w-4" />
-            {isBusy ? "Creating…" : "Create invite link"}
+            {isBusy ? "Creating…" : "Create judge access link"}
           </Button>
           {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
         </div>
 
         {inviteUrl ? (
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Input readOnly value={inviteUrl} className="font-mono text-xs" />
+            <Input aria-label="Judge access link" readOnly value={inviteUrl} className="font-mono text-xs" />
             <Button type="button" variant="secondary" onClick={() => void handleCopy()}>
               {copied ? (
                 <>

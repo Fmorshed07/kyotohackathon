@@ -1,5 +1,13 @@
 rules_version = '2';
 
+// Community data model (additive; existing portal collections are unchanged):
+// community_channels/{general|teams|judges}/messages/{20-character auto-ID}:
+//   user_id string <=128, author_name string 1..80, author_role enum,
+//   body nonblank string <=2000, created_at server timestamp. Immutable;
+//   only its author may delete. No account emails/private profiles are copied.
+// community_chat_limits/{uid}: channel_id enum, message_id auto-ID,
+//   last_sent_at server timestamp. Atomic with one new message, 3s cooldown.
+
 service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() {
@@ -537,6 +545,94 @@ service cloud.firestore {
           && resource.data.hackathon_id is string
           && ownsHackathon(resource.data.hackathon_id)
         );
+    }
+
+    // Cross-event community: all registered members, independent of event access.
+    function isCommunityChannel(channelId) {
+      return channelId in ["general", "teams", "judges"];
+    }
+
+    function isCommunityMember() {
+      return userDocExists()
+        && request.auth.token.get("firebase", {}).get("sign_in_provider", "") != "anonymous"
+        && currentUserRole() in ["participant", "participants", "judge", "judges", "mentor", "mentors", "host", "hosts", "admin", "admins"];
+    }
+
+    // Approval gates badges, not networking access. Badges are never authority.
+    function communityDisplayRole() {
+      let data = get(userDocPath()).data;
+      let role = data.get("role", "");
+      return role in ["participant", "participants"] ? "participant"
+        : role in ["admin", "admins"] ? "admin"
+        : role in ["judge", "judges"] && data.get("judgeApprovalStatus", "") == "approved" ? "judge"
+        : role in ["mentor", "mentors"] && data.get("judgeApprovalStatus", "") == "approved" ? "mentor"
+        : role in ["host", "hosts"] && data.get("hostApprovalStatus", "") == "approved" ? "host"
+        : "member";
+    }
+
+    function communityLimitPath() {
+      return /databases/$(database)/documents/community_chat_limits/$(request.auth.uid);
+    }
+
+    function communityCooldownPassed() {
+      return !exists(communityLimitPath())
+        || request.time >= get(communityLimitPath()).data.last_sent_at + duration.value(3, 's');
+    }
+
+    function isValidCommunityMessage(data) {
+      let fields = ["user_id", "author_name", "author_role", "body", "created_at"];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && data.user_id is string && data.user_id.size() > 0 && data.user_id.size() <= 128
+        && data.author_name is string && data.author_name.size() > 0 && data.author_name.size() <= 80
+        && data.author_name.matches('(?s).*[^\\s].*')
+        && data.author_role in ["participant", "judge", "mentor", "host", "admin", "member"]
+        && data.body is string && data.body.size() > 0 && data.body.size() <= 2000
+        && data.body.matches('(?s).*[^\\s].*')
+        && data.created_at is timestamp;
+    }
+
+    match /community_channels/{channelId}/messages/{messageId} {
+      allow get: if isCommunityMember() && isCommunityChannel(channelId);
+      allow list: if isCommunityMember() && isCommunityChannel(channelId)
+        && request.query.limit != null && request.query.limit <= 100;
+      allow create: if isCommunityMember() && isCommunityChannel(channelId)
+        && messageId.matches('^[a-zA-Z0-9]{20}$')
+        && isValidCommunityMessage(request.resource.data)
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.author_role == communityDisplayRole()
+        && request.resource.data.created_at == request.time
+        && communityCooldownPassed()
+        && getAfter(communityLimitPath()).data.last_sent_at == request.time
+        && getAfter(communityLimitPath()).data.channel_id == channelId
+        && getAfter(communityLimitPath()).data.message_id == messageId;
+      // Messages cannot be rewritten, re-owned, backdated, or schema-polluted.
+      allow update: if false;
+      allow delete: if isCommunityMember() && isCommunityChannel(channelId)
+        && resource.data.user_id == request.auth.uid;
+    }
+
+    function isValidCommunityLimit(data) {
+      let fields = ["channel_id", "message_id", "last_sent_at"];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && data.channel_id is string && isCommunityChannel(data.channel_id)
+        && data.message_id is string && data.message_id.matches('^[a-zA-Z0-9]{20}$')
+        && data.last_sent_at is timestamp && data.last_sent_at == request.time;
+    }
+
+    function hasNewCommunityMessage(data) {
+      let path = /databases/$(database)/documents/community_channels/$(data.channel_id)/messages/$(data.message_id);
+      return !exists(path)
+        && getAfter(path).data.user_id == request.auth.uid
+        && getAfter(path).data.created_at == request.time;
+    }
+
+    match /community_chat_limits/{userId} {
+      allow get: if isCommunityMember() && userId == request.auth.uid;
+      allow create, update: if isCommunityMember() && userId == request.auth.uid
+        && isValidCommunityLimit(request.resource.data)
+        && communityCooldownPassed()
+        && hasNewCommunityMessage(request.resource.data);
+      allow list, delete: if false;
     }
 
     // Looking-for-teammates board: signed-in participants can browse and post.

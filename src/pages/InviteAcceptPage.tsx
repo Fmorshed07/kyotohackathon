@@ -1,50 +1,44 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Scale, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { getHackathonById, getJudgeEventWorkspacePath, isHackathonId } from "@/lib/hackathons";
 import {
   clearPendingInvite,
   getEventBoardPathAfterTeamInvite,
-  getJudgeDashboardPathAfterInvite,
   stashPendingInvite,
 } from "@/lib/inviteTokens";
 import {
   acceptTeamInvite,
-  getJudgeInvite,
   getTeamInvite,
-  redeemJudgeInvite,
 } from "@/lib/portalInvites";
-import type { PortalJudgeInvite, TeamInvite } from "@/types/portal";
-
-type InviteKind = "team" | "judge";
+import type { TeamInvite } from "@/types/portal";
+import JudgeInvitePage from "@/pages/JudgeInvitePage";
 
 export default function InviteAcceptPage() {
   const { kind, token } = useParams<{ kind: string; token: string }>();
-  const inviteKind: InviteKind | null =
-    kind === "team" || kind === "judge" ? kind : null;
+  return kind === "judge" && token
+    ? <JudgeInvitePage key={token} token={token} />
+    : <TeamInviteAcceptPage key={`${kind}:${token}`} />;
+}
+
+function TeamInviteAcceptPage() {
+  const { kind, token } = useParams<{ kind: string; token: string }>();
+  const inviteKind = kind === "team" ? "team" : null;
   const navigate = useNavigate();
   const db = getFirestoreDb();
   const { sessionUser, loading: authLoading } = usePortalAuth();
 
   const [teamInvite, setTeamInvite] = useState<TeamInvite | null>(null);
-  const [judgeInvite, setJudgeInvite] = useState<PortalJudgeInvite | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActing, setIsActing] = useState(false);
   const [isLoadingInvite, setIsLoadingInvite] = useState(true);
   const autoJoinAttempted = useRef(false);
-  const autoRedeemAttempted = useRef(false);
-
-  const judgePrimaryHackathonId = judgeInvite?.hackathon_ids.find(isHackathonId) ?? null;
-  const judgeDashboardPath = judgePrimaryHackathonId
-    ? getJudgeEventWorkspacePath(judgePrimaryHackathonId)
-    : "/dashboard/judge";
 
   useEffect(() => {
     if (!inviteKind || !token) {
@@ -58,24 +52,13 @@ export default function InviteAcceptPage() {
       setIsLoadingInvite(true);
       setLoadError(null);
       try {
-        if (inviteKind === "team") {
-          const invite = await getTeamInvite(db, token);
-          if (cancelled) return;
-          if (!invite || invite.status !== "open") {
-            setLoadError("This team invite is invalid or has been revoked.");
-            setTeamInvite(null);
-          } else {
-            setTeamInvite(invite);
-          }
+        const invite = await getTeamInvite(db, token);
+        if (cancelled) return;
+        if (!invite || invite.status !== "open") {
+          setLoadError("This team invite is invalid or has been revoked.");
+          setTeamInvite(null);
         } else {
-          const invite = await getJudgeInvite(db, token);
-          if (cancelled) return;
-          if (!invite || invite.status !== "open") {
-            setLoadError("This judge invite is invalid or has been revoked.");
-            setJudgeInvite(null);
-          } else {
-            setJudgeInvite(invite);
-          }
+          setTeamInvite(invite);
         }
       } catch (error) {
         if (!cancelled) {
@@ -93,11 +76,6 @@ export default function InviteAcceptPage() {
       cancelled = true;
     };
   }, [db, inviteKind, token]);
-
-  const judgeHackathonLabels = useMemo(() => {
-    if (!judgeInvite) return [];
-    return judgeInvite.hackathon_ids.map((id) => getHackathonById(id).name);
-  }, [judgeInvite]);
 
   const handleAcceptTeam = async () => {
     if (!token || !sessionUser || sessionUser.role !== "participant") return;
@@ -131,27 +109,6 @@ export default function InviteAcceptPage() {
     }
   };
 
-  const handleRedeemJudge = async () => {
-    if (!token || !sessionUser) return;
-    setIsActing(true);
-    setActionError(null);
-    try {
-      const result = await redeemJudgeInvite(db, token, {
-        userId: sessionUser.id,
-        email: sessionUser.email,
-        existingHackathonIds: sessionUser.hackathonIds,
-      });
-      clearPendingInvite("judge");
-      navigate(getJudgeDashboardPathAfterInvite(result.primaryHackathonId), { replace: true });
-    } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Unable to activate judge access."
-      );
-    } finally {
-      setIsActing(false);
-    }
-  };
-
   // Signed-in participants join as soon as the invite is valid — no extra click required.
   useEffect(() => {
     if (authLoading || isLoadingInvite || inviteKind !== "team" || !token || !teamInvite) return;
@@ -170,46 +127,15 @@ export default function InviteAcceptPage() {
     isActing,
   ]);
 
-  // Signed-in judges/mentors (or accounts without a role yet) redeem and open the event workspace.
-  useEffect(() => {
-    if (authLoading || isLoadingInvite || inviteKind !== "judge" || !token || !judgeInvite) return;
-    if (!sessionUser) return;
-    const eligible =
-      sessionUser.role === "judge" ||
-      sessionUser.role === "mentor" ||
-      !sessionUser.role;
-    if (!eligible || sessionUser.role === "admin") return;
-    if (autoRedeemAttempted.current || isActing) return;
-    autoRedeemAttempted.current = true;
-    void handleRedeemJudge();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot auto redeem for invite deep links
-  }, [
-    authLoading,
-    isLoadingInvite,
-    inviteKind,
-    token,
-    judgeInvite,
-    sessionUser,
-    isActing,
-  ]);
-
   const goSignUp = () => {
     if (!inviteKind || !token) return;
     stashPendingInvite(inviteKind, token);
-    if (inviteKind === "judge") {
-      navigate(`/signup?role=judge&invite=${encodeURIComponent(token)}`);
-      return;
-    }
     navigate(`/signup?role=participant&invite=${encodeURIComponent(token)}`);
   };
 
   const goSignIn = () => {
     if (!inviteKind || !token) return;
     stashPendingInvite(inviteKind, token);
-    if (inviteKind === "judge") {
-      navigate(`/signin?role=judge&invite=${encodeURIComponent(token)}`);
-      return;
-    }
     navigate(`/signin?role=participant&invite=${encodeURIComponent(token)}`);
   };
 
@@ -225,12 +151,8 @@ export default function InviteAcceptPage() {
         <Card className="border-white/10 bg-card/90 backdrop-blur">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-display text-xl">
-              {inviteKind === "judge" ? (
-                <Scale className="h-5 w-5 text-primary" />
-              ) : (
-                <Users className="h-5 w-5 text-primary" />
-              )}
-              {inviteKind === "judge" ? "Judge portal invite" : "Team invite"}
+              <Users className="h-5 w-5 text-primary" />
+              Team invite
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -280,51 +202,6 @@ export default function InviteAcceptPage() {
                     </Button>
                   </div>
                 )}
-              </>
-            ) : inviteKind === "judge" && judgeInvite ? (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  This link grants direct access to the judging portal for the assigned event
-                  {judgeInvite.label ? ` (${judgeInvite.label})` : ""}.
-                </p>
-                {judgeHackathonLabels.length > 0 ? (
-                  <p className="text-sm text-foreground">
-                    Event{judgeHackathonLabels.length > 1 ? "s" : ""}:{" "}
-                    {judgeHackathonLabels.join(", ")}
-                  </p>
-                ) : null}
-                {sessionUser &&
-                (sessionUser.role === "judge" ||
-                  sessionUser.role === "mentor" ||
-                  !sessionUser.role) ? (
-                  <Button type="button" disabled={isActing} onClick={() => void handleRedeemJudge()}>
-                    {isActing ? "Opening event workspace…" : "Open event judge dashboard"}
-                  </Button>
-                ) : sessionUser?.role === "admin" ? (
-                  <Button asChild>
-                    <Link to="/dashboard/admin">You already have admin access</Link>
-                  </Button>
-                ) : sessionUser ? (
-                  <p className="text-sm text-muted-foreground">
-                    This invite is for judges. Your account is registered as {sessionUser.role}.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" onClick={goSignUp}>
-                      Sign up as judge
-                    </Button>
-                    <Button type="button" variant="outline" onClick={goSignIn}>
-                      Log in
-                    </Button>
-                  </div>
-                )}
-                {sessionUser &&
-                sessionUser.role === "judge" &&
-                sessionUser.judgeApprovalStatus === "approved" ? (
-                  <Button asChild variant="ghost">
-                    <Link to={judgeDashboardPath}>Go to event dashboard</Link>
-                  </Button>
-                ) : null}
               </>
             ) : (
               <p className="text-sm text-muted-foreground">Invite not found.</p>

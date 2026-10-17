@@ -2,7 +2,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { initializeTestEnvironment, assertFails as expectDenied, assertSucceeds } from "@firebase/rules-unit-testing";
-import { collection, deleteField, doc, getDoc, getDocs, query, runTransaction, setDoc, updateDoc, where } from "firebase/firestore";
+import { arrayUnion, collection, deleteField, doc, getDoc, getDocs, increment, query, runTransaction, setDoc, updateDoc, where } from "firebase/firestore";
 
 // Never fall back to a production database or credentials.
 const address = process.env.FIRESTORE_EMULATOR_HOST;
@@ -51,6 +51,66 @@ beforeEach(async () => {
     seed("users/admin", { role: "admin" }),
     seed("submissions/entry", project({ member_user_ids: ["teammate"] })),
   ]);
+});
+
+describe("one-step judge invitation transactions", () => {
+  const token = "judge-onboarding-test-token";
+  const invite = () => ({ type: "judge", status: "open", created_by: "host", hackathon_ids: [eventId], use_count: 0, max_uses: 25, used_by: [] });
+  const redeem = (uid, { corruptInvite = false, consume = true } = {}) => {
+    const firestore = db(uid);
+    return runTransaction(firestore, async transaction => {
+    const inviteRef = doc(firestore, "portal_invites", token);
+    const userRef = doc(firestore, "users", uid);
+    await transaction.get(inviteRef);
+    await transaction.get(userRef);
+    transaction.set(userRef, {
+      email: `${uid}@example.com`, fullName: "Invited judge", role: "judge", judgeApprovalStatus: "approved",
+      hackathon_id: eventId, hackathon_ids: [eventId], invite_token: token,
+    }, { merge: true });
+    if (consume) transaction.update(inviteRef, corruptInvite ? { label: "Unauthorised edit" } : { use_count: increment(1), used_by: arrayUnion(uid) });
+    });
+  };
+
+  it("atomically creates an invited judge who can immediately score", async () => {
+    await seed(`portal_invites/${token}`, invite());
+    await assertSucceeds(redeem("new-invited-judge"));
+    const profile = await getDoc(doc(db("new-invited-judge"), "users", "new-invited-judge"));
+    assert.equal(profile.data().judgeApprovalStatus, "approved");
+    const redeemed = await getDoc(doc(db("new-invited-judge"), "portal_invites", token));
+    assert.equal(redeemed.data().use_count, 1);
+    assert.deepEqual(redeemed.data().used_by, ["new-invited-judge"]);
+    await assertSucceeds(edit("new-invited-judge", scoreUpdate("new-invited-judge")));
+  });
+
+  it("approves an existing pending judge without a second approval", async () => {
+    await seed(`portal_invites/${token}`, invite());
+    await assertSucceeds(redeem("pending"));
+    await assertSucceeds(edit("pending", scoreUpdate("pending")));
+  });
+
+  it("reopens a previously used invite without changing its use count", async () => {
+    await seed(`portal_invites/${token}`, { ...invite(), max_uses: 1, use_count: 1, used_by: ["judge"] });
+    await assertSucceeds(redeem("judge", { consume: false }));
+    assert.equal((await getDoc(doc(db("judge"), "portal_invites", token))).data().use_count, 1);
+  });
+
+  it("rolls back new judge approval when the paired invite write is denied", async () => {
+    await seed(`portal_invites/${token}`, invite());
+    await assertFails(redeem("new-invited-judge", { corruptInvite: true }));
+    assert.equal((await getDoc(doc(db("new-invited-judge"), "users", "new-invited-judge"))).exists(), false);
+    assert.equal((await getDoc(doc(db("new-invited-judge"), "portal_invites", token))).data().use_count, 0);
+  });
+
+  it("does not activate a revoked invitation", async () => {
+    await seed(`portal_invites/${token}`, { ...invite(), status: "revoked" });
+    await assertFails(redeem("new-invited-judge"));
+  });
+
+  it("does not convert a participant account into a judge", async () => {
+    await seed(`portal_invites/${token}`, invite());
+    await assertFails(redeem("participant"));
+    assert.equal((await getDoc(doc(db("participant"), "users", "participant"))).data().role, "participant");
+  });
 });
 
 describe("participant submissions", () => {

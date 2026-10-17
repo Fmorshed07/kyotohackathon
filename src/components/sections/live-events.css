@@ -119,7 +119,7 @@
 .event-quiet-copy h3 { margin-top: .8rem; font: 400 clamp(1.8rem, 3vw, 2.5rem)/1.2 var(--font-sans); letter-spacing: -.035em; }
 .event-quiet-copy p { margin-top: .75rem; color: #9aafc2; font-size: 13px; line-height: 1.7; }
 .event-quiet-copy .event-primary-action { margin-top: 1.5rem; }
-.event-loading { display: grid; grid-template-columns: 1fr 1fr; min-height: 590px; overflow: hidden; border: 1px solid #6ebeff30; border-radius: 1.5rem; background: #060e18; }
+.event-loading { display: grid; grid-template-columns: 1fr 1fr; min-height: 590px; overflow: hidden; border-block: 1px solid #6ebeff30; background: #060e18; }
 .event-loading-art { position: relative; display: grid; place-items: center; overflow: hidden; background: #09203877; }
 .event-loading-art .event-orbit { width: 75%; }
 .event-loading-copy { display: flex; flex-direction: column; gap: 1.5rem; justify-content: center; padding: 3rem; }

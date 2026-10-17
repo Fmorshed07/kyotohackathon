@@ -6,12 +6,14 @@ import {
   getDocs,
   increment,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
   type Firestore,
 } from "firebase/firestore";
 import { createInviteToken } from "@/lib/inviteTokens";
+import { isHackathonId } from "@/lib/hackathons";
 import type {
   PortalJudgeInvite,
   Submission,
@@ -76,7 +78,7 @@ export function mapJudgeInvite(
     created_by: getString(data.created_by),
     created_by_email: getString(data.created_by_email) || null,
     label: getString(data.label) || null,
-    status: data.status === "revoked" ? "revoked" : "open",
+    status: data.status === "open" ? "open" : "revoked",
     created_at: getString(data.created_at),
     max_uses: typeof data.max_uses === "number" ? data.max_uses : null,
     use_count: typeof data.use_count === "number" ? data.use_count : 0,
@@ -415,11 +417,23 @@ export async function getJudgeInvite(
   db: Firestore,
   token: string
 ): Promise<PortalJudgeInvite | null> {
+  if (!/^[a-zA-Z0-9_-]{9,128}$/.test(token)) return null;
   const snap = await getDoc(doc(db, JUDGE_INVITES, token));
   if (!snap.exists()) return null;
   const data = snap.data() as Record<string, unknown>;
-  if (data.type && data.type !== "judge") return null;
+  if (data.type !== "judge") return null;
   return mapJudgeInvite(snap.id, data);
+}
+
+export function judgeInviteProblem(invite: PortalJudgeInvite | null, userId?: string): string | null {
+  if (!invite || invite.status !== "open") return "This judge invite is invalid or has been revoked. Ask the organiser for a new link.";
+  if (!invite.hackathon_ids.length || !invite.hackathon_ids.every(isHackathonId)) return "This invite has no valid assigned event. Ask the organiser for a new link.";
+  // Before sign-in, we cannot know whether this is a returning invitee. Capacity
+  // is enforced again with the authenticated UID inside the transaction.
+  if (userId && invite.max_uses != null && invite.use_count >= invite.max_uses && !invite.used_by?.includes(userId)) {
+    return "This judge invite has reached its use limit. Ask the organiser for a new link.";
+  }
+  return null;
 }
 
 export async function revokeJudgeInvite(db: Firestore, token: string): Promise<void> {
@@ -434,44 +448,41 @@ export async function revokeJudgeInvite(db: Firestore, token: string): Promise<v
 export async function redeemJudgeInvite(
   db: Firestore,
   token: string,
-  user: { userId: string; email: string; existingHackathonIds?: string[] }
+  user: { userId: string; email: string; existingHackathonIds?: string[]; displayName?: string }
 ): Promise<{ hackathonIds: string[]; primaryHackathonId: string | null }> {
-  const invite = await getJudgeInvite(db, token);
-  if (!invite || invite.status !== "open") {
-    throw new Error("This judge invite is invalid or has been revoked.");
-  }
-  if (invite.max_uses != null && invite.use_count >= invite.max_uses) {
-    throw new Error("This judge invite has reached its use limit.");
-  }
-
-  const primaryHackathonId = invite.hackathon_ids[0] ?? null;
-
-  if (invite.used_by?.includes(user.userId)) {
-    return { hackathonIds: invite.hackathon_ids, primaryHackathonId };
-  }
-
-  // Prefer the invited event as the active workspace, then keep any prior enrollments.
-  const nextHackathonIds = Array.from(
-    new Set([...invite.hackathon_ids, ...(user.existingHackathonIds ?? [])].filter(Boolean))
-  );
-
-  await setDoc(
-    doc(db, "users", user.userId),
-    {
+  if (!/^[a-zA-Z0-9_-]{9,128}$/.test(token)) throw new Error("This judge invite is invalid.");
+  // Approval and invite usage must either both succeed or neither succeed.
+  // Transaction retries also prevent two clients from taking the same last place.
+  return runTransaction(db, async transaction => {
+    const inviteRef = doc(db, JUDGE_INVITES, token);
+    const userRef = doc(db, "users", user.userId);
+    const inviteSnap = await transaction.get(inviteRef);
+    const data = inviteSnap.data();
+    const invite = data?.type === "judge" ? mapJudgeInvite(inviteSnap.id, data) : null;
+    const problem = judgeInviteProblem(invite, user.userId);
+    if (problem || !invite) throw new Error(problem ?? "This judge invite is invalid.");
+    const userSnap = await transaction.get(userRef);
+    const profile = userSnap.data() ?? {};
+    if (profile.role && !["judge", "mentor"].includes(profile.role)) {
+      throw new Error("This account already has another portal role. Use a judge account or ask the organiser to update your role.");
+    }
+    const existingIds = Array.isArray(profile.hackathon_ids)
+      ? profile.hackathon_ids.filter((id: unknown): id is string => typeof id === "string" && isHackathonId(id))
+      : typeof profile.hackathon_id === "string" && isHackathonId(profile.hackathon_id) ? [profile.hackathon_id] : [];
+    const nextHackathonIds = Array.from(new Set([...invite.hackathon_ids, ...existingIds]));
+    const primaryHackathonId = invite.hackathon_ids[0];
+    transaction.set(userRef, {
       email: user.email,
       role: "judge",
       judgeApprovalStatus: "approved",
-      hackathon_id: primaryHackathonId ?? nextHackathonIds[0] ?? null,
+      hackathon_id: primaryHackathonId,
       hackathon_ids: nextHackathonIds,
       invite_token: token,
-    },
-    { merge: true }
-  );
-
-  await updateDoc(doc(db, JUDGE_INVITES, token), {
-    use_count: increment(1),
-    used_by: arrayUnion(user.userId),
+      ...(!profile.fullName && user.displayName?.trim() ? { fullName: user.displayName.trim().slice(0, 120) } : {}),
+    }, { merge: true });
+    if (!invite.used_by?.includes(user.userId)) {
+      transaction.update(inviteRef, { use_count: increment(1), used_by: arrayUnion(user.userId) });
+    }
+    return { hackathonIds: nextHackathonIds, primaryHackathonId };
   });
-
-  return { hackathonIds: nextHackathonIds, primaryHackathonId };
 }

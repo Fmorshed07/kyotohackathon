@@ -1,0 +1,86 @@
+.submission-save {
+  max-inline-size: 100%;
+}
+
+.submission-save__button {
+  position: relative;
+  isolation: isolate;
+  transition: background-color 240ms ease, color 240ms ease, box-shadow 240ms ease;
+}
+
+.submission-save__button[data-saving="true"]:disabled {
+  color: #c5edff;
+  background: #092c4c;
+  box-shadow: inset 0 0 0 1px rgb(87 184 255 / 48%), 0 0 24px rgb(0 149 255 / 9%);
+  opacity: 1;
+}
+
+.submission-save__glyph {
+  display: grid;
+  flex: 0 0 1.4rem;
+  place-items: center;
+  inline-size: 1.4rem;
+  block-size: 1.4rem;
+}
+
+.submission-save__glyph svg {
+  inline-size: 1.4rem;
+  block-size: 1.4rem;
+}
+
+.submission-save__back-sheet,
+.submission-save__front-sheet,
+.submission-save__line {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.submission-save__back-sheet {
+  opacity: 0.35;
+}
+
+.submission-save__front-sheet {
+  fill: #092c4c;
+}
+
+.submission-save__line {
+  animation: submission-save-signal 1.8s ease-in-out infinite;
+}
+
+.submission-save__line:nth-of-type(2) {
+  animation-delay: 150ms;
+}
+
+.submission-save__line:nth-of-type(3) {
+  animation-delay: 300ms;
+}
+
+.submission-save__label {
+  display: grid;
+}
+
+.submission-save__label > span {
+  grid-area: 1 / 1;
+}
+
+.submission-save__measure {
+  visibility: hidden;
+}
+
+@keyframes submission-save-signal {
+  0%, 75%, 100% { opacity: 0.3; transform: translateX(-1px); }
+  35% { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submission-save__button {
+    transition: none;
+  }
+
+  .submission-save__line {
+    animation: none;
+    opacity: 0.9;
+    transform: none;
+  }
+}

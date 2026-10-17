@@ -1,4 +1,5 @@
 import { ArrowUpRight, Check } from "lucide-react";
+import SectionReveal from "@/components/SectionReveal";
 import "./sections/peer-careers.css";
 
 const PEER_PORTAL_URL = "https://peerportal.app/";
@@ -6,7 +7,7 @@ const PEER_PORTAL_URL = "https://peerportal.app/";
 export default function PeerPortalCampaign() {
   return (
     <div className="peer-campaign">
-      <div className="peer-campaign-copy">
+      <SectionReveal className="peer-campaign-copy" direction="left">
         <p className="peer-campaign-eyebrow">From building to belonging.</p>
         <h2 id="get-hired-heading">Get hired with <span>Peer Portal</span></h2>
         <p className="peer-campaign-description">You’ve built something worth sharing. Take your projects, skills, and ambition to your next opportunity in Japan.</p>
@@ -19,7 +20,8 @@ export default function PeerPortalCampaign() {
           <a href={PEER_PORTAL_URL} target="_blank" rel="noopener noreferrer">Explore Peer Portal <ArrowUpRight aria-hidden="true" /></a>
           <span>Opens in a new tab</span>
         </div>
-      </div>
+      </SectionReveal>
+      <SectionReveal className="peer-campaign-artwork-reveal" direction="right" delay={.1}>
       <figure className="peer-campaign-artwork">
         <img
           src="/images/peer-portal-careers.png"
@@ -30,6 +32,7 @@ export default function PeerPortalCampaign() {
           decoding="async"
         />
       </figure>
+      </SectionReveal>
     </div>
   );
 }

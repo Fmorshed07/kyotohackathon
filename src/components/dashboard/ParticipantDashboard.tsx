@@ -32,6 +32,7 @@ import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector
 import { GalleryUploadField, ImageUploadField } from "@/components/dashboard/ImageUploadField";
 import { getPeopleProfileCompleteness } from "@/components/dashboard/PeopleProfileSection";
 import { SubmissionSearchInput } from "@/components/dashboard/SubmissionSearchInput";
+import { SubmissionSaveButton } from "@/components/dashboard/SubmissionSaveButton";
 import { ProjectPublicLinks } from "@/components/projects/ProjectPublicLinks";
 import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
 import { useProjectShareCounts } from "@/hooks/useProjectShareCounts";
@@ -935,15 +936,11 @@ export function ParticipantDashboard({
                   <ExternalLink className="ml-1.5 h-4 w-4" />
                 </Link>
               </Button>
-              <Button
-                onClick={onSave}
-                disabled={isSubmittingProject || isReadOnly}
-                size="lg"
-                className="w-full uppercase tracking-[0.12em] sm:w-auto sm:tracking-[0.18em]"
-              >
-                <Rocket className="h-4 w-4" />
-                {isSubmittingProject ? "Saving..." : isReadOnly ? "Locked" : "Save Submission"}
-              </Button>
+              <SubmissionSaveButton
+                onSave={onSave}
+                isSaving={isSubmittingProject}
+                isReadOnly={isReadOnly}
+              />
             </div>
           </div>
         </div>

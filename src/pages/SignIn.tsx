@@ -28,6 +28,7 @@ import { redeemJudgeInvite } from "@/lib/portalInvites";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { checkParticipantEventEnrollment } from "@/lib/participantEventEnrollment";
 import type { JudgeApprovalStatus, PortalRole, SessionUser } from "@/types/portal";
+import JudgeInvitePage from "@/pages/JudgeInvitePage";
 
 const sectionClass = "rounded-xl border border-border bg-card";
 
@@ -130,6 +131,15 @@ const roleCopy: Record<
 };
 
 export default function SignIn() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const token = params.get("role") === "judge" ? params.get("invite")?.trim() || readPendingInvite("judge") : null;
+  // Legacy signup/signin links get the same one-step flow as /invite/judge/:token.
+  // Do not mount the generic auth page: its redirect can outrun invite redemption.
+  return token ? <JudgeInvitePage key={token} token={token} /> : <PortalSignIn />;
+}
+
+function PortalSignIn() {
   const navigate = useNavigate();
   const location = useLocation();
   const auth = getFirebaseAuth();

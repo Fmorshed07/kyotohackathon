@@ -1,0 +1,29 @@
+.event-rich-text {
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.event-rich-text > * + * {
+  margin-block-start: 1rem;
+}
+
+.event-rich-text > :is(h2, h3, h4, h5, h6) {
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.event-rich-text > * + :is(h2, h3, h4, h5, h6) {
+  margin-block-start: 2rem;
+}
+
+.event-rich-text > :is(h2, h3, h4, h5, h6) + * {
+  margin-block-start: 0.625rem;
+}
+
+.event-rich-text > :first-child {
+  margin-block-start: 0;
+}
+
+.event-rich-text a:visited {
+  color: hsl(var(--foreground) / 0.8);
+}

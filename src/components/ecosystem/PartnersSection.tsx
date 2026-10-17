@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowUpRight, Pause, Play } from "lucide-react";
 import { COMMUNITY_PARTNERS, FEATURED_BRAND_ROWS, type FeaturedCommunityBrand } from "@/data/communityPartners";
 import { useAmbientMotion } from "@/hooks/useAmbientMotion";
+import SectionReveal from "@/components/SectionReveal";
 import { COMMUNITY_SOURCE } from "@/lib/communityEcosystem";
 import "./ecosystem.css";
 
@@ -29,11 +30,13 @@ export default function PartnersSection() {
   const { ref, running, paused, setPaused } = useAmbientMotion();
   return <section ref={ref} id="partners" className="ecosystem-section partners-section" data-motion={running && !expanded ? "on" : "off"} aria-labelledby="partners-title">
     <div className="ecosystem-section-inner">
+      <SectionReveal>
       <header className="eco-partner-heading">
         <p className="partner-eyebrow"><span aria-hidden="true" />The Cognisor ecosystem</p>
         <h2 id="partners-title">Great ideas. <span>Extraordinary company.</span></h2>
         <p>Founders, communities &amp; technology. Moving ideas forward, together.</p>
       </header>
+      </SectionReveal>
       {!expanded && <div className="partner-wall" aria-label="Featured partners and technology">
         {FEATURED_BRAND_ROWS.map((row, index) => <div className="partner-ribbon" key={index}>
           <div className="partner-track">

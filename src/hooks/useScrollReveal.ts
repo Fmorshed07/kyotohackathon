@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface UseScrollRevealOptions {
   threshold?: number;
@@ -11,39 +11,67 @@ export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(
 ) {
   const { threshold = 0.1, rootMargin = "-50px 0px", triggerOnce = true } = options;
   const ref = useRef<T>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [hasTriggered, setHasTriggered] = useState(false);
-
-  const handleIntersection = useCallback(
-    ([entry]: IntersectionObserverEntry[]) => {
-      if (entry.isIntersecting && !hasTriggered) {
-        // Small delay for smoother stagger effect
-        requestAnimationFrame(() => {
-          setIsVisible(true);
-          if (triggerOnce) {
-            setHasTriggered(true);
-          }
-        });
-      } else if (!triggerOnce && !entry.isIntersecting) {
-        setIsVisible(false);
-      }
-    },
-    [hasTriggered, triggerOnce]
+  const [reducedMotion, setReducedMotion] = useState(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false,
   );
+  const [isVisible, setIsVisible] = useState(() => reducedMotion || typeof IntersectionObserver === "undefined");
+  const hasRevealed = useRef(isVisible);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (event: MediaQueryListEvent) => setReducedMotion(event.matches);
+    setReducedMotion(preference.matches);
+    if (typeof preference.addEventListener === "function") {
+      preference.addEventListener("change", onChange);
+      return () => preference.removeEventListener("change", onChange);
+    }
+    preference.addListener?.(onChange);
+    return () => preference.removeListener?.(onChange);
+  }, []);
 
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
 
-    const observer = new IntersectionObserver(handleIntersection, {
-      threshold,
-      rootMargin,
-    });
+    if (reducedMotion || typeof IntersectionObserver === "undefined" || (triggerOnce && hasRevealed.current)) {
+      hasRevealed.current = true;
+      setIsVisible(true);
+      return;
+    }
+
+    let active = true;
+    let frame: number | null = null;
+    const cancelReveal = () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = null;
+    };
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!active || !entry || (triggerOnce && hasRevealed.current)) return;
+      cancelReveal();
+      if (!entry.isIntersecting || entry.intersectionRatio < threshold) {
+        if (!triggerOnce) setIsVisible(false);
+        return;
+      }
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        if (!active) return;
+        hasRevealed.current = true;
+        setIsVisible(true);
+        if (triggerOnce) observer.disconnect();
+      });
+    }, { threshold, rootMargin });
 
     observer.observe(element);
 
-    return () => observer.disconnect();
-  }, [threshold, rootMargin, handleIntersection]);
+    return () => {
+      active = false;
+      cancelReveal();
+      observer.disconnect();
+    };
+  }, [threshold, rootMargin, triggerOnce, reducedMotion]);
 
-  return { ref, isVisible };
+  return { ref, isVisible: reducedMotion || isVisible, reducedMotion };
 }

@@ -12,6 +12,7 @@ import {
 } from "./lib/portalRoutes";
 import Index from "./pages/Index";
 import CommunityWorkPage from "./pages/CommunityWorkPage";
+import CommunityChatPage from "./pages/CommunityChatPage";
 import SignIn from "./pages/SignIn";
 import AdminSignIn from "./pages/AdminSignIn";
 import HostSignIn from "./pages/HostSignIn";
@@ -36,7 +37,7 @@ import ResourcesPage from "./pages/ResourcesPage";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
 import NotFound from "./pages/NotFound";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
-import { AiIdeathonStarNotice } from "./components/AiIdeathonStarNotice";
+import { OngoingEventNotice } from "./components/OngoingEventNotice";
 import { WebsiteAnalyticsTracker } from "./components/WebsiteAnalyticsTracker";
 
 const queryClient = new QueryClient();
@@ -121,11 +122,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <WebsiteAnalyticsTracker />
-        <AiIdeathonStarNotice />
+        <OngoingEventNotice />
         <RouteErrorBoundary>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/work" element={<CommunityWorkPage />} />
+          <Route path="/community" element={<CommunityChatPage />} />
           <Route path="/hackathons" element={<HackathonsPage />} />
           <Route path="/events/:hackathonId" element={<GeneratedHackathonPage />} />
           <Route path="/signin" element={<SignIn />} />

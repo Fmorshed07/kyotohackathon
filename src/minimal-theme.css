@@ -54,6 +54,9 @@ h2.font-display {
 .feature-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .feature-link { display: flex; flex-direction: column; gap: 1.5rem; padding: 2rem; border-top: 1px solid hsl(var(--border)); transition: background-color .2s; min-width: 0; }
 .feature-link + .feature-link { border-left: 1px solid hsl(var(--border)); }
+.feature-link-reveal { display: flex; }
+.feature-link-reveal .feature-link { width: 100%; }
+.feature-link-reveal + .feature-link-reveal { border-left: 1px solid hsl(var(--border)); }
 .feature-link:hover { background: hsl(var(--card)); }
 .feature-link:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: -2px; }
 .feature-link-top { display: flex; align-items: center; justify-content: space-between; color: hsl(var(--muted-foreground)); font-size: .75rem; font-variant-numeric: tabular-nums; }
@@ -68,4 +71,5 @@ h2.font-display {
   .feature-links { grid-template-columns: minmax(0, 1fr); }
   .feature-link { padding: 1.5rem 0; }
   .feature-link + .feature-link { border-left: 0; }
+  .feature-link-reveal + .feature-link-reveal { border-left: 0; }
 }

@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rules": "npx --yes firebase-tools@15.33.0 emulators:exec --config firebase.rules-test.json --project demo-cognisor-permissions --only firestore \"node --test tests/firestore.permissions.test.mjs\"",
+    "test:rules": "npx --yes firebase-tools@15.33.0 emulators:exec --config firebase.rules-test.json --project demo-cognisor-permissions --only firestore \"node --test --test-concurrency=1 tests/firestore.permissions.test.mjs tests/firestore.community.test.mjs\"",
     "admin:reset-password": "node --env-file=.env.local scripts/reset-admin-password.mjs",
     "event:publish-elevenlabs": "node --experimental-strip-types --env-file=.env.local scripts/publish-elevenlabs-meetup.mjs",
     "event:publish-osaka": "node --experimental-strip-types --env-file=.env.local scripts/publish-imported-event.mjs --event=impact-osaka-2026",

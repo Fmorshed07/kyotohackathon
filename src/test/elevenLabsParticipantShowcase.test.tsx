@@ -102,10 +102,54 @@ describe("ElevenLabs participant submissions", () => {
     fireEvent.click(screen.getByRole("button", { name: `Preview ${submission.title} video` }));
     fireEvent.error(screen.getByTitle(`${submission.title} video preview`));
     expect(screen.getByRole("status")).toHaveTextContent("Use the original link below");
+    expect(screen.queryByText("Loading video preview")).toBeNull();
     expect(screen.getByRole("link", { name: /Original video/ })).toHaveAttribute("href", submission.videoUrl);
     fireEvent.click(screen.getByRole("button", { name: `Close ${submission.title} preview` }));
     fireEvent.click(screen.getByRole("button", { name: `Preview ${submission.title} video` }));
     expect(screen.getByTitle(`${submission.title} video preview`)).toBeInTheDocument();
+  });
+
+  it("shows real iframe loading feedback and resets it when a preview is reopened", () => {
+    const submission = playableYoutube();
+    show([submission]);
+    expect(screen.queryByRole("status")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: `Preview ${submission.title} video` }));
+    const frame = screen.getByTitle(`${submission.title} video preview`);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading video preview");
+    expect(frame).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("link", { name: /Original video/ })).toHaveAttribute("href", submission.videoUrl);
+    expect(screen.getByRole("button", { name: `Close ${submission.title} preview` })).toBeEnabled();
+
+    fireEvent.load(frame);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(frame).toHaveAttribute("aria-busy", "false");
+    fireEvent.click(screen.getByRole("button", { name: `Close ${submission.title} preview` }));
+    fireEvent.click(screen.getByRole("button", { name: `Preview ${submission.title} video` }));
+    expect(screen.getByRole("status")).toHaveTextContent("Loading video preview");
+    fireEvent.click(screen.getByRole("button", { name: `Close ${submission.title} preview` }));
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByTitle(`${submission.title} video preview`)).toBeNull();
+  });
+
+  it("waits for native video data and clears loading on video failure without changing controls", () => {
+    const submission = { ...playableYoutube(), videoUrl: "https://example.com/demo.mp4", previewStatus: undefined };
+    show([submission]);
+    fireEvent.click(screen.getByRole("button", { name: `Preview ${submission.title} video` }));
+    const video = screen.getByLabelText(`${submission.title} video preview`);
+    expect(video).toHaveAttribute("controls");
+    expect(video).toHaveAttribute("playsinline");
+    expect(video).not.toHaveAttribute("autoplay");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading video preview");
+    fireEvent.loadedMetadata(video);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading video preview");
+    fireEvent.loadedData(video);
+    expect(screen.queryByRole("status")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: `Close ${submission.title} preview` }));
+    fireEvent.click(screen.getByRole("button", { name: `Preview ${submission.title} video` }));
+    fireEvent.error(screen.getByLabelText(`${submission.title} video preview`));
+    expect(screen.getByRole("status")).toHaveTextContent("Use the original link below");
+    expect(screen.queryByText("Loading video preview")).toBeNull();
+    expect(screen.getByRole("link", { name: /Original video/ })).toHaveAttribute("href", submission.videoUrl);
   });
 
   it("permits only the curated website to open in a restricted sandbox", () => {

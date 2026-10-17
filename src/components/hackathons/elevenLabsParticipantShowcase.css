@@ -40,13 +40,20 @@
 .elevenlabs-winner--first a { color: #f0d397; }
 .elevenlabs-all-projects-label { margin-bottom: 1.1rem; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: #a5bacb; }
 .elevenlabs-submission-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; align-items: start; }
+.elevenlabs-submission-arrival { min-width: 0; }
 .elevenlabs-submission-card { min-width: 0; border: 1px solid #ffffff14; border-radius: .85rem; overflow: hidden; background: #10151d; scroll-margin-top: 6rem; }
 .elevenlabs-submission-card:target { border-color: #8cd2fb99; box-shadow: 0 0 0 2px #8cd2fb24; }
 .elevenlabs-submission-preview { position: relative; aspect-ratio: 16 / 9; background: #05090f; }
+.elevenlabs-preview-media { position: relative; width: 100%; height: 100%; }
+.elevenlabs-preview-media[data-loaded="true"] { animation: submission-media-ready .35s ease-out both; }
+@keyframes submission-media-ready { from { opacity: .35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .elevenlabs-preview-media[data-loaded="true"] { animation: none; } }
+.elevenlabs-preview-loading { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; padding: 1rem 2.75rem; background: linear-gradient(145deg, #0b1724f5, #07101bd9); pointer-events: none; }
+.elevenlabs-preview-media:has(video) .elevenlabs-preview-loading { bottom: 2.75rem; }
 .elevenlabs-submission-preview iframe, .elevenlabs-submission-preview video { display: block; width: 100%; height: 100%; border: 0; }
 .elevenlabs-preview-cover { position: relative; display: flex; align-items: center; justify-content: center; height: 100%; overflow: hidden; background: radial-gradient(ellipse at 50% 100%, #04629645, transparent 75%), linear-gradient(135deg, #111c27, #080e16); }
-.elevenlabs-submission-card:nth-child(3n+2) .elevenlabs-preview-cover { background: radial-gradient(ellipse at 80% 90%, #39706840, transparent 75%), #0c181c; }
-.elevenlabs-submission-card:nth-child(3n) .elevenlabs-preview-cover { background: radial-gradient(ellipse at 50% 100%, #3f477a50, transparent 75%), #101421; }
+.elevenlabs-submission-arrival:nth-child(3n+2) .elevenlabs-preview-cover { background: radial-gradient(ellipse at 80% 90%, #39706840, transparent 75%), #0c181c; }
+.elevenlabs-submission-arrival:nth-child(3n) .elevenlabs-preview-cover { background: radial-gradient(ellipse at 50% 100%, #3f477a50, transparent 75%), #101421; }
 .elevenlabs-preview-number { position: absolute; top: 1rem; left: 1rem; font-size: .65rem; letter-spacing: .12em; color: #ffffff66; }
 .elevenlabs-preview-wave { position: absolute; inset: 22% 12%; display: flex; align-items: center; justify-content: center; gap: 3%; opacity: .18; }
 .elevenlabs-preview-wave span { width: 3px; border-radius: 20px; background: #a3deff; }

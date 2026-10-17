@@ -1,9 +1,24 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import "./event-rich-text.css";
 
 type EventRichTextProps = {
   content: string;
   className?: string;
+  headingLevel?: 2 | 3 | 4;
+};
+
+// Imported descriptions and organiser input are untrusted. Render text through
+// React, never HTML, and allow only normal web/contact links.
+const safeHref = (value: string): string | undefined => {
+  const href = value.trim();
+  if (!href) return undefined;
+  try {
+    const url = new URL(href, "https://event.invalid");
+    return ["http:", "https:", "mailto:", "tel:"].includes(url.protocol) ? href : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 const renderInline = (text: string, keyPrefix: string): ReactNode[] => {
@@ -40,13 +55,19 @@ const renderInline = (text: string, keyPrefix: string): ReactNode[] => {
     } else {
       const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (linkMatch) {
+        const href = safeHref(linkMatch[2]);
+        if (!href) {
+          nodes.push(linkMatch[1]);
+          lastIndex = match.index + token.length;
+          continue;
+        }
         nodes.push(
           <a
             key={key}
-            href={linkMatch[2]}
+            href={href}
             target="_blank"
-            rel="noreferrer"
-            className="font-semibold text-primary underline underline-offset-4 hover:text-primary/80"
+            rel="noopener noreferrer"
+            className="font-medium text-primary underline decoration-primary/50 underline-offset-4 hover:decoration-primary focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
           >
             {linkMatch[1]}
           </a>,
@@ -60,68 +81,89 @@ const renderInline = (text: string, keyPrefix: string): ReactNode[] => {
   return nodes;
 };
 
-/**
- * Lightweight event brief renderer — headings, lists, bold/italic, links.
- * Keeps organiser copy readable without a full markdown dependency.
+type Block =
+  | { type: "heading"; level: number; text: string }
+  | { type: "paragraph"; lines: string[] }
+  | { type: "list"; ordered: boolean; start: number; items: string[] };
+
+const headingPattern = /^(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/;
+const listPattern = /^(?:([-*+•])|(\d{1,9})[.)])\s+(.+)$/;
+
+/** A small, line-based parser for the formatting supported by the brief editor.
+ * Block boundaries must not depend on authors adding blank lines after headings.
  */
-export function EventRichText({ content, className }: EventRichTextProps) {
-  const blocks = content
-    .replace(/\r\n/g, "\n")
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
+function parseBlocks(content: string): Block[] {
+  const blocks: Block[] = [];
+  let current: Block | undefined;
+  for (const rawLine of content.replace(/\r\n?/g, "\n").split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      current = undefined;
+      continue;
+    }
+    const heading = line.match(headingPattern);
+    const item = line.match(listPattern);
+    if (heading) {
+      blocks.push({ type: "heading", level: heading[1].length, text: heading[2] });
+      current = undefined;
+    } else if (item) {
+      const ordered = Boolean(item[2]);
+      if (current?.type !== "list" || current.ordered !== ordered) {
+        current = { type: "list", ordered, start: ordered ? Number(item[2]) : 1, items: [] };
+        blocks.push(current);
+      }
+      current.items.push(item[3]);
+    } else if (current?.type === "list" && /^\s{2,}/.test(rawLine)) {
+      current.items[current.items.length - 1] += `\n${line}`;
+    } else {
+      if (current?.type !== "paragraph") {
+        current = { type: "paragraph", lines: [] };
+        blocks.push(current);
+      }
+      current.lines.push(line);
+    }
+  }
+  return blocks;
+}
+
+/** Shared safe formatting for public event descriptions and organiser previews. */
+export function EventRichText({ content, className, headingLevel = 3 }: EventRichTextProps) {
+  const blocks = parseBlocks(content);
 
   if (blocks.length === 0) return null;
 
-  return (
-    <div className={cn("space-y-4 text-base leading-relaxed text-muted-foreground", className)}>
-      {blocks.map((block, blockIndex) => {
-        const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
-        const headingMatch = lines[0]?.match(/^(#{1,3})\s+(.+)$/);
+  // An imported brief may begin at ###. Place it under the surrounding section
+  // heading while preserving relative levels, rather than skipping straight to h4.
+  const firstLevel = blocks.reduce((level, block) => block.type === "heading" ? Math.min(level, block.level) : level, 6);
 
-        if (headingMatch && lines.length === 1) {
-          const level = headingMatch[1].length;
-          const text = headingMatch[2];
-          if (level === 1) {
-            return (
-              <h2 key={blockIndex} className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                {renderInline(text, `h1-${blockIndex}`)}
-              </h2>
-            );
-          }
-          if (level === 2) {
-            return (
-              <h3 key={blockIndex} className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-                {renderInline(text, `h2-${blockIndex}`)}
-              </h3>
-            );
-          }
+  return (
+    <div className={cn("event-rich-text min-w-0 max-w-[70ch] text-base text-muted-foreground", className)}>
+      {blocks.map((block, blockIndex) => {
+        if (block.type === "heading") {
+          const Heading = `h${Math.min(6, headingLevel + block.level - firstLevel)}` as "h2" | "h3" | "h4" | "h5" | "h6";
           return (
-            <h4
-              key={blockIndex}
-              className="text-xs font-semibold uppercase tracking-[0.18em] text-primary"
-            >
-              {renderInline(text, `h3-${blockIndex}`)}
-            </h4>
+            <Heading key={blockIndex} className="font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+              {renderInline(block.text, `heading-${blockIndex}`)}
+            </Heading>
           );
         }
 
-        if (lines.every((line) => /^[-*•]\s+/.test(line))) {
+        if (block.type === "list") {
+          const List = block.ordered ? "ol" : "ul";
           return (
-            <ul key={blockIndex} className="space-y-2 pl-1">
-              {lines.map((line, lineIndex) => (
-                <li key={`${blockIndex}-${lineIndex}`} className="flex gap-3">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-                  <span>{renderInline(line.replace(/^[-*•]\s+/, ""), `li-${blockIndex}-${lineIndex}`)}</span>
+            <List key={blockIndex} start={block.ordered ? block.start : undefined} className={cn("space-y-2 pl-6 marker:text-primary", block.ordered ? "list-decimal" : "list-disc")}>
+              {block.items.map((item, itemIndex) => (
+                <li key={`${blockIndex}-${itemIndex}`} className="pl-1 whitespace-pre-line">
+                  {renderInline(item, `li-${blockIndex}-${itemIndex}`)}
                 </li>
               ))}
-            </ul>
+            </List>
           );
         }
 
         return (
           <p key={blockIndex} className="text-pretty">
-            {lines.map((line, lineIndex) => (
+            {block.lines.map((line, lineIndex) => (
               <span key={`${blockIndex}-${lineIndex}`}>
                 {lineIndex > 0 ? <br /> : null}
                 {renderInline(line, `p-${blockIndex}-${lineIndex}`)}

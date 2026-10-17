@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Crown, Globe, GlobeLock, Mail, Search, Users } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Crown, Eye, EyeOff, Globe, GlobeLock, Mail, Search, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,9 @@ const getInitials = (name: string) => {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 };
 
+const displayName = (name: string | null | undefined, fallback: string) =>
+  name?.trim() && !name.includes("@") ? name.trim() : fallback;
+
 export function AdminTeamsPanel({
   selectedHackathon,
   submissions,
@@ -45,6 +48,9 @@ export function AdminTeamsPanel({
   onSetSubmissionPublic,
 }: AdminTeamsPanelProps) {
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+  const [revealedContact, setRevealedContact] = useState<string | null>(null);
   const totalMembers = submissions.reduce((sum, row) => sum + row.memberCount, 0);
   const namedTeams = submissions.filter((row) => row.teamName?.trim()).length;
 
@@ -63,6 +69,14 @@ export function AdminTeamsPanel({
       ])
     );
   }, [query, submissions]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / 6));
+  const currentPage = Math.min(page, pageCount - 1);
+  const visibleTeams = filtered.slice(currentPage * 6, (currentPage + 1) * 6);
+  const changePage = (nextPage: number) => {
+    setPage(nextPage);
+    setExpandedTeam(null);
+    setRevealedContact(null);
+  };
 
   return (
     <section className={`${sectionClass} scroll-mt-24`} id="event-teams" aria-labelledby="event-teams-heading">
@@ -77,7 +91,7 @@ export function AdminTeamsPanel({
               Teams
             </h2>
             <p className="dash-subtitle">
-              Name, leader, and members for every project in {selectedHackathon.shortName}.
+              Find a team in {selectedHackathon.shortName}, then open its roster and controls.
               {onSetSubmissionPublic
                 ? " Make a project public to show it on boards and the gallery."
                 : ""}
@@ -109,8 +123,12 @@ export function AdminTeamsPanel({
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-9"
+            aria-label="Search teams"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              changePage(0);
+            }}
             placeholder="Search team, member, email, or project…"
           />
         </div>
@@ -123,11 +141,11 @@ export function AdminTeamsPanel({
       ) : filtered.length === 0 ? (
         <p className="dash-empty">No teams match your search.</p>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {filtered.map((row) => (
+        <div className="grid items-start gap-3">
+          {visibleTeams.map((row) => (
             <article
               key={row.id}
-              className="space-y-4 rounded-2xl border border-white/10 bg-background/40 p-4 sm:p-5"
+              className={`space-y-3 rounded-xl border bg-background/40 p-4 transition-colors sm:p-5 ${expandedTeam === row.id ? "border-primary/40" : "border-white/10"}`}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -151,100 +169,173 @@ export function AdminTeamsPanel({
                 </div>
               </div>
 
-              <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Crown className="h-3.5 w-3.5 text-amber-200" />
-                Leader: {row.teamLeaderName || row.participantEmail}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Crown className="h-3.5 w-3.5 text-amber-200" />
+                  Leader: {displayName(row.teamLeaderName, "Team creator")}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="flex gap-2 text-primary"
+                  aria-label={`${expandedTeam === row.id ? "Close" : "Open"} roster for ${row.teamName?.trim() || "Unnamed team"}`}
+                  aria-expanded={expandedTeam === row.id}
+                  aria-controls={`team-roster-${row.id}`}
+                  onClick={() => {
+                    setExpandedTeam(expandedTeam === row.id ? null : row.id);
+                    setRevealedContact(null);
+                  }}
+                >
+                  {expandedTeam === row.id ? "Close roster" : "View roster"}
+                  <ChevronDown className={`h-4 w-4 transition-transform ${expandedTeam === row.id ? "rotate-180" : ""}`} />
+                </Button>
+              </div>
 
-              <ul className="space-y-2">
-                {row.members.map((member) => (
-                  <li
-                    key={`${row.id}-${member.user_id}`}
-                    className="flex items-start gap-3 rounded-xl border border-white/10 bg-black/15 px-3 py-2.5"
-                  >
-                    <Avatar className="h-9 w-9 rounded-full border border-primary/25">
-                      {member.avatarUrl?.trim() ? (
-                        <AvatarImage
-                          src={member.avatarUrl.trim()}
-                          alt={member.name}
-                          className="object-cover"
-                        />
-                      ) : null}
-                      <AvatarFallback className="bg-primary/15 text-[10px] font-semibold text-primary">
-                        {getInitials(member.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
-                        <span className="truncate">{member.name}</span>
-                        {member.isLeader ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200">
-                            <Crown className="h-3 w-3" />
-                            Leader
-                          </span>
-                        ) : null}
-                        {member.isOwner && !member.isLeader ? (
-                          <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Creator
-                          </span>
-                        ) : null}
-                      </p>
-                      {member.headline ? (
-                        <p className="truncate text-xs text-muted-foreground">{member.headline}</p>
-                      ) : null}
-                      {member.email ? (
-                        <a
-                          href={`mailto:${member.email}`}
-                          className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
-                        >
-                          <Mail className="h-3 w-3" />
-                          {member.email}
+              {expandedTeam === row.id ? (
+                <div id={`team-roster-${row.id}`} className="space-y-4 border-t border-white/10 pt-4">
+                  {(row.teamLeaderEmail || row.participantEmail) ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-pressed={revealedContact === `${row.id}:leader`}
+                        onClick={() => setRevealedContact(revealedContact === `${row.id}:leader` ? null : `${row.id}:leader`)}
+                      >
+                        {revealedContact === `${row.id}:leader` ? <EyeOff className="mr-2 h-3.5 w-3.5" /> : <Eye className="mr-2 h-3.5 w-3.5" />}
+                        {revealedContact === `${row.id}:leader` ? "Hide leader email" : "Show leader email"}
+                      </Button>
+                      {revealedContact === `${row.id}:leader` ? (
+                        <a className="break-all text-sm text-primary hover:underline" href={`mailto:${row.teamLeaderEmail || row.participantEmail}`}>
+                          {row.teamLeaderEmail || row.participantEmail}
                         </a>
                       ) : null}
                     </div>
-                  </li>
-                ))}
-                {row.extraMemberNames.map((name) => (
-                  <li
-                    key={`${row.id}-named-${name}`}
-                    className="rounded-xl border border-dashed border-white/10 bg-black/10 px-3 py-2 text-sm text-muted-foreground"
-                  >
-                    {name} · listed on submission
-                  </li>
-                ))}
-              </ul>
+                  ) : null}
+                  <ul className="grid gap-2 md:grid-cols-2">
+                    {row.members.map((member) => (
+                      <li
+                        key={`${row.id}-${member.user_id}`}
+                        className="flex items-start gap-3 rounded-xl border border-white/10 bg-black/15 px-3 py-2.5"
+                      >
+                        <Avatar className="h-9 w-9 rounded-full border border-primary/25">
+                          {member.avatarUrl?.trim() ? (
+                            <AvatarImage
+                              src={member.avatarUrl.trim()}
+                              alt={displayName(member.name, "Team member")}
+                              className="object-cover"
+                            />
+                          ) : null}
+                          <AvatarFallback className="bg-primary/15 text-[10px] font-semibold text-primary">
+                            {getInitials(displayName(member.name, "Team member"))}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
+                            <span className="truncate">{displayName(member.name, "Team member")}</span>
+                            {member.isLeader ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200">
+                                <Crown className="h-3 w-3" />
+                                Leader
+                              </span>
+                            ) : null}
+                            {member.isOwner && !member.isLeader ? (
+                              <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                Creator
+                              </span>
+                            ) : null}
+                          </p>
+                          {member.headline ? (
+                            <p className="truncate text-xs text-muted-foreground">{member.headline}</p>
+                          ) : null}
+                          {member.email ? (
+                            <div className="mt-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 gap-1.5 px-1 text-xs text-muted-foreground"
+                                aria-label={`${revealedContact === `${row.id}:${member.user_id}` ? "Hide" : "Show"} email for ${displayName(member.name, "team member")}`}
+                                aria-pressed={revealedContact === `${row.id}:${member.user_id}`}
+                                onClick={() => setRevealedContact(revealedContact === `${row.id}:${member.user_id}` ? null : `${row.id}:${member.user_id}`)}
+                              >
+                                {revealedContact === `${row.id}:${member.user_id}` ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                {revealedContact === `${row.id}:${member.user_id}` ? "Hide email" : "Show email"}
+                              </Button>
+                              {revealedContact === `${row.id}:${member.user_id}` ? (
+                                <a
+                                  href={`mailto:${member.email}`}
+                                  className="mt-0.5 flex items-center gap-1.5 break-all text-xs text-primary hover:underline"
+                                >
+                                  <Mail className="h-3 w-3" />
+                                  {member.email}
+                                </a>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                    {row.extraMemberNames.map((name) => (
+                      <li
+                        key={`${row.id}-named-${name}`}
+                        className="rounded-xl border border-dashed border-white/10 bg-black/10 px-3 py-2 text-sm text-muted-foreground"
+                      >
+                        {displayName(name, "Team member")} · listed on submission
+                      </li>
+                    ))}
+                  </ul>
 
-              {onSetSubmissionPublic ? (
-                <Button
-                  size="sm"
-                  variant={row.isPublic ? "outline" : "default"}
-                  className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
-                  disabled={publishingSubmissionId === row.id}
-                  onClick={async () => {
-                    const makePublic = !row.isPublic;
-                    const confirmed = window.confirm(
-                      makePublic
-                        ? "Show this project on hackathon boards and the public gallery?"
-                        : "Hide this project from boards and the public gallery?",
-                    );
-                    if (!confirmed) return;
-                    await onSetSubmissionPublic(row.id, makePublic);
-                  }}
-                >
-                  {row.isPublic ? <GlobeLock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
-                  {publishingSubmissionId === row.id
-                    ? row.isPublic
-                      ? "Hiding..."
-                      : "Publishing..."
-                    : row.isPublic
-                      ? "Unpublish"
-                      : "Make public"}
-                </Button>
+                  {onSetSubmissionPublic ? (
+                    <Button
+                      size="sm"
+                      variant={row.isPublic ? "outline" : "default"}
+                      className="h-8 px-3 text-[0.65rem] uppercase tracking-[0.2em]"
+                      disabled={publishingSubmissionId === row.id}
+                      onClick={async () => {
+                        const makePublic = !row.isPublic;
+                        const confirmed = window.confirm(
+                          makePublic
+                            ? "Show this project on hackathon boards and the public gallery?"
+                            : "Hide this project from boards and the public gallery?",
+                        );
+                        if (!confirmed) return;
+                        await onSetSubmissionPublic(row.id, makePublic);
+                      }}
+                    >
+                      {row.isPublic ? <GlobeLock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+                      {publishingSubmissionId === row.id
+                        ? row.isPublic
+                          ? "Hiding..."
+                          : "Publishing..."
+                        : row.isPublic
+                          ? "Unpublish"
+                          : "Make public"}
+                    </Button>
+                  ) : null}
+                </div>
               ) : null}
             </article>
           ))}
         </div>
       )}
+      {!isLoading && filtered.length > 0 ? (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            Showing {currentPage * 6 + 1}–{Math.min((currentPage + 1) * 6, filtered.length)} of {filtered.length} teams
+          </p>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" aria-label="Previous teams" disabled={currentPage === 0} onClick={() => changePage(currentPage - 1)}>
+              <ChevronLeft className="h-4 w-4" /> Previous
+            </Button>
+            <span className="text-xs tabular-nums text-muted-foreground">{currentPage + 1} / {pageCount}</span>
+            <Button type="button" variant="outline" size="sm" aria-label="Next teams" disabled={currentPage + 1 >= pageCount} onClick={() => changePage(currentPage + 1)}>
+              Next <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

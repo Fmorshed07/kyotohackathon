@@ -51,7 +51,7 @@
   .peer-careers-topline { font-size: 10px; padding-bottom: 20px; }
   .peer-careers-topline > span:last-child > span { margin-inline: 3px; }
   .peer-campaign { grid-template-columns: minmax(0, 1fr); gap: 30px; padding-block: 28px 38px; }
-  .peer-campaign-artwork { grid-row: 1; }
+  .peer-campaign-artwork-reveal { grid-row: 1; }
   .peer-campaign h2 { font-size: clamp(40px, 9vw, 62px); }
   .peer-campaign-description { max-width: 540px; font-size: 14px; }
   .peer-campaign-action a { width: 100%; }

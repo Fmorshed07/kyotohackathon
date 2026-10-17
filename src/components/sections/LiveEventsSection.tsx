@@ -4,6 +4,8 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, CalendarDays, CalendarP
 import { useEventPreviews } from "@/hooks/useEventPreviews";
 import PastEventsSection from "@/components/sections/PastEventsSection";
 import CommunityAtmosphere from "@/components/CommunityAtmosphere";
+import ActivityIndicator from "@/components/ActivityIndicator";
+import SectionReveal from "@/components/SectionReveal";
 import CreatorsCircuitLivePreview from "@/components/CreatorsCircuitLivePreview";
 import { useAmbientMotion } from "@/hooks/useAmbientMotion";
 import { getHostedHackathonUrl, type HostedHackathon } from "@/lib/aiHackathons";
@@ -105,6 +107,7 @@ export default function LiveEventsSection({ showPastEvents = true }: { showPastE
           <span>For the moments<br />that move you.</span>
           <span className="event-edition">Meet. Build.<br />Belong.</span>
         </div>
+        <SectionReveal>
         <header className="event-section-heading">
           <div>
             <h2 id="live-events-title">{isLoading ? "Live events" : heading}<span aria-hidden="true">.</span></h2>
@@ -112,12 +115,12 @@ export default function LiveEventsSection({ showPastEvents = true }: { showPastE
           </div>
           <Link to="/hackathons" className="event-directory-link">Browse all events <ArrowUpRight aria-hidden="true" /></Link>
         </header>
+        </SectionReveal>
 
         {isLoading ? (
-          <div className="event-loading" role="status" aria-label="Loading event previews">
-            <div className="event-loading-art" aria-hidden="true"><div className="event-orbit" /></div>
+          <div className="event-loading" aria-busy="true">
+            <div className="event-loading-art"><ActivityIndicator label="Loading event previews" detail="Finding your next connection." /></div>
             <div className="event-loading-copy" aria-hidden="true"><span /><span /><span /><span /></div>
-            <span className="sr-only">Loading event previews</span>
           </div>
         ) : hasError || !selected ? (
           <div className="event-quiet-state" role={hasError ? "alert" : undefined}>
