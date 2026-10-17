@@ -2,6 +2,7 @@ import { ExternalLink, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   COGNISOR_SITE,
+  COGNISOR_DISCORD,
   COGNISOR_SOCIALS,
   CREATORS_CIRCUIT_COMMUNITY,
   CREATORS_CIRCUIT_SITE,
@@ -96,6 +97,12 @@ export function FollowCommunityPanel({ className, highlight = false }: FollowCom
               <Button asChild variant="outline" size="sm">
                 <a href={CREATORS_CIRCUIT_WHATSAPP} target="_blank" rel="noreferrer">
                   WhatsApp group
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href={COGNISOR_DISCORD} target="_blank" rel="noopener noreferrer">
+                  Join Discord
+                  <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
                 </a>
               </Button>
             </div>

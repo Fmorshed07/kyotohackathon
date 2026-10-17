@@ -1,6 +1,7 @@
 /** Cognisor AI + Creators Circuit public links (site, socials, community). */
 
 export const COGNISOR_SITE = "https://www.cognisorai.com";
+export const COGNISOR_DISCORD = "https://discord.gg/cQEFjQDFm";
 export const CREATORS_CIRCUIT_SITE = "https://creatorscircuit.tech";
 export const CREATORS_CIRCUIT_COMMUNITY = "https://creatorscircuit.tech/community";
 export const CREATORS_CIRCUIT_WHATSAPP = "https://chat.whatsapp.com/JoXFxmOSKoBHylXouvd560";
@@ -62,5 +63,10 @@ export const CREATORS_CIRCUIT_LINKS: BrandLink[] = [
     id: "circuit-whatsapp",
     label: "WhatsApp group",
     href: CREATORS_CIRCUIT_WHATSAPP,
+  },
+  {
+    id: "circuit-discord",
+    label: "Join Discord",
+    href: COGNISOR_DISCORD,
   },
 ];
