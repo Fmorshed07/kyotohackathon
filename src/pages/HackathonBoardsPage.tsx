@@ -22,6 +22,7 @@ import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useProjectCommunityStars } from "@/hooks/useProjectCommunityStars";
 import { useProjectShareCounts } from "@/hooks/useProjectShareCounts";
 import { getFirestoreDb } from "@/lib/firebaseClient";
+import { COGNISOR_DISCORD } from "@/lib/brandLinks";
 import { listPublicProjectLinks, toPublicGallerySubmission } from "@/lib/projectSocial";
 import {
   buildParticipantHackathonSummaries,
@@ -51,7 +52,6 @@ import { formatSubmissionDateTime } from "@/lib/datetime";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-const DISCORD_URL = "https://discord.gg/cQEFjQDFm";
 
 const statusStyles: Record<PortalHackathon["status"], string> = {
   active: "border-primary/50 bg-primary/15 text-primary",
@@ -663,7 +663,7 @@ export default function HackathonBoardsPage() {
           </section>
 
           <a
-            href={DISCORD_URL}
+            href={COGNISOR_DISCORD}
             target="_blank"
             rel="noreferrer"
             className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/15"

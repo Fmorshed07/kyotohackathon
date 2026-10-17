@@ -82,7 +82,7 @@ describe("dashboard sidebar navigation", () => {
     }
     expect(overview).toHaveAttribute("data-active", "true");
     expect(team).toHaveAttribute("data-active", "false");
-    expect(discord).toHaveAttribute("href", "https://discord.gg/cQEFjQDFm");
+    expect(discord).toHaveAttribute("href", "https://discord.gg/GD5xxzteA");
     expect(discord).toHaveAttribute("target", "_blank");
     expect(discord.getAttribute("rel")).toContain("noreferrer");
     expect(board).toHaveAttribute("href", "/boards/impact-osaka-2026");

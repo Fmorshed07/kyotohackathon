@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 import { ExternalLink, MessageCircle, Users } from "lucide-react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { COGNISOR_DISCORD } from "@/lib/brandLinks";
 
-const DISCORD_URL = "https://discord.gg/cQEFjQDFm";
 const CREATORS_CIRCUIT_URL = "https://www.creatorscircuit.tech";
 
 const CommunitySection = () => {
@@ -46,7 +46,7 @@ const CommunitySection = () => {
               upcoming hackathons.
             </p>
             <motion.a
-              href={DISCORD_URL}
+              href={COGNISOR_DISCORD}
               target="_blank"
               rel="noreferrer"
               className="btn-poster-cta mt-8 inline-flex min-w-[200px] items-center justify-center gap-2 self-start"

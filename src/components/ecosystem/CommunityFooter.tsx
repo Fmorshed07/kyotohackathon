@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import { COGNISOR_DISCORD } from "@/lib/brandLinks";
 import { CommunityLink } from "./CommunityLink";
 import "./ecosystem.css";
 
 const groups = [
   { title: "Events", links: [["Find events", "/hackathons"], ["Submit an event", "/host/signin"], ["Create an event", "/host/signin"], ["Our work", "/work"]] },
   { title: "Platform", links: [["Projects & demos", "/projects"], ["Careers", "/#get-hired"], ["About Cognisor", "https://www.cognisorai.com/about"], ["Field notes", "https://www.cognisorai.com/blog"], ["Contact us", "https://www.cognisorai.com/contact"]] },
-  { title: "Community", links: [["Discord", "https://discord.gg/cQEFjQDFm"], ["LinkedIn", "https://www.linkedin.com/company/cognisor-ai/"], ["Instagram", "https://www.instagram.com/cognisor.ai/"], ["GitHub", "https://github.com/cognisor"], ["Creators Circuit", "https://www.creatorscircuit.tech"]] },
+  { title: "Community", links: [["Discord", COGNISOR_DISCORD], ["LinkedIn", "https://www.linkedin.com/company/cognisor-ai/"], ["Instagram", "https://www.instagram.com/cognisor.ai/"], ["GitHub", "https://github.com/cognisor"], ["Creators Circuit", "https://www.creatorscircuit.tech"]] },
 ];
 
 export default function CommunityFooter() {

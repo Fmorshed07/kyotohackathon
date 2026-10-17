@@ -1,7 +1,7 @@
 /** Cognisor AI + Creators Circuit public links (site, socials, community). */
 
 export const COGNISOR_SITE = "https://www.cognisorai.com";
-export const COGNISOR_DISCORD = "https://discord.gg/cQEFjQDFm";
+export const COGNISOR_DISCORD = "https://discord.gg/GD5xxzteA";
 export const CREATORS_CIRCUIT_SITE = "https://creatorscircuit.tech";
 export const CREATORS_CIRCUIT_COMMUNITY = "https://creatorscircuit.tech/community";
 export const CREATORS_CIRCUIT_WHATSAPP = "https://chat.whatsapp.com/JoXFxmOSKoBHylXouvd560";

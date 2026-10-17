@@ -1,4 +1,5 @@
 /** Shared Resources & Guide content for participants (public page + dashboard). */
+import { COGNISOR_DISCORD } from "@/lib/brandLinks";
 
 export type GuideStep = {
   id: string;
@@ -110,7 +111,7 @@ export const PARTICIPANT_QUICK_LINKS: QuickLink[] = [
   {
     id: "discord",
     label: "Discord",
-    href: "https://discord.gg/cQEFjQDFm",
+    href: COGNISOR_DISCORD,
     description: "Community and announcements",
     external: true,
   },

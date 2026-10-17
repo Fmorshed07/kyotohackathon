@@ -88,6 +88,7 @@ import {
 } from "@/lib/hackathons";
 import type { SessionUser } from "@/types/portal";
 import { cn } from "@/lib/utils";
+import { COGNISOR_DISCORD } from "@/lib/brandLinks";
 
 type DashboardLayoutProps = {
   sessionUser: SessionUser;
@@ -419,7 +420,6 @@ function MobileMenuTrigger() {
   );
 }
 
-const DISCORD_URL = "https://discord.gg/cQEFjQDFm";
 const PEER_PORTAL_URL = "https://peerportal.app";
 
 const DashboardNavLink = forwardRef<HTMLAnchorElement, React.ComponentPropsWithoutRef<"a"> & {
@@ -1055,7 +1055,7 @@ function DashboardLayoutContent({
             <SidebarMenuItem>
               <SidebarMenuButton asChild className={menuButtonClass}>
                 <DashboardNavLink
-                  href={DISCORD_URL}
+                  href={COGNISOR_DISCORD}
                   onNavigate={closeMobileNav}
                   external
                 >
