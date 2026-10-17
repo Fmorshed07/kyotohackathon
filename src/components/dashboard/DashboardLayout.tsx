@@ -361,6 +361,15 @@ const judgeToolsNav: NavItem[] = [
   { href: "/dashboard/judge/project-screening", label: "Project agent", icon: ScanSearch },
 ];
 
+const buildJudgeWorkspaceNav = (items: NavItem[], hackathonId?: HackathonId): NavItem[] =>
+  items.map((item) => ({
+    ...item,
+    href: withHackathonQuery(
+      item.href.startsWith("#") ? `/dashboard/judge${item.href}` : item.href,
+      hackathonId,
+    ),
+  }));
+
 function scrollToHashId(id: string) {
   const target = document.getElementById(id);
   if (!target) return false;
@@ -715,9 +724,9 @@ function DashboardLayoutContent({
 
   // Participants, judges, and mentors only see boards for their assigned events.
   // Admins use the live catalog passed from the dashboard (includes hosted events).
-  // Boards nav: active + upcoming so live hosted events stay reachable.
+  // Staff retain their assigned past boards alongside current events.
   const catalogHackathons =
-    hackathons && hackathons.length > 0
+    hackathons !== undefined
       ? hackathons
       : role === "admin"
         ? PORTAL_HACKATHONS
@@ -727,17 +736,19 @@ function DashboardLayoutContent({
               hackathonIds: sessionUser.hackathonIds,
             }),
           );
-  const boardHackathons = catalogHackathons.filter(
-    (hackathon) => hackathon.status === "active" || hackathon.status === "upcoming",
-  );
-  // Participants retain every joined edition, including their past events.
-  // Staff switchers stay focused on current events unless administering the catalog.
+  const boardHackathons = isStaffDashboard
+    ? catalogHackathons
+    : catalogHackathons.filter(
+        (hackathon) => hackathon.status === "active" || hackathon.status === "upcoming",
+      );
+  // Each scoped catalog already contains only the user's accessible editions.
+  // Keep history reachable for participants and staff; hosts focus on current events.
   const switcherHackathons =
-    role === "admin" || role === "participant"
-      ? catalogHackathons
-      : filterCurrentHackathons(catalogHackathons, {
+    role === "host"
+      ? filterCurrentHackathons(catalogHackathons, {
           includeId: selectedHackathonId,
-        });
+        })
+      : catalogHackathons;
 
   const closeMobileNav = () => {
     if (isMobile) {
@@ -829,7 +840,7 @@ function DashboardLayoutContent({
             </NavSection>
           ) : isStaffDashboard ? (
             <NavSection label="Dashboard">
-              <NavMenuItems items={judgeDashboardNav} onNavigate={closeMobileNav} />
+              <NavMenuItems items={buildJudgeWorkspaceNav(judgeDashboardNav, selectedHackathonId)} onNavigate={closeMobileNav} />
             </NavSection>
           ) : (
             <NavSection label="Dashboard">
@@ -933,10 +944,10 @@ function DashboardLayoutContent({
           {isStaffDashboard ? (
             <>
               <NavSection label="Scoring">
-                <NavMenuItems items={judgeScoringNav} onNavigate={closeMobileNav} />
+                <NavMenuItems items={buildJudgeWorkspaceNav(judgeScoringNav, selectedHackathonId)} onNavigate={closeMobileNav} />
               </NavSection>
               <NavSection label="Tools">
-                <NavMenuItems items={judgeToolsNav} onNavigate={closeMobileNav} />
+                <NavMenuItems items={buildJudgeWorkspaceNav(judgeToolsNav, selectedHackathonId)} onNavigate={closeMobileNav} />
               </NavSection>
             </>
           ) : null}
@@ -1008,20 +1019,22 @@ function DashboardLayoutContent({
             switcherHackathons.length > 0 &&
             selectedHackathonId &&
             onHackathonChange && (
-              <NavSection label="Hackathons">
+              <NavSection label={isStaffDashboard ? "Assigned hackathons" : "Hackathons"}>
                 {switcherHackathons.map((hackathon) => {
                   const isActive = hackathon.id === selectedHackathonId;
                   return (
                     <SidebarMenuItem key={hackathon.id}>
                       <SidebarMenuButton
                         isActive={isActive}
+                        aria-pressed={isActive}
                         className={multiLineMenuButtonClass}
                         onClick={() => handleHackathonChange(hackathon.id)}
                       >
                         <CalendarRange className={cn(navIconClass, "dash-event-icon")} />
                         <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                          <span className="dash-nav-event-title">
-                            {hackathon.shortName}
+                          <span className="flex w-full flex-wrap items-center gap-2">
+                            <span className="dash-nav-event-title">{hackathon.shortName}</span>
+                            {isStaffDashboard && <Badge variant="outline" className="text-[10px] uppercase">{hackathon.status === "active" ? "Active" : hackathon.status === "upcoming" ? "Upcoming" : "Past"}</Badge>}
                           </span>
                           <NavEventSchedule date={hackathon.eventDate} />
                         </span>
@@ -1178,6 +1191,7 @@ function DashboardLayoutContent({
           </div>
           {(role === "admin" || isStaffDashboard || role === "participant" || role === "host") &&
             hackathons &&
+            hackathons.length > 0 &&
             selectedHackathonId &&
             onHackathonChange && (
               <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
@@ -1187,6 +1201,7 @@ function DashboardLayoutContent({
                     selectedHackathonId={selectedHackathonId}
                     onSelect={onHackathonChange}
                     onBrowseHackathons={role === "participant" ? onBrowseHackathons : undefined}
+                    groupByStatus={isStaffDashboard}
                     compact
                   />
                 </div>
@@ -1198,6 +1213,9 @@ function DashboardLayoutContent({
                 )}
               </div>
             )}
+          {isStaffDashboard && catalogHackathons.length > 0 && (
+            <p className="mt-2 text-sm text-muted-foreground">Switch between your assigned hackathons, including past events.</p>
+          )}
         </header>
         <div className="dash-content px-3 py-4 sm:px-5 sm:py-5 md:px-8 md:py-8">
           <div className="mx-auto w-full max-w-[1400px] space-y-6 sm:space-y-8 md:space-y-10">

@@ -14,6 +14,7 @@ import {
   HACKATHON_STORAGE_KEYS,
   isHackathonId,
   PORTAL_HACKATHONS,
+  withHackathonQuery,
   type PortalHackathon,
 } from "@/lib/hackathons";
 import { canAccessStaffDashboard } from "@/lib/portalRoutes";
@@ -115,7 +116,11 @@ export default function ProjectScreeningPage() {
   }
 
   const role = isHostPortal ? "host" : isJudgePortal ? (sessionUser.role === "mentor" ? "mentor" : "judge") : "admin";
-  const homeHref = isHostPortal ? "/dashboard/host" : isJudgePortal ? "/dashboard/judge" : "/dashboard/admin";
+  const homeHref = isHostPortal
+    ? "/dashboard/host"
+    : isJudgePortal
+      ? withHackathonQuery("/dashboard/judge", ops.selectedHackathonId)
+      : "/dashboard/admin";
   const homeLabel = isHostPortal ? "Host overview" : isJudgePortal ? "Judge overview" : "Admin overview";
   const catalogLoading =
     (isHostPortal && hostCatalog.isLoading) || (isJudgePortal && judgeCatalogLoading);
@@ -156,7 +161,7 @@ export default function ProjectScreeningPage() {
         )}
         {isJudgePortal ? (
           <Button asChild variant="outline" size="sm" className="gap-1.5">
-            <Link to="/dashboard/judge#project-marks">Theme marks</Link>
+            <Link to={withHackathonQuery("/dashboard/judge#project-marks", ops.selectedHackathonId)}>Theme marks</Link>
           </Button>
         ) : !isHostPortal ? (
           <Button asChild variant="outline" size="sm" className="gap-1.5">

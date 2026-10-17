@@ -29,6 +29,7 @@ import {
   DEFAULT_HACKATHON_ID,
   getEventBoardPath,
   getHackathonsByIds,
+  getJudgeEventWorkspacePath,
   getParticipantEventWorkspacePath,
   getSubmissionHackathonId,
   getUserAllowedHackathonIds,
@@ -41,7 +42,7 @@ import {
   type PortalHackathon,
 } from "@/lib/hackathons";
 import { fetchPortalHackathonCatalog } from "@/lib/aiHackathons";
-import { getDashboardPathForUser } from "@/lib/portalRoutes";
+import { getDashboardPathForUser, isStaffRole } from "@/lib/portalRoutes";
 import type { Submission } from "@/types/portal";
 import { countTeamBuilders, formatTeamMemberNames, isSubmissionCollaborator } from "@/lib/teamRoster";
 import { listAccessibleSubmissions } from "@/lib/portalInvites";
@@ -354,7 +355,8 @@ export default function HackathonBoardsPage() {
       sessionUser?.role === "admin" || sessionUser?.role === "host"
         ? eventCatalog
         : getHackathonsByIds(accessibleHackathonIds, eventCatalog);
-    // Boards nav: live + upcoming — past editions stay off the switcher.
+    // Judges and mentors can revisit every event they already have access to.
+    if (isStaffRole(sessionUser?.role)) return catalog;
     return catalog.filter(
       (hackathon) => hackathon.status === "active" || hackathon.status === "upcoming",
     );
@@ -449,10 +451,14 @@ export default function HackathonBoardsPage() {
     return <Navigate to="/signin" replace />;
   }
 
-  const dashboardPath = getDashboardPathForUser(
+  const dashboardHome = getDashboardPathForUser(
     sessionUser.role,
     sessionUser.judgeApprovalStatus,
   );
+  const dashboardPath =
+    dashboardHome === "/dashboard/judge" && accessibleHackathonIds.includes(selectedHackathonId)
+      ? getJudgeEventWorkspacePath(selectedHackathonId)
+      : dashboardHome;
   const canBrowseAllBoards = sessionUser.role === "admin" || sessionUser.role === "host";
   const canViewSelected =
     canBrowseAllBoards ||
@@ -716,7 +722,7 @@ export default function HackathonBoardsPage() {
                 </Button>
               ) : (
                 <Button asChild variant="outline" className="mt-6">
-                  <Link to={getDashboardPathForUser(sessionUser.role, sessionUser.judgeApprovalStatus)}>
+                  <Link to={dashboardPath}>
                     Back to dashboard
                   </Link>
                 </Button>

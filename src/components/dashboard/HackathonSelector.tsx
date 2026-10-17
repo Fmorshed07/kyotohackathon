@@ -10,6 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
   SelectSeparator,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import {
   PORTAL_HACKATHONS,
@@ -27,6 +29,7 @@ type HackathonSelectorProps = {
   /** When true, hide past editions from the switcher. */
   currentOnly?: boolean;
   onBrowseHackathons?: () => void;
+  groupByStatus?: boolean;
 };
 
 const statusLabel: Record<PortalHackathon["status"], string> = {
@@ -57,6 +60,7 @@ export function HackathonSelector({
   compact = false,
   currentOnly = false,
   onBrowseHackathons,
+  groupByStatus = false,
 }: HackathonSelectorProps) {
   const options = (() => {
     const base = currentOnly
@@ -69,6 +73,12 @@ export function HackathonSelector({
   })();
   const selected = options.find((hackathon) => hackathon.id === selectedHackathonId)
     ?? resolvePortalHackathon(selectedHackathonId, hackathons);
+  const groups = groupByStatus
+    ? [
+        { label: "Current & upcoming", entries: options.filter((event) => event.status !== "past") },
+        { label: "Past hackathons", entries: options.filter((event) => event.status === "past") },
+      ].filter((group) => group.entries.length > 0)
+    : [{ label: "", entries: options }];
 
   return (
     <div className={compact ? "w-full min-w-0" : "w-full max-w-xl"}>
@@ -104,9 +114,12 @@ export function HackathonSelector({
             ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="max-h-[min(70vh,420px)]">
-          {options.map((hackathon) => (
-            <SelectItem key={hackathon.id} value={hackathon.id} className="py-3">
+        <SelectContent className="max-h-[min(70vh,420px)] w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-1.5rem)]">
+          {groups.map((group) => (
+            <SelectGroup key={group.label || "hackathons"}>
+              {group.label && <SelectLabel className="text-xs uppercase tracking-wide text-muted-foreground">{group.label}</SelectLabel>}
+          {group.entries.map((hackathon) => (
+            <SelectItem key={hackathon.id} value={hackathon.id} className="whitespace-normal break-words py-3 [&>span:last-child]:min-w-0 [&>span:last-child]:w-full">
               <div className="flex items-center gap-3">
                 {(hackathon.coverImageUrl || hackathon.bannerImageUrl) && (
                   <img src={hackathon.coverImageUrl || hackathon.bannerImageUrl} alt="" loading="lazy" className="h-14 w-16 shrink-0 rounded-lg object-cover" />
@@ -125,6 +138,8 @@ export function HackathonSelector({
                 </div>
               </div>
             </SelectItem>
+          ))}
+            </SelectGroup>
           ))}
           {onBrowseHackathons && (
             <>

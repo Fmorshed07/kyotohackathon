@@ -146,6 +146,38 @@ describe("judge workspace save isolation", () => {
     expect(screen.getByRole("textbox", { name: "event-b-project notes" })).toBeInTheDocument();
   });
 
+  it("keeps unsaved notes isolated through an A to B to A event switch without saving scores", async () => {
+    mocks.submissions.mockImplementation(async (_db, event) => [submission(`${event}-project`, event)]);
+    const view = render(page());
+    await screen.findByRole("textbox", { name: "event-a-project notes" });
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByRole("textbox", { name: "event-a-project notes" }), { target: { value: "Unsaved event A note" } });
+
+    // Switch before the browser draft debounce or score autosave can run.
+    mocks.selectedEvent = "event-b";
+    await act(async () => { view.rerender(page()); });
+    expect(screen.getByRole("textbox", { name: "event-b-project notes" })).toHaveValue("Original note");
+    expect(screen.queryByRole("textbox", { name: "event-a-project notes" })).not.toBeInTheDocument();
+    const eventADraft = readFormDraft<Draft>(draftKey);
+    expect(eventADraft?.value.scoresBySubmission["event-a-project"].notes).toBe("Unsaved event A note");
+    expect(eventADraft?.value.scoresBySubmission).not.toHaveProperty("event-b-project");
+    const eventBDraftKey = "cognisor_form_draft:judge-workspace:judge:event-b";
+    expect(readFormDraft(eventBDraftKey)).toBeNull();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "event-b-project notes" }), { target: { value: "Unsaved event B note" } });
+    mocks.selectedEvent = "event-a";
+    await act(async () => { view.rerender(page()); });
+    expect(screen.getByRole("textbox", { name: "event-a-project notes" })).toHaveValue("Unsaved event A note");
+    expect(screen.queryByRole("textbox", { name: "event-b-project notes" })).not.toBeInTheDocument();
+    const eventBDraft = readFormDraft<Draft>(eventBDraftKey);
+    expect(eventBDraft?.value.scoresBySubmission["event-b-project"].notes).toBe("Unsaved event B note");
+    expect(eventBDraft?.value.scoresBySubmission).not.toHaveProperty("event-a-project");
+    expect(readFormDraft<Draft>(draftKey)?.value.scoresBySubmission["event-a-project"].notes).toBe("Unsaved event A note");
+    expect(mocks.guard).toHaveBeenLastCalledWith(true);
+    expect(mocks.updateDoc).not.toHaveBeenCalled();
+    expect(mocks.setDoc).not.toHaveBeenCalled();
+  });
+
   it("preserves edits typed during a manual save and keeps them in the browser draft", async () => {
     const saving = deferred<void>();
     mocks.updateDoc.mockReturnValue(saving.promise);
