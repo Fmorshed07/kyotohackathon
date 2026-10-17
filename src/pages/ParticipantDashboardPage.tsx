@@ -11,6 +11,7 @@ import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ParticipantDashboard } from "@/components/dashboard/ParticipantDashboard";
+import { HackathonDiscoveryDialog } from "@/components/dashboard/HackathonDiscoveryDialog";
 import {
   buildParticipantHackathonSummaries,
   collectAccessibleHackathonIds,
@@ -207,6 +208,12 @@ export default function ParticipantDashboardPage() {
   const [eventCatalog, setEventCatalog] = useState<PortalHackathon[]>(PORTAL_HACKATHONS);
   const didApplyPreferredEvent = useRef(false);
   const [liveJoinableHackathons, setLiveJoinableHackathons] = useState<PortalHackathon[]>([]);
+  const [discoveryOpen, setDiscoveryOpen] = useState(false);
+  const [isLoadingJoinable, setIsLoadingJoinable] = useState(true);
+  const [joinableError, setJoinableError] = useState<string | null>(null);
+  const [joinableLoadAttempt, setJoinableLoadAttempt] = useState(0);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const joinRequestRef = useRef<symbol | null>(null);
   const { selectedHackathonId, setSelectedHackathonId } = useHackathonSelection(
     HACKATHON_STORAGE_KEYS.participant,
     undefined,
@@ -255,6 +262,13 @@ export default function ParticipantDashboardPage() {
   // An account switch can happen while Firestore is resolving a save.
   const isCurrentAccount = () =>
     Boolean(sessionUser && getFirebaseAuth().currentUser?.uid === sessionUser.id);
+
+  useEffect(() => {
+    setDiscoveryOpen(false);
+    setJoinError(null);
+    setIsJoiningHackathon(false);
+    joinRequestRef.current = null;
+  }, [sessionUser?.id]);
   const isCurrentWorkspace = () =>
     isMountedRef.current && isCurrentAccount() && workspaceKeyRef.current === workspaceKey;
 
@@ -339,23 +353,33 @@ export default function ParticipantDashboardPage() {
   useEffect(() => {
     let cancelled = false;
     const loadEvents = async () => {
+      setIsLoadingJoinable(true);
+      setJoinableError(null);
       try {
-        const [catalog, joinable] = await Promise.all([
+        const [catalog, joinable] = await Promise.allSettled([
           fetchPortalHackathonCatalog(db),
           fetchJoinablePortalHackathons(db),
         ]);
         if (cancelled) return;
-        setEventCatalog(catalog);
-        setLiveJoinableHackathons(joinable);
+        if (catalog.status === "fulfilled") setEventCatalog(catalog.value);
+        if (joinable.status === "fulfilled") {
+          setLiveJoinableHackathons(joinable.value);
+          setEventCatalog((current) => joinable.value.reduce(upsertPortalHackathon, current));
+        } else {
+          setLiveJoinableHackathons([]);
+          setJoinableError("Could not load open hackathons. Please try again.");
+        }
       } catch {
-        // Keep static catalog fallbacks.
+        if (!cancelled) setJoinableError("Could not load open hackathons. Please try again.");
+      } finally {
+        if (!cancelled) setIsLoadingJoinable(false);
       }
     };
     void loadEvents();
     return () => {
       cancelled = true;
     };
-  }, [db]);
+  }, [db, joinableLoadAttempt]);
 
   useEffect(() => {
     const unsubscribe = subscribeHackathon(
@@ -823,16 +847,24 @@ export default function ParticipantDashboardPage() {
     return data;
   };
 
-  const handleJoinHackathon = async (hackathonId: HackathonId) => {
-    if (!sessionUser || !isCurrentAccount() || isLoadingWorkspace || workspaceError) return;
+  const handleJoinHackathon = async (hackathonId: HackathonId): Promise<boolean> => {
+    if (!sessionUser || !isCurrentAccount() || joinRequestRef.current) return false;
+    if (isLoadingWorkspace || workspaceError) {
+      setJoinError("Your workspace could not be loaded yet. Close this window and retry loading your projects.");
+      return false;
+    }
     const joinable = liveJoinableHackathons.some((entry) => entry.id === hackathonId);
     if (!joinable) {
       setSubmissionMessage("That event is not open for new participants.");
-      return;
+      setJoinError("That event is not open for new participants. Refresh the event list and try again.");
+      return false;
     }
 
+    const request = Symbol("join-hackathon");
+    joinRequestRef.current = request;
     setIsJoiningHackathon(true);
     setSubmissionMessage(null);
+    setJoinError(null);
     try {
       const nextHackathonIds = nextEnrolledHackathonIds(enrolledHackathonIds, hackathonId);
       await setDoc(
@@ -843,20 +875,27 @@ export default function ParticipantDashboardPage() {
         },
         { merge: true }
       );
-      if (!isMountedRef.current || !isCurrentAccount()) return;
+      if (!isMountedRef.current || !isCurrentAccount() || joinRequestRef.current !== request) return false;
       setEnrolledHackathonIds(nextHackathonIds);
       setSelectedHackathonId(hackathonId);
       setSubmissionMessage(
         `Joined ${resolvePortalHackathon(hackathonId, eventCatalog).name}.`
       );
+      return true;
     } catch (error: unknown) {
+      if (!isMountedRef.current || !isCurrentAccount() || joinRequestRef.current !== request) return false;
       const message =
         typeof error === "object" && error && "message" in error
           ? String((error as { message?: string }).message)
           : "Could not join that event.";
       setSubmissionMessage(message);
+      setJoinError(message);
+      return false;
     } finally {
-      setIsJoiningHackathon(false);
+      if (joinRequestRef.current === request) {
+        joinRequestRef.current = null;
+        if (isMountedRef.current && isCurrentAccount()) setIsJoiningHackathon(false);
+      }
     }
   };
 
@@ -982,6 +1021,7 @@ export default function ParticipantDashboardPage() {
       hackathons={accessibleHackathons}
       selectedHackathonId={selectedHackathonId}
       onHackathonChange={setSelectedHackathonId}
+      onBrowseHackathons={() => { setJoinError(null); setDiscoveryOpen(true); }}
     >
       {workspaceError ? (
         <div role="alert" className="mb-4 rounded-lg border border-destructive/40 p-4">
@@ -1031,6 +1071,18 @@ export default function ParticipantDashboardPage() {
           ...memberProfiles,
           ...(userProfile ? { [sessionUser.id]: userProfile } : {}),
         }}
+      />
+      <HackathonDiscoveryDialog
+        key={sessionUser.id}
+        open={discoveryOpen}
+        onOpenChange={setDiscoveryOpen}
+        hackathons={joinableHackathons}
+        isLoading={isLoadingJoinable || isLoadingWorkspace}
+        error={joinableError}
+        joinError={joinError}
+        isJoining={isJoiningHackathon}
+        onRetry={() => setJoinableLoadAttempt((attempt) => attempt + 1)}
+        onJoin={handleJoinHackathon}
       />
     </DashboardLayout>
   );

@@ -155,7 +155,7 @@ export type ParticipantDashboardProps = {
   isReadOnly?: boolean;
   isJoiningHackathon?: boolean;
   onSelectHackathon: (hackathonId: HackathonId) => void;
-  onJoinHackathon?: (hackathonId: HackathonId) => Promise<void>;
+  onJoinHackathon?: (hackathonId: HackathonId) => Promise<void | boolean>;
   participantForm: ParticipantFormState;
   setParticipantForm: React.Dispatch<React.SetStateAction<ParticipantFormState>>;
   participantSubmissions: Submission[];

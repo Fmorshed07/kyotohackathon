@@ -46,6 +46,7 @@ import {
   mergeBundledHackathons,
 } from "@/lib/bundledHackathons";
 import { IMPACT_OSAKA_ID, IMPACT_OSAKA_DEFAULT_CRITERIA } from "@/lib/impactOsaka";
+import { isEventRegistrationClosed } from "@/lib/eventRegistration";
 
 export type HackathonGuest = {
   name: string;
@@ -902,6 +903,8 @@ export async function fetchPublishedHackathons(db: Firestore): Promise<HostedHac
 }
 
 export function hostedToPortalHackathon(event: HostedHackathon): PortalHackathon {
+  const coverImageUrl = event.coverImageUrl?.trim();
+  const bannerImageUrl = event.bannerImageUrl?.trim();
   return {
     id: event.id,
     name: event.name,
@@ -911,6 +914,8 @@ export function hostedToPortalHackathon(event: HostedHackathon): PortalHackathon
     theme: event.theme,
     status: event.status,
     submissionMode: event.submissionMode,
+    ...(coverImageUrl ? { coverImageUrl } : {}),
+    ...(bannerImageUrl ? { bannerImageUrl } : {}),
   };
 }
 
@@ -1031,7 +1036,7 @@ export function buildAdminPortalCatalog(events: HostedHackathon[]): PortalHackat
 
 /**
  * Events participants can join at signup / onboarding / dashboard.
- * Follows admin publish + lifecycle (active / upcoming only).
+ * Follows admin publish, lifecycle and the registration gate.
  */
 export async function fetchJoinablePortalHackathons(db: Firestore): Promise<PortalHackathon[]> {
   const published = await fetchPublishedHackathons(db);
@@ -1040,7 +1045,9 @@ export async function fetchJoinablePortalHackathons(db: Firestore): Promise<Port
     createdAtById[event.id] = event.createdAt;
   }
 
-  const joinable = published.filter(isJoinableHackathon).map(hostedToPortalHackathon);
+  const joinable = published
+    .filter((event) => isJoinableHackathon(event) && !isEventRegistrationClosed(event))
+    .map(hostedToPortalHackathon);
   return sortJoinableHackathons(joinable, createdAtById);
 }
 

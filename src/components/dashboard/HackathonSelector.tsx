@@ -1,4 +1,4 @@
-import { CalendarDays, MapPin, Sparkles } from "lucide-react";
+import { CalendarDays, MapPin, Plus, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import kyotoHero from "@/assets/kyoto-hero.jpg";
 import kyotoSkyline from "@/assets/kyoto-skyline.jpg";
@@ -9,6 +9,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
 } from "@/components/ui/select";
 import {
   PORTAL_HACKATHONS,
@@ -23,8 +24,9 @@ type HackathonSelectorProps = {
   onSelect: (hackathonId: HackathonId) => void;
   hackathons?: PortalHackathon[];
   compact?: boolean;
-  /** When true (default), hide past editions from the switcher. */
+  /** When true, hide past editions from the switcher. */
   currentOnly?: boolean;
+  onBrowseHackathons?: () => void;
 };
 
 const statusLabel: Record<PortalHackathon["status"], string> = {
@@ -54,6 +56,7 @@ export function HackathonSelector({
   hackathons = PORTAL_HACKATHONS,
   compact = false,
   currentOnly = false,
+  onBrowseHackathons,
 }: HackathonSelectorProps) {
   const options = (() => {
     const base = currentOnly
@@ -69,8 +72,12 @@ export function HackathonSelector({
 
   return (
     <div className={compact ? "w-full min-w-0" : "w-full max-w-xl"}>
-      <Select value={selectedHackathonId} onValueChange={(value) => onSelect(value as HackathonId)}>
+      <Select value={selectedHackathonId} onValueChange={(value) => {
+        if (value === "__browse_hackathons__") { onBrowseHackathons?.(); return; }
+        onSelect(value as HackathonId);
+      }}>
         <SelectTrigger
+          aria-label="Choose your hackathon"
           className={
             compact
               ? "h-auto min-h-11 w-full border-white/10 bg-white/[0.04] py-2.5 text-base hover:bg-white/[0.06] sm:min-h-12 sm:text-lg"
@@ -100,7 +107,11 @@ export function HackathonSelector({
         <SelectContent className="max-h-[min(70vh,420px)]">
           {options.map((hackathon) => (
             <SelectItem key={hackathon.id} value={hackathon.id} className="py-3">
-              <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-3">
+                {(hackathon.coverImageUrl || hackathon.bannerImageUrl) && (
+                  <img src={hackathon.coverImageUrl || hackathon.bannerImageUrl} alt="" loading="lazy" className="h-14 w-16 shrink-0 rounded-lg object-cover" />
+                )}
+                <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{hackathon.name}</span>
                   <Badge variant={statusVariant[hackathon.status]} className="text-[0.6rem] uppercase">
@@ -111,9 +122,19 @@ export function HackathonSelector({
                   {hackathon.eventDate} · {hackathon.location}
                 </span>
                 <span className="text-xs text-muted-foreground">{hackathon.theme}</span>
+                </div>
               </div>
             </SelectItem>
           ))}
+          {onBrowseHackathons && (
+            <>
+              <SelectSeparator />
+              <SelectItem value="__browse_hackathons__" className="py-4 text-primary">
+                <span className="flex items-center gap-2 font-semibold"><Plus className="h-4 w-4" aria-hidden="true" />Join another hackathon</span>
+                <span className="mt-1 block text-xs text-muted-foreground">Preview open events and find your next challenge.</span>
+              </SelectItem>
+            </>
+          )}
         </SelectContent>
       </Select>
     </div>
@@ -137,7 +158,8 @@ export function HackathonContextBanner({
   role,
   publicSiteUrl,
 }: HackathonContextBannerProps) {
-  const visual = hackathonVisuals[hackathon.id] ?? kyotoAbstract;
+  const fallbackVisual = hackathonVisuals[hackathon.id] ?? kyotoAbstract;
+  const visual = hackathon.bannerImageUrl || hackathon.coverImageUrl || fallbackVisual;
 
   return (
     <div className="dash-event-card relative overflow-hidden rounded-lg border border-white/[0.08] bg-card">
@@ -146,6 +168,11 @@ export function HackathonContextBanner({
           src={visual}
           alt=""
           className="h-full w-full object-cover"
+          onError={(event) => {
+            if (event.currentTarget.getAttribute("src") !== fallbackVisual) {
+              event.currentTarget.src = fallbackVisual;
+            }
+          }}
           aria-hidden
         />
       </div>

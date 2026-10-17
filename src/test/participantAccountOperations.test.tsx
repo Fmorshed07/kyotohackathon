@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ParticipantDashboardPage from "@/pages/ParticipantDashboardPage";
@@ -66,8 +66,15 @@ vi.mock("@/lib/portalInvites", () => ({
 vi.mock("@/lib/profileMedia", () => ({ uploadProfileImage: vi.fn() }));
 vi.mock("@/lib/participantEmail", () => ({ queueParticipantEmail: backend.queueEmail }));
 vi.mock("@/components/dashboard/DashboardLayout", () => ({
-  DashboardLayout: ({ children, hackathons = [] }: { children: React.ReactNode; hackathons?: PortalHackathon[] }) => <div>
+  DashboardLayout: ({ children, hackathons = [], selectedHackathonId, onBrowseHackathons }: {
+    children: React.ReactNode;
+    hackathons?: PortalHackathon[];
+    selectedHackathonId?: string;
+    onBrowseHackathons?: () => void;
+  }) => <div>
     <output data-testid="accessible-events">{hackathons.map(event => event.id).join(",")}</output>
+    <output data-testid="selected-event">{selectedHackathonId}</output>
+    <button onClick={onBrowseHackathons}>Join another hackathon</button>
     {children}
   </div>,
 }));
@@ -116,8 +123,8 @@ beforeEach(() => {
   backend.setDoc.mockReset().mockResolvedValue(undefined);
   backend.deleteDoc.mockReset().mockResolvedValue(undefined);
   backend.assertWritable.mockReset().mockResolvedValue(undefined);
-  backend.catalog.mockResolvedValue([event("event-one"), event("event-two")]);
-  backend.joinable.mockResolvedValue([event("event-two")]);
+  backend.catalog.mockReset().mockResolvedValue([event("event-one"), event("event-two")]);
+  backend.joinable.mockReset().mockResolvedValue([event("event-two")]);
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
 });
 
@@ -326,6 +333,105 @@ describe("participant operations during account changes", () => {
 
     expect(screen.getByRole("textbox", { name: "Project title" })).toHaveValue("Unfinished idea");
     expect(backend.submissions).toHaveBeenCalledOnce();
+  });
+
+  it("opens discovery for unjoined events and previews an event without enrolling or changing workspaces", async () => {
+    const nextEvent = {
+      ...event("event-two"),
+      name: "Next Community Hackathon",
+      theme: "Build useful tools together",
+      eventDate: "24 October 2026",
+      location: "Tokyo, Japan",
+      coverImageUrl: "https://images.example.test/next-event.jpg",
+    };
+    backend.joinable.mockResolvedValue([event("event-one"), nextEvent]);
+    await showDashboard();
+    backend.selectEvent.mockClear();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Join another hackathon" }));
+    const dialog = screen.getByRole("dialog", { name: "Join another hackathon" });
+    const discovery = within(dialog);
+    const preview = discovery.getByRole("link", { name: /Preview Next Community Hackathon/ });
+
+    expect(discovery.queryByRole("heading", { name: "event-one" })).not.toBeInTheDocument();
+    expect(discovery.getByRole("img", { name: "Next Community Hackathon poster" })).toHaveAttribute("src", nextEvent.coverImageUrl);
+    expect(discovery.getByRole("article", { name: nextEvent.name })).toHaveTextContent(nextEvent.eventDate);
+    expect(preview).toHaveAttribute("target", "_blank");
+    expect(preview).toHaveAttribute("href", "/events/event-two");
+    fireEvent.click(preview);
+
+    expect(backend.setDoc).not.toHaveBeenCalled();
+    expect(backend.selectEvent).not.toHaveBeenCalled();
+    expect(screen.getByTestId("selected-event")).toHaveTextContent(/^event-one$/);
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it("retries a failed event discovery load without writing enrollment", async () => {
+    backend.catalog.mockRejectedValueOnce(new Error("Catalog unavailable"));
+    backend.joinable.mockRejectedValueOnce(new Error("Connection interrupted"));
+    await showDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Join another hackathon" }));
+    const discovery = within(screen.getByRole("dialog", { name: "Join another hackathon" }));
+    expect(await discovery.findByRole("alert")).toHaveTextContent("Could not load open hackathons");
+
+    fireEvent.click(discovery.getByRole("button", { name: "Try again" }));
+
+    expect(await discovery.findByRole("button", { name: "Join event-two" })).toBeEnabled();
+    expect(discovery.queryByRole("alert")).not.toBeInTheDocument();
+    expect(backend.catalog).toHaveBeenCalledTimes(2);
+    expect(backend.joinable).toHaveBeenCalledTimes(2);
+    expect(backend.setDoc).not.toHaveBeenCalled();
+  });
+
+  it("keeps discovery and the old workspace after a failed join, then preserves both enrollments on retry", async () => {
+    backend.setDoc.mockRejectedValueOnce(new Error("Enrollment connection failed"));
+    await showDashboard();
+    backend.selectEvent.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Join another hackathon" }));
+    const dialog = screen.getByRole("dialog", { name: "Join another hackathon" });
+    const discovery = within(dialog);
+    fireEvent.click(discovery.getByRole("button", { name: "Join event-two" }));
+
+    expect(await discovery.findByRole("alert")).toHaveTextContent("Enrollment connection failed");
+    expect(discovery.getByRole("button", { name: "Join event-two" })).toBeEnabled();
+    expect(backend.selectEvent).not.toHaveBeenCalled();
+    expect(screen.getByTestId("selected-event")).toHaveTextContent(/^event-one$/);
+    expect(screen.getByTestId("registered-events")).toHaveTextContent(/^event-one$/);
+
+    fireEvent.click(discovery.getByRole("button", { name: "Join event-two" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(backend.selectEvent).toHaveBeenCalledExactlyOnceWith("event-two");
+    expect(backend.setDoc).toHaveBeenCalledTimes(2);
+    expect(backend.setDoc).toHaveBeenLastCalledWith(
+      expect.objectContaining({ path: "users/account-a" }),
+      { hackathon_id: "event-two", hackathon_ids: ["event-one", "event-two"] },
+      { merge: true },
+    );
+    expect(screen.getByTestId("registered-events")).toHaveTextContent("event-one");
+    expect(screen.getByTestId("registered-events")).toHaveTextContent("event-two");
+    expect(backend.queueEmail).not.toHaveBeenCalled();
+  });
+
+  it("writes enrollment only once when join is requested repeatedly before the first write finishes", async () => {
+    const pendingWrite = deferred<void>();
+    backend.setDoc.mockReturnValueOnce(pendingWrite.promise);
+    await showDashboard();
+    backend.selectEvent.mockClear();
+    const join = screen.getByRole("button", { name: "Join event" });
+
+    act(() => {
+      fireEvent.click(join);
+      fireEvent.click(join);
+    });
+    fireEvent.click(join);
+
+    expect(backend.setDoc).toHaveBeenCalledOnce();
+    expect(backend.selectEvent).not.toHaveBeenCalled();
+    await act(async () => { pendingWrite.resolve(undefined); });
+    expect(backend.selectEvent).toHaveBeenCalledExactlyOnceWith("event-two");
+    expect(backend.setDoc).toHaveBeenCalledOnce();
   });
 
   it("finishes enrollment and sends the saved submission confirmation for the same account", async () => {

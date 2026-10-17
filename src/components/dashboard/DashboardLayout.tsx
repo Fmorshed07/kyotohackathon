@@ -36,6 +36,7 @@ import {
   ClipboardCheck,
   ListChecks,
   Star,
+  Plus,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -96,6 +97,7 @@ type DashboardLayoutProps = {
   hackathons?: PortalHackathon[];
   selectedHackathonId?: HackathonId;
   onHackathonChange?: (hackathonId: HackathonId) => void;
+  onBrowseHackathons?: () => void;
 };
 
 type NavItem = {
@@ -698,6 +700,7 @@ function DashboardLayoutContent({
   hackathons,
   selectedHackathonId,
   onHackathonChange,
+  onBrowseHackathons,
 }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -727,10 +730,10 @@ function DashboardLayoutContent({
   const boardHackathons = catalogHackathons.filter(
     (hackathon) => hackathon.status === "active" || hackathon.status === "upcoming",
   );
-  // Admins need every edition in the switcher (including past) so switching
-  // never hides the event they just left. Other roles stay on live/upcoming.
+  // Participants retain every joined edition, including their past events.
+  // Staff switchers stay focused on current events unless administering the catalog.
   const switcherHackathons =
-    role === "admin"
+    role === "admin" || role === "participant"
       ? catalogHackathons
       : filterCurrentHackathons(catalogHackathons, {
           includeId: selectedHackathonId,
@@ -921,6 +924,17 @@ function DashboardLayoutContent({
                   </DashboardNavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {onBrowseHackathons && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className={cn(menuButtonClass, "mt-2 border-primary/25 bg-primary/5 text-primary")}
+                    onClick={() => { closeMobileNav(); onBrowseHackathons(); }}
+                  >
+                    <Plus className={navIconClass} />
+                    <span>Join another hackathon</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </NavSection>
           )}
 
@@ -1174,12 +1188,23 @@ function DashboardLayoutContent({
             hackathons &&
             selectedHackathonId &&
             onHackathonChange && (
-              <HackathonSelector
-                hackathons={switcherHackathons.length > 0 ? switcherHackathons : hackathons}
-                selectedHackathonId={selectedHackathonId}
-                onSelect={onHackathonChange}
-                compact
-              />
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
+                <div className="min-w-0 flex-1">
+                  <HackathonSelector
+                    hackathons={switcherHackathons.length > 0 ? switcherHackathons : hackathons}
+                    selectedHackathonId={selectedHackathonId}
+                    onSelect={onHackathonChange}
+                    onBrowseHackathons={role === "participant" ? onBrowseHackathons : undefined}
+                    compact
+                  />
+                </div>
+                {role === "participant" && onBrowseHackathons && (
+                  <Button className="min-h-12 shrink-0 gap-2 rounded-lg sm:px-5" onClick={onBrowseHackathons}>
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Join another hackathon
+                  </Button>
+                )}
+              </div>
             )}
         </header>
         <div className="dash-content px-3 py-4 sm:px-5 sm:py-5 md:px-8 md:py-8">

@@ -35,6 +35,9 @@ export type PortalHackathon = {
   location: string;
   theme: string;
   status: HackathonStatus;
+  /** Optional event artwork used by participant discovery cards. */
+  coverImageUrl?: string;
+  bannerImageUrl?: string;
   /** Organiser gate for project writes. Missing → open, unless the event is past. */
   submissionMode?: SubmissionMode;
 };
