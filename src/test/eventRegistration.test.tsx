@@ -51,9 +51,13 @@ const ideathon: HostedHackathon = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(window, "scrollTo");
   mocks.getDoc.mockResolvedValue({ data: () => ({ criteria: [] }) });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 async function renderEvent(event: HostedHackathon) {
   mocks.fetchEvent.mockResolvedValue(event);
@@ -97,6 +101,7 @@ describe("public event registration CTAs", () => {
     expect(screen.getAllByText(/Video Execution & Storytelling/).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Location & joining" })).toBeInTheDocument();
     expect(screen.queryByText("Meet us in Tokyo")).toBeNull();
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
   });
   it.each(["stage", "folio", "signal"])("shows the finished AI Ideathon archive without registration in the %s layout", async (layoutStyle) => {
     await renderEvent({ ...ideathon, layoutStyle });

@@ -491,7 +491,11 @@ export default function GeneratedHackathonPage() {
   }, [hackathonId]);
 
   useEffect(() => {
-    if (isLoading || !displayedEventId || !hash) return;
+    if (isLoading || !displayedEventId) return;
+    if (!hash) {
+      window.scrollTo({ top: 0, behavior: "instant" });
+      return;
+    }
     let sectionId: string;
     try { sectionId = decodeURIComponent(hash.slice(1)); }
     catch { return; }

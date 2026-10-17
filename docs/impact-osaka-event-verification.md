@@ -25,6 +25,7 @@ This report replaces the older verification claims supplied with the patch. Resu
 - Admin actions materialize a complete event and missing rubric atomically. An additional regression fix preserves unpublished bundled events when the admin catalog falls back to a published-only query.
 - Firestore rules enforce past/unpublished/automatic-end gates for participant writes while allowing the separate judge-mark workflow. Missing legacy event documents retain their previous rule behavior.
 - The shared publisher preserves existing event and rubric edits and rejects a dry run combined with lifecycle mutation.
+- Browser verification caught event links retaining the home page's scroll position. Event pages now open at the top while preserving explicit section anchors; the 22 affected page tests passed after this follow-up fix, followed by TypeScript, changed-file lint and a fresh production build.
 
 ## Verification performed in this run
 
@@ -41,11 +42,21 @@ This report replaces the older verification claims supplied with the patch. Resu
 - Production build: passed; existing large-bundle and outdated Browserslist warnings remain.
 - Browser integration found that the deployed public rules reject a missing Osaka document. The client treats that denial as hidden, so the production event record must be materialized to show the new catalog entry with the real configuration. Mocked missing-document tests alone did not cover this deployment dependency.
 
-## Release state and limits
+## Live verification and release
+
+- Event implementation commit `c51786e` was pushed to `main`. Both existing Vercel production projects (`impactkyotohackathon` and `impacthackathon`) deployed successfully.
+- Canonical cover and banner returned HTTP 200 with the correct image content types/signatures and SHA-256 hashes matching the committed files.
+- The existing administrator created the Osaka event and initial rubric transactionally. The publisher returned `published_and_verified`; no existing event, account or competition marks were overwritten.
+- Public page: https://impactkyoto.cognisorai.com/events/impact-osaka-2026
+- The real browser verified the page at 1280 px and 390 px: correct challenge/date, all three registration links point to Luma, no broken images, no horizontal overflow and no captured page errors. Temporary mobile viewport settings were reset.
+- The home card was checked against production data, including navigation into the event. The final local follow-up build opens the event at scroll position 0.
+- The public participant signup route opens with Participant selected. Registration/onboarding writes were tested locally, without creating production test accounts.
+
+## Remaining deployment limits
 
 Pre-release verification used read-only production access. Application changes and artwork must be released before creating the production event/rubric record; publishing the record first would point the deployed old app at artwork paths it does not yet contain. Production rule deployment is a separate release step. No real test accounts, email or scoring writes are needed.
 
-The server deadline check needs both the published event's `sourceLifecycleAutomatic: true` and numeric `endAtMs`, plus the updated deployed rules. Production rules were not inspected. The old local rules ignore the automatic deadline; a successful event creation alone would not prove backend enforcement. Normal client saves use the event end (21:00 JST); there is no separate enforced 19:30 deadline for the programme's build-and-submit slot.
+The server deadline check needs both the published event's `sourceLifecycleAutomatic: true` and numeric `endAtMs`, plus the updated deployed rules. The existing Firebase CLI account received HTTP 403 when listing releases and reading the deployed Firestore release. Production rules could not be compared safely and **were not deployed**. The old local rules ignore the automatic deadline; a successful event creation alone does not prove backend enforcement. Normal client saves use the event end (21:00 JST); there is no separate enforced 19:30 deadline for the programme's build-and-submit slot.
 
 The supplied audit's pre-existing administrator-bootstrap, event-isolation, private-data and score-value-validation findings remain outside this event change. Passing these functional tests is not a complete production security sign-off. See `impact-osaka-permissions-audit.json` for details.
 
