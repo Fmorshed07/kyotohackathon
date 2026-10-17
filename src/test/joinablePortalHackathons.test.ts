@@ -89,6 +89,21 @@ describe("participant discovery artwork", () => {
   });
 });
 
+describe("participant guide rule book metadata", () => {
+  it("preserves trimmed public URLs and safe local rule book assets", () => {
+    expect(hostedToPortalHackathon(event("public-rules", { rulebookUrl: "  https://example.test/rules.pdf?lang=en#eligibility  " })))
+      .toHaveProperty("rulebookUrl", "https://example.test/rules.pdf?lang=en#eligibility");
+    expect(hostedToPortalHackathon(event("local-rules", { rulebookUrl: "/documents/hackathon-rules.pdf" })))
+      .toHaveProperty("rulebookUrl", "/documents/hackathon-rules.pdf");
+  });
+
+  it("omits empty, missing and unsafe rule book links", () => {
+    for (const rulebookUrl of ["", undefined, "javascript:alert(1)", "//example.test/rules.pdf"]) {
+      expect(hostedToPortalHackathon(event("no-public-rules", { rulebookUrl }))).not.toHaveProperty("rulebookUrl");
+    }
+  });
+});
+
 describe("events available for participant enrollment", () => {
   it("excludes closed registrations, finished events and unpublished listings while retaining live/upcoming open events", async () => {
     publishedRows([

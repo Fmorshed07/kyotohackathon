@@ -1046,7 +1046,7 @@ function DashboardLayoutContent({
           <NavSection label="Resources">
             <SidebarMenuItem>
               <SidebarMenuButton asChild className={menuButtonClass}>
-                <DashboardNavLink href="/resources" onNavigate={closeMobileNav}>
+                <DashboardNavLink href={withHackathonQuery("/resources", selectedHackathonId)} onNavigate={closeMobileNav}>
                   <BookOpen className={navIconClass} />
                   <span>Guide</span>
                 </DashboardNavLink>

@@ -38,6 +38,8 @@ export type PortalHackathon = {
   /** Optional event artwork used by participant discovery cards. */
   coverImageUrl?: string;
   bannerImageUrl?: string;
+  /** Optional organiser-provided rule book for the event guide. */
+  rulebookUrl?: string;
   /** Organiser gate for project writes. Missing → open, unless the event is past. */
   submissionMode?: SubmissionMode;
 };

@@ -29,6 +29,7 @@ import {
 } from "@/lib/hostEventBriefForm";
 import { uploadEventImage } from "@/lib/profileMedia";
 import { cn } from "@/lib/utils";
+import { isValidRulebookUrl, RULEBOOK_URL_ERROR } from "@/lib/rulebook";
 
 export type { HostEventBriefForm } from "@/lib/hostEventBriefForm";
 
@@ -84,6 +85,7 @@ export function HostEventBriefEditor({
   uploaderId,
   disabled,
 }: HostEventBriefEditorProps) {
+  const rulebookError = !isValidRulebookUrl(value.rulebookUrl) ? RULEBOOK_URL_ERROR : null;
   const patch = (partial: Partial<HostEventBriefForm>) => onChange({ ...value, ...partial });
 
   const updateScheduleItem = (index: number, partial: Partial<HostEventScheduleItem>) => {
@@ -398,15 +400,22 @@ export function HostEventBriefEditor({
                 onChange={(event) => patch({ registrationUrl: event.target.value })}
               />
             </label>
-            <label className="block space-y-1.5">
-              <span className={fieldLabel}>Rulebook URL</span>
+            <div className="space-y-1.5">
+              <label htmlFor="host-rulebook-url" className={fieldLabel}>Rule book URL (optional)</label>
               <Input
+                id="host-rulebook-url"
                 placeholder="https://…"
                 value={value.rulebookUrl}
                 disabled={disabled}
                 onChange={(event) => patch({ rulebookUrl: event.target.value })}
+                aria-invalid={Boolean(rulebookError)}
+                aria-describedby={`host-rulebook-hint${rulebookError ? " host-rulebook-error" : ""}`}
               />
-            </label>
+              <span id="host-rulebook-hint" className="block text-xs text-muted-foreground">
+                Appears in Resources and on the event page after publishing. Use an http(s) link or a local /path.
+              </span>
+              {rulebookError && <span id="host-rulebook-error" role="alert" className="block text-xs text-destructive">{rulebookError}</span>}
+            </div>
           </div>
         </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { validateRulebookUrl } from "@/lib/rulebook";
 import { Navigate, Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
@@ -475,7 +476,7 @@ export default function HostDashboardPage() {
       eligibility: eventForm.eligibility.trim(),
       teamSize: eventForm.teamSize.trim(),
       prize: eventForm.prize.trim(),
-      rulebookUrl: eventForm.rulebookUrl.trim(),
+      rulebookUrl: validateRulebookUrl(eventForm.rulebookUrl),
       registrationUrl: eventForm.registrationUrl.trim(),
       highlightNote: eventForm.highlightNote.trim(),
       focusAreas: normalizeFocusAreas(eventForm.focusAreas),

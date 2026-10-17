@@ -15,6 +15,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { validateRulebookUrl } from "@/lib/rulebook";
 import {
   HACKATHON_PUBLIC_URLS,
   PORTAL_HACKATHONS,
@@ -236,6 +237,7 @@ export async function publishAiHackathon(
   rulebookUrl: string,
   createdBy: string,
 ): Promise<HostedHackathon> {
+  const safeRulebookUrl = validateRulebookUrl(rulebookUrl);
   const now = new Date().toISOString();
   const id = `${eventSlug(draft.name)}-${Date.now().toString(36).slice(-6)}` as HackathonId;
   const event: HostedHackathon = {
@@ -253,7 +255,7 @@ export async function publishAiHackathon(
     prize: draft.prize.trim(),
     requirements: draft.requirements.map((item) => item.trim()).filter(Boolean),
     schedule: draft.schedule,
-    rulebookUrl: externalUrl(rulebookUrl),
+    rulebookUrl: safeRulebookUrl,
     coverImageUrl: externalUrl(draft.coverImageUrl),
     bannerImageUrl: externalUrl(draft.bannerImageUrl) || externalUrl(draft.coverImageUrl),
     galleryUrls: normalizeGalleryUrls(draft.galleryUrls),
@@ -278,6 +280,7 @@ export async function publishManualHackathon(
   rulebookUrl: string,
   createdBy: string,
 ): Promise<HostedHackathon> {
+  const safeRulebookUrl = validateRulebookUrl(rulebookUrl);
   const now = new Date().toISOString();
   const id = `${eventSlug(draft.name)}-${Date.now().toString(36).slice(-6)}` as HackathonId;
   const event: HostedHackathon = {
@@ -299,7 +302,7 @@ export async function publishManualHackathon(
       title: item.title.trim(),
       description: item.description.trim(),
     })),
-    rulebookUrl: externalUrl(rulebookUrl),
+    rulebookUrl: safeRulebookUrl,
     coverImageUrl: externalUrl(draft.coverImageUrl),
     bannerImageUrl: externalUrl(draft.bannerImageUrl) || externalUrl(draft.coverImageUrl),
     galleryUrls: normalizeGalleryUrls(draft.galleryUrls),
@@ -332,6 +335,7 @@ export async function publishHostEventPublicly(
   createdBy: string,
   options?: { status?: HackathonStatus },
 ): Promise<HostedHackathon> {
+  const safeRulebookUrl = validateRulebookUrl(hostEvent.rulebookUrl);
   if (!hostEvent.name.trim() || !hostEvent.start_at || !hostEvent.location.trim()) {
     throw new Error("Event name, start time, and location are required before publishing.");
   }
@@ -422,7 +426,7 @@ export async function publishHostEventPublicly(
     prize: hostEvent.prize.trim() || "As announced by the host",
     requirements: [...focusRequirements, ...capacityRequirement],
     schedule: programme,
-    rulebookUrl: externalUrl(hostEvent.rulebookUrl),
+    rulebookUrl: safeRulebookUrl,
     coverImageUrl: externalUrl(hostEvent.coverImageUrl),
     bannerImageUrl: externalUrl(hostEvent.bannerImageUrl) || externalUrl(hostEvent.coverImageUrl),
     galleryUrls: normalizeGalleryUrls(hostEvent.galleryUrls),
@@ -808,6 +812,9 @@ export async function updateHostedHackathon(
   id: string,
   patch: HostedHackathonUpdate,
 ): Promise<void> {
+  const safeRulebookUrl = patch.rulebookUrl === undefined
+    ? undefined
+    : validateRulebookUrl(patch.rulebookUrl);
   await ensurePortalCatalogHackathon(db, id);
 
   const payload: Record<string, unknown> = {};
@@ -831,7 +838,7 @@ export async function updateHostedHackathon(
       description: item.description.trim(),
     }));
   }
-  if (patch.rulebookUrl !== undefined) payload.rulebookUrl = externalUrl(patch.rulebookUrl);
+  if (safeRulebookUrl !== undefined) payload.rulebookUrl = safeRulebookUrl;
   if (patch.coverImageUrl !== undefined) payload.coverImageUrl = externalUrl(patch.coverImageUrl);
   if (patch.bannerImageUrl !== undefined) {
     payload.bannerImageUrl = externalUrl(patch.bannerImageUrl) || externalUrl(patch.coverImageUrl);
@@ -852,6 +859,7 @@ export async function updateHostedHackathon(
   if (typeof payload.name === "string") hostPatch.name = payload.name;
   if (typeof payload.summary === "string") hostPatch.description = payload.summary;
   if (typeof payload.location === "string") hostPatch.location = payload.location;
+  if (typeof payload.rulebookUrl === "string") hostPatch.rulebookUrl = payload.rulebookUrl;
   await updateDoc(doc(db, "host_events", hostEventId), hostPatch);
 }
 
@@ -905,6 +913,7 @@ export async function fetchPublishedHackathons(db: Firestore): Promise<HostedHac
 export function hostedToPortalHackathon(event: HostedHackathon): PortalHackathon {
   const coverImageUrl = event.coverImageUrl?.trim();
   const bannerImageUrl = event.bannerImageUrl?.trim();
+  const rulebookUrl = externalUrl(event.rulebookUrl);
   return {
     id: event.id,
     name: event.name,
@@ -916,6 +925,7 @@ export function hostedToPortalHackathon(event: HostedHackathon): PortalHackathon
     submissionMode: event.submissionMode,
     ...(coverImageUrl ? { coverImageUrl } : {}),
     ...(bannerImageUrl ? { bannerImageUrl } : {}),
+    ...(rulebookUrl ? { rulebookUrl } : {}),
   };
 }
 

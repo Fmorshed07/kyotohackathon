@@ -75,8 +75,9 @@ describe("dashboard sidebar navigation", () => {
     const discord = screen.getByRole("link", { name: "Discord" });
     const board = screen.getByRole("link", { name: /Impact Osaka Board/ });
     const feed = screen.getByRole("link", { name: "Project feed & videos" });
+    const guide = screen.getByRole("link", { name: "Guide" });
 
-    for (const link of [overview, team, discord, board, feed]) {
+    for (const link of [overview, team, discord, board, feed, guide]) {
       expect(link).toHaveAttribute("data-sidebar", "menu-button");
       expect(link).toHaveClass("dash-nav-item");
     }
@@ -88,6 +89,7 @@ describe("dashboard sidebar navigation", () => {
     expect(board).toHaveAttribute("href", "/boards/impact-osaka-2026");
     expect(board).toHaveTextContent(OSAKA_DATE);
     expect(feed).toHaveAttribute("href", "/feed");
+    expect(guide).toHaveAttribute("href", "/resources?hackathon=impact-osaka-2026");
   });
 
   it("keeps team, board, and combined feed navigation working and updates the active menu entry", () => {
@@ -102,6 +104,9 @@ describe("dashboard sidebar navigation", () => {
 
     fireEvent.click(screen.getByRole("link", { name: "Project feed & videos" }));
     expect(screen.getByTestId("dashboard-location")).toHaveTextContent("/feed");
+
+    fireEvent.click(screen.getByRole("link", { name: "Guide" }));
+    expect(screen.getByTestId("dashboard-location")).toHaveTextContent("/resources?hackathon=impact-osaka-2026");
   });
 
   it("keeps full event dates available and passes the chosen event to the switch handler", () => {

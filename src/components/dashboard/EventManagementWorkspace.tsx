@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmissionGateControls } from "@/components/dashboard/SubmissionGateControls";
+import { isValidRulebookUrl, RULEBOOK_URL_ERROR, validateRulebookUrl } from "@/lib/rulebook";
 
 type TabKey = "public" | "host";
 type FilterKey = "all" | "live" | "published" | "unpublished" | "past" | "host";
@@ -139,6 +140,7 @@ export function EventManagementWorkspace({
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
+  const rulebookError = editDraft && !isValidRulebookUrl(editDraft.rulebookUrl) ? RULEBOOK_URL_ERROR : null;
 
   useEffect(() => {
     if (!editingId) {
@@ -193,6 +195,7 @@ export function EventManagementWorkspace({
 
   const saveEdit = async () => {
     if (!editingId || !editDraft) return;
+    if (rulebookError) return;
     if (!editDraft.name.trim() || !editDraft.eventDate.trim() || !editDraft.location.trim()) return;
     await onSaveEvent(editingId, {
       name: editDraft.name,
@@ -205,7 +208,7 @@ export function EventManagementWorkspace({
       eligibility: editDraft.eligibility,
       teamSize: editDraft.teamSize,
       prize: editDraft.prize,
-      rulebookUrl: editDraft.rulebookUrl,
+      rulebookUrl: validateRulebookUrl(editDraft.rulebookUrl),
       lumaUrl: editDraft.lumaUrl,
     });
     setEditingId(null);
@@ -664,14 +667,30 @@ export function EventManagementWorkspace({
                             placeholder="Prize"
                             disabled={busy}
                           />
-                          <Input
-                            value={editDraft.rulebookUrl}
-                            onChange={(e) =>
-                              setEditDraft((d) => (d ? { ...d, rulebookUrl: e.target.value } : d))
-                            }
-                            placeholder="Rulebook URL"
-                            disabled={busy}
-                          />
+                          <div className="space-y-1.5">
+                            <label htmlFor={`rulebook-${event.id}`} className="text-xs font-semibold text-foreground">
+                              Rule book URL (optional)
+                            </label>
+                            <Input
+                              id={`rulebook-${event.id}`}
+                              value={editDraft.rulebookUrl}
+                              onChange={(e) =>
+                                setEditDraft((d) => (d ? { ...d, rulebookUrl: e.target.value } : d))
+                              }
+                              placeholder="https://example.com/rules.pdf"
+                              disabled={busy}
+                              aria-invalid={Boolean(rulebookError)}
+                              aria-describedby={`rulebook-hint-${event.id}${rulebookError ? ` rulebook-error-${event.id}` : ""}`}
+                            />
+                            <p id={`rulebook-hint-${event.id}`} className="text-xs text-muted-foreground">
+                              Appears in Resources and on the event page. Use an http(s) link or a local /path.
+                            </p>
+                            {rulebookError && (
+                              <p id={`rulebook-error-${event.id}`} role="alert" className="text-xs text-destructive">
+                                {rulebookError}
+                              </p>
+                            )}
+                          </div>
                           <Input
                             value={editDraft.lumaUrl}
                             onChange={(e) =>
@@ -691,7 +710,7 @@ export function EventManagementWorkspace({
                           rows={4}
                         />
                         <div className="flex flex-wrap gap-2">
-                          <Button type="button" size="sm" disabled={busy || isBusy} onClick={() => void saveEdit()}>
+                          <Button type="button" size="sm" disabled={busy || isBusy || Boolean(rulebookError)} onClick={() => void saveEdit()}>
                             Save changes
                           </Button>
                           <Button

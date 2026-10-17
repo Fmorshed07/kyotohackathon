@@ -9,6 +9,7 @@ import {
   Rocket,
 } from "lucide-react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import HackathonRulebookSection from "@/components/sections/HackathonRulebookSection";
 import {
   PARTICIPANT_GUIDE_STEPS,
   PARTICIPANT_QUICK_LINKS,
@@ -104,6 +105,8 @@ const ResourcesGuideSection = () => {
             );
           })}
         </motion.div>
+
+        <HackathonRulebookSection />
 
         <motion.div
           className="mb-8 flex items-center gap-3"
