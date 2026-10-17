@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowDown, Hash, Send, Trash2, WifiOff } from "lucide-react";
+import { ArrowDown, Hash, Send, Trash2, WifiOff, LockKeyhole, Megaphone, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,11 +7,10 @@ import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
 import {
   CHAT_COOLDOWN_MS, CHAT_HISTORY_LIMIT, CHAT_MESSAGE_LIMIT, communityChatError,
   deleteCommunityMessage, sendCommunityMessage, subscribeToCommunityMessages,
-  type CommunityMessage, type COMMUNITY_CHANNELS,
+  type CommunityMessage,
 } from "@/lib/communityChat";
+import { canPostCommunityMessage, type CommunityChannel } from "@/lib/communityChannels";
 import type { SessionUser } from "@/types/portal";
-
-type Channel = typeof COMMUNITY_CHANNELS[number];
 
 function MessageBody({ text }: { text: string }) {
   return <>{text.split(/(https?:\/\/[^\s]+)/g).map((part, index) => {
@@ -21,7 +20,7 @@ function MessageBody({ text }: { text: string }) {
 }
 
 /** Mount with an account/channel key so drafts and pending callbacks never cross rooms. */
-export function CommunityChat({ user, channel }: { user: SessionUser; channel: Channel }) {
+export function CommunityChat({ user, channel, settingsReady = true }: { user: SessionUser; channel: CommunityChannel; settingsReady?: boolean }) {
   const [messages, setMessages] = useState<CommunityMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
@@ -87,12 +86,19 @@ export function CommunityChat({ user, channel }: { user: SessionUser; channel: C
   }, [lastMessageId]);
 
   const connected = !loading && !connectionError && !fromCache && online;
+  const canPost = settingsReady && canPostCommunityMessage(user, channel);
+  const canModerate = user.role === "admin";
+  const canRemove = (message: CommunityMessage) => message.userId === user.id || canModerate;
+  const postingNotice = !settingsReady ? "Syncing channel settings. Posting will be available when connected."
+    : channel.status === "archived" ? "This channel is archived. You can still read its history."
+    : channel.status === "closed" ? "Posting is closed in this channel. An admin can reopen it."
+    : "Only admins can post announcements. Updates are visible to every member.";
   const filtered = messages.filter(message => `${message.authorName} ${message.body}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const isCurrentUser = () => active.current && getFirebaseAuth().currentUser?.uid === user.id;
 
   async function send(event: FormEvent) {
     event.preventDefault();
-    if (sendingRef.current || coolingDown || !connected || !draft.trim() || draft.trim().length > CHAT_MESSAGE_LIMIT) return;
+    if (!canPost || sendingRef.current || coolingDown || !connected || !draft.trim() || draft.trim().length > CHAT_MESSAGE_LIMIT) return;
     if (!isCurrentUser()) { setActionError("Your account changed. Sign in again before posting."); return; }
     sendingRef.current = true;
     setSending(true);
@@ -114,7 +120,8 @@ export function CommunityChat({ user, channel }: { user: SessionUser; channel: C
   }
 
   async function removeMessage() {
-    if (!deleteTarget || deletingRef.current || !connected || !isCurrentUser()) return;
+    const target = messages.find((message) => message.id === deleteTarget);
+    if (!deleteTarget || !target || !canRemove(target) || deletingRef.current || !connected || !isCurrentUser()) return;
     deletingRef.current = true;
     setDeleting(true);
     setActionError("");
@@ -132,7 +139,9 @@ export function CommunityChat({ user, channel }: { user: SessionUser; channel: C
   return <section className="flex min-w-0 flex-col" aria-label={`#${channel.name} chat`}>
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border p-4 sm:p-6">
       <div className="min-w-0">
-        <h2 className="flex items-center gap-2 font-display text-xl"><Hash className="h-5 w-5 text-primary" aria-hidden="true" />{channel.name}</h2>
+        <h2 className="flex flex-wrap items-center gap-2 font-display text-xl">{channel.type === "announcement" ? <Megaphone className="h-5 w-5 text-primary" aria-hidden /> : <Hash className="h-5 w-5 text-primary" aria-hidden />}{channel.name}
+          {channel.status !== "open" && <span className="rounded-full border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{channel.status}</span>}
+        </h2>
         <p className="mt-1 max-w-xl text-sm text-muted-foreground">{channel.description}</p>
       </div>
       <span role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -166,13 +175,13 @@ export function CommunityChat({ user, channel }: { user: SessionUser; channel: C
             <time className="text-xs text-muted-foreground" dateTime={message.createdAt ? new Date(message.createdAt).toISOString() : undefined}>{message.pending ? "Sending…" : message.createdAt ? new Date(message.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</time>
           </div>
           <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]"><MessageBody text={message.body} /></p>
-          {deleteTarget === message.id && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-border p-3 text-xs">
-            <span>Delete your message permanently?</span>
+          {deleteTarget === message.id && canRemove(message) && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-border p-3 text-xs">
+            <span>{message.userId === user.id ? "Delete your message permanently?" : "Remove this message from the community permanently?"}</span>
             <Button size="sm" variant="destructive" disabled={deleting || !connected} onClick={() => void removeMessage()}>{deleting ? "Deleting…" : "Confirm delete"}</Button>
             <Button size="sm" variant="ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button>
           </div>}
         </div>
-        {message.userId === user.id && !message.pending && <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 text-muted-foreground" aria-label={`Delete message from ${message.authorName}`} onClick={() => setDeleteTarget(message.id)}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /></Button>}
+        {canRemove(message) && !message.pending && <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 text-muted-foreground" aria-label={`${message.userId === user.id ? "Delete" : "Remove"} message from ${message.authorName}`} onClick={() => setDeleteTarget(message.id)}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /></Button>}
       </article>)}
     </div>
     {newMessages && <Button variant="secondary" size="sm" className="mx-auto mb-3 gap-2" onClick={() => {
@@ -180,7 +189,8 @@ export function CommunityChat({ user, channel }: { user: SessionUser; channel: C
       nearBottom.current = true;
       setNewMessages(false);
     }}><ArrowDown className="h-4 w-4" aria-hidden="true" />Jump to latest</Button>}
-    <form className="border-t border-border p-4 sm:p-6" onSubmit={event => void send(event)} aria-label="Send a community message">
+    {!canPost && <div role="note" className="flex items-start gap-3 border-t border-border bg-secondary/20 p-5 text-sm text-muted-foreground">{channel.type === "announcement" && channel.status === "open" && settingsReady ? <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden /> : <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />}<p>{postingNotice}</p></div>}
+    {canPost && <form className="border-t border-border p-4 sm:p-6" onSubmit={event => void send(event)} aria-label={channel.type === "announcement" ? "Post an announcement" : "Send a community message"}>
       <label htmlFor="community-message" className="sr-only">Message #{channel.name}</label>
       <Textarea id="community-message" value={draft} onChange={event => setDraft(event.target.value)} placeholder={channel.placeholder} rows={3} maxLength={CHAT_MESSAGE_LIMIT} disabled={sending} aria-describedby="community-chat-guidance" onKeyDown={event => {
         if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
@@ -191,8 +201,8 @@ export function CommunityChat({ user, channel }: { user: SessionUser; channel: C
       {actionError && <p role="alert" className="mt-3 text-sm text-destructive">{actionError}</p>}
       <div className="mt-3 flex items-center justify-between gap-3">
         <p id="community-chat-guidance" className="text-xs leading-relaxed text-muted-foreground">Be kind. No private scores or personal details.<br />Shift + Enter for a new line · {draft.length}/{CHAT_MESSAGE_LIMIT}</p>
-        <Button type="submit" disabled={!connected || sending || coolingDown || !draft.trim()} className="shrink-0 gap-2"><Send className="h-4 w-4" aria-hidden="true" />{sending ? "Sending…" : coolingDown ? "Wait a moment" : "Send"}</Button>
+        <Button type="submit" disabled={!connected || sending || coolingDown || !draft.trim()} className="shrink-0 gap-2"><Send className="h-4 w-4" aria-hidden="true" />{sending ? "Sending…" : coolingDown ? "Wait a moment" : channel.type === "announcement" ? "Post announcement" : "Send"}</Button>
       </div>
-    </form>
+    </form>}
   </section>;
 }

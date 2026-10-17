@@ -1,42 +1,48 @@
 {
   "score": 1,
-  "summary": "Scoped community chat rules passed 35 new emulator tests plus all 42 existing submission/judge/host permission tests. The new schema, ownership, atomic rate limit and authenticated access checks passed. The rules were deployed to hackathon-tokyo on 2026-10-18 JST and read back with an exact match to the tested source (ruleset 4e1cfd5a-9769-49a5-b870-2918734ff281). The overall repository score remains 1 because previously documented administrator bootstrap and role-authority risks remain outside this additive feature. This is not an overall security approval. No production messages or user records were modified for testing.",
+  "summary": "The expanded community channel rules passed 133 local Firestore emulator tests on 2026-10-18 JST: 85 community cases, including 50 new channel-management and moderation regressions, plus all 48 existing submission, judge-invitation, host and event permission cases. Metadata has strict create/update validation, administration follows the current database admin role, posting respects after-write channel state, announcements restrict posting, and moderation permits author/admin deletion without editing or cooldown resets. The overall repository score remains 1 because inherited administrator bootstrap and role-authority risks remain outside this scoped change. Production Firestore rules were deployed to hackathon-tokyo and read back as an exact match to the tested local source: ruleset projects/hackathon-tokyo/rulesets/d75ce896-b612-4a01-aa0a-53a9a9b5fcfb, updated 2026-10-17T19:15:34.118439Z (18 October JST), LF-normalized SHA-256 a3e1743fdacedebd64636cf03c49d27a17e2045f4884f82afa051f97f9d7d76f. Only the rules release changed; no production messages, channel documents or user records were created or modified for testing or deployment.",
   "findings": [
     {
       "check": "Authority source and inherited privilege escalation",
       "severity": "critical",
-      "issue": "The existing portal-admin email bootstrap lacks an email-verification/custom-claim requirement. Existing staff assignment and invitation authority risks remain documented in submission-permissions-audit.json. Chat role labels use those existing profiles and are not independently verified identity credentials.",
-      "recommendation": "Migrate administrator authority and event/role assignments to trusted server-managed identities in a separate coordinated change. Do not treat a chat name or role label as authorization. This feature deliberately adds no admin bypass for message editing or deletion."
+      "issue": "The existing portal-admin email bootstrap lacks an email-verification/custom-claim requirement. Existing profile, staff-assignment and invitation authority risks remain documented in submission-permissions-audit.json. The new community controls read the current stored role and do not independently repair those upstream authority paths.",
+      "recommendation": "Move administrator and event-role assignment to trusted server-managed authority in a separate coordinated change. Preserve the community-specific checks rather than substituting request-provided fields, display badges or the legacy email shortcut for stored administrator identity."
     },
     {
-      "check": "Public list, authentication and application query compatibility",
+      "check": "Community administration and moderation identity",
       "severity": "minor",
-      "issue": "No scoped bypass found: registered roles including unapproved staff can use all three rooms; unauthenticated, anonymous and missing-role accounts are denied. Unknown rooms and unbounded queries are denied. The app's ordered limit-100 listener is allowed. Rooms are virtual; missing parent documents are intentional.",
-      "recommendation": "Retain role, query and unknown-room emulator tests. Membership in the shared community must not grant access to event submissions or judging data."
+      "issue": "No scoped bypass found: only registered users whose current database role is admin/admins can create or edit channels, post announcements, or delete another author's message. Participants, judges, mentors, hosts and pending staff cannot manage metadata. Forged role fields, request role/admin claims, the portal-admin email shortcut and anonymous admin profiles were denied by emulator tests.",
+      "recommendation": "Retain the direct authority regressions and anonymous-account exclusion. Channel updated_by and message author_role are validated metadata, never the source of permission."
     },
     {
-      "check": "Create/update consistency, immutable ownership and deletion",
+      "check": "Registered discovery, bounded reads and compatibility",
       "severity": "minor",
-      "issue": "No scoped bypass found: forged UID or profile-inconsistent role labels are denied on create, and every message update is denied, including ownership, timestamp, content and schema modifications. Only the author can delete; other members and administrators cannot delete another author's message through these rules.",
-      "recommendation": "Preserve these regressions. Any future moderation feature needs an audited trusted authority path rather than reusing the existing broad admin bootstrap."
+      "issue": "No scoped bypass found: metadata and message reads require recognized registered roles. Metadata/message list queries require a limit of at most 100. Members, including pending staff and users without event membership, can discover channels and read valid closed/archived history. General, teams, judges and announcements have explicit fallback behavior without metadata; unknown or malformed configured channels cannot expose message history or accept posts.",
+      "recommendation": "Keep the audience explicit: these are shared community channels, not private event or staff rooms. Preserve exact application-query and fallback-channel tests when adding pagination or discovery changes."
     },
     {
-      "check": "Types, bounds, timestamps, required fields and schema pollution",
+      "check": "Channel lifecycle, announcements and immutable messages",
       "severity": "minor",
-      "issue": "No scoped bypass found: nonblank bounded names/body, exact required schemas, UID/role constraints and server timestamps are validated. Missing/extra fields, wrong types, oversized text and timestamp manipulation are denied. There are no numeric counters, editable workflow status fields or user-defined storage paths in this model.",
-      "recommendation": "Keep validators on both limiter create and update; messages remain immutable. Repeat the attack matrix for any new field, editing or upload capability."
+      "issue": "No scoped bypass found: only open channels accept new messages, and announcements require a database admin. Closed/archived channels remain readable and reopen correctly. After-write validation rejects a message paired with closing an existing custom channel or a virtual default in the same atomic batch. A valid new announcement and its first admin post can be created atomically. Messages remain immutable; only their author or a registered database admin can delete them, including in archived history.",
+      "recommendation": "Keep lifecycle checks in both message creation and limiter validation. Preserve atomic-transition and moderator-identity tests; granting deletion must not also grant editing, re-ownership or timestamp changes."
+    },
+    {
+      "check": "Metadata create/update consistency, type safety and bounds",
+      "severity": "minor",
+      "issue": "No scoped bypass found: metadata create and update enforce the same exact ten-field schema, safe channel IDs up to 64 characters, bounded strings, nonblank name/section, type/status enums, integer order from 0 through 999, the authenticated updater and server update time. Invalid types, oversized values, missing/extra fields, forged updater IDs and timestamp manipulation were denied on both operations. Metadata deletion is denied even to admins; archiving preserves channel identity and history. Existing immutable message bounds and schema checks also passed.",
+      "recommendation": "Apply the complete validator to every future metadata write path. Do not allow parent deletion or treat malformed metadata as an open default channel."
     },
     {
       "check": "Atomic pairing, replay and resource abuse",
       "severity": "moderate",
-      "issue": "The emulator blocked unpaired/mismatched writes, limiter replay/reset/deletion and rapid cross-room messages. The three-second limit is per UID only. Multiple accounts, repeated reads and unbounded long-term storage remain potential abuse and cost vectors.",
-      "recommendation": "Before broad launch, add appropriate App Check, trusted abuse controls, monitoring and a documented retention policy. Avoid describing the per-account cooldown as comprehensive spam prevention."
+      "issue": "Existing schema, ownership, server-time and three-second cross-room limiter protections passed unchanged alongside dynamic channels. Unpaired/mismatched writes, multiple messages for one limiter, limiter replay/reset/deletion and rapid posting after moderator deletion were denied. The cooldown remains per UID only; multiple accounts, repeated reads, unbounded stored history and an administrator-created catalog larger than the discovery window remain potential abuse or operational cost vectors.",
+      "recommendation": "Retain paired-write regressions and bounded reads. Add appropriate trusted abuse controls, monitoring, retention and catalog pagination as usage grows; do not describe a per-account delay as comprehensive spam prevention."
     },
     {
       "check": "Mixed-content privacy and moderation",
       "severity": "moderate",
-      "issue": "The chat model copies no account email/private profile fields and renders text without HTML interpretation. All registered members can nevertheless read message bodies and user-chosen names, and can voluntarily post sensitive data or abusive content. Reports and moderator removal are not yet implemented.",
-      "recommendation": "Keep the visible shared-audience and no-private-scores guidance. Add reviewed moderation/reporting before broad rollout. Do not expose private user documents to resolve chat profiles."
+      "issue": "The message schema copies no account email or private profile fields, and messages are rendered as text. All registered members can nevertheless read bodies and user-chosen names, so members can voluntarily disclose sensitive information or post abusive content. Admin message removal is now supported, but reporting, moderation reasons and action-history workflows are not included in this change.",
+      "recommendation": "Keep the shared-audience and no-private-scores guidance visible. Consider reviewed reporting and moderation audit trails separately without exposing private user documents to resolve chat profiles."
     }
   ]
 }

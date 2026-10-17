@@ -1,10 +1,14 @@
 rules_version = '2';
 
 // Community data model (additive; existing portal collections are unchanged):
-// community_channels/{general|teams|judges}/messages/{20-character auto-ID}:
+// community_channels/{safe-channel-id}: validated, bounded admin-managed
+//   name/title/description/placeholder/section/type/status/order and audit fields.
+//   general/teams/judges/announcements also work as virtual default channels.
+// community_channels/{safe-channel-id}/messages/{20-character auto-ID}:
 //   user_id string <=128, author_name string 1..80, author_role enum,
 //   body nonblank string <=2000, created_at server timestamp. Immutable;
-//   only its author may delete. No account emails/private profiles are copied.
+//   its author or a registered DB admin may delete. No account emails/private
+//   profiles are copied. Closed/archived channels retain readable history.
 // community_chat_limits/{uid}: channel_id enum, message_id auto-ID,
 //   last_sent_at server timestamp. Atomic with one new message, 3s cooldown.
 
@@ -548,14 +552,72 @@ service cloud.firestore {
     }
 
     // Cross-event community: all registered members, independent of event access.
-    function isCommunityChannel(channelId) {
-      return channelId in ["general", "teams", "judges"];
-    }
-
     function isCommunityMember() {
       return userDocExists()
         && request.auth.token.get("firebase", {}).get("sign_in_provider", "") != "anonymous"
         && currentUserRole() in ["participant", "participants", "judge", "judges", "mentor", "mentors", "host", "hosts", "admin", "admins"];
+    }
+
+    // Channel administration intentionally does not inherit the portal email bypass.
+    function isCommunityAdmin() {
+      return isCommunityMember() && currentUserRole() in ["admin", "admins"];
+    }
+
+    function isValidCommunityChannelId(channelId) {
+      return channelId is string && channelId.matches('^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$');
+    }
+
+    function communityChannelPath(channelId) {
+      return /databases/$(database)/documents/community_channels/$(channelId);
+    }
+
+    function isValidCommunityChannelData(data) {
+      let fields = ["name", "title", "description", "placeholder", "section", "type", "status", "order", "updated_by", "updated_at"];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 48
+        && data.name.matches('(?s).*[^\\s].*')
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 120
+        && data.description is string && data.description.size() <= 300
+        && data.placeholder is string && data.placeholder.size() <= 200
+        && data.section is string && data.section.size() > 0 && data.section.size() <= 48
+        && data.section.matches('(?s).*[^\\s].*')
+        && data.type in ["discussion", "announcement"]
+        && data.status in ["open", "closed", "archived"]
+        && data.order is int && data.order >= 0 && data.order <= 999
+        && data.updated_by is string && data.updated_by.size() > 0 && data.updated_by.size() <= 128
+        && data.updated_at is timestamp;
+    }
+
+    function isCommunityChannel(channelId) {
+      return isValidCommunityChannelId(channelId)
+        && (exists(communityChannelPath(channelId))
+          ? isValidCommunityChannelData(get(communityChannelPath(channelId)).data)
+          : channelId in ["general", "teams", "judges", "announcements"]);
+    }
+
+    function canPostInCommunityChannel(channelId) {
+      // After-write state prevents pairing a message with a simultaneous close.
+      let configured = existsAfter(communityChannelPath(channelId));
+      let data = configured ? getAfter(communityChannelPath(channelId)).data : {};
+      return isValidCommunityChannelId(channelId)
+        && (configured
+          ? isValidCommunityChannelData(data) && data.status == "open"
+            && (data.type == "discussion" || isCommunityAdmin())
+          : channelId in ["general", "teams", "judges"]
+            || (channelId == "announcements" && isCommunityAdmin()));
+    }
+
+    match /community_channels/{channelId} {
+      allow get: if isCommunityMember() && isValidCommunityChannelId(channelId);
+      allow list: if isCommunityMember()
+        && request.query.limit != null && request.query.limit <= 100;
+      allow create, update: if isCommunityAdmin()
+        && isValidCommunityChannelId(channelId)
+        && isValidCommunityChannelData(request.resource.data)
+        && request.resource.data.updated_by == request.auth.uid
+        && request.resource.data.updated_at == request.time;
+      // Archive a channel instead of deleting metadata and orphaning history.
+      allow delete: if false;
     }
 
     // Approval gates badges, not networking access. Badges are never authority.
@@ -595,7 +657,7 @@ service cloud.firestore {
       allow get: if isCommunityMember() && isCommunityChannel(channelId);
       allow list: if isCommunityMember() && isCommunityChannel(channelId)
         && request.query.limit != null && request.query.limit <= 100;
-      allow create: if isCommunityMember() && isCommunityChannel(channelId)
+      allow create: if isCommunityMember() && canPostInCommunityChannel(channelId)
         && messageId.matches('^[a-zA-Z0-9]{20}$')
         && isValidCommunityMessage(request.resource.data)
         && request.resource.data.user_id == request.auth.uid
@@ -608,13 +670,13 @@ service cloud.firestore {
       // Messages cannot be rewritten, re-owned, backdated, or schema-polluted.
       allow update: if false;
       allow delete: if isCommunityMember() && isCommunityChannel(channelId)
-        && resource.data.user_id == request.auth.uid;
+        && (resource.data.user_id == request.auth.uid || isCommunityAdmin());
     }
 
     function isValidCommunityLimit(data) {
       let fields = ["channel_id", "message_id", "last_sent_at"];
       return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
-        && data.channel_id is string && isCommunityChannel(data.channel_id)
+        && data.channel_id is string && canPostInCommunityChannel(data.channel_id)
         && data.message_id is string && data.message_id.matches('^[a-zA-Z0-9]{20}$')
         && data.last_sent_at is timestamp && data.last_sent_at == request.time;
     }

@@ -3,13 +3,9 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import type { SessionUser } from "@/types/portal";
+import { isCommunityChannelId, type CommunityChannelId } from "@/lib/communityChannels";
 
-export const COMMUNITY_CHANNELS = [
-  { id: "general", name: "general", title: "Good conversations start here.", description: "Introduce yourself, share what you're building, and meet the community.", placeholder: "Say hello. What are you building?" },
-  { id: "teams", name: "find-a-team", title: "Find your next collaborator.", description: "Share your event, idea, skills, timezone, and the teammate you're looking for.", placeholder: "I'm joining… I can help with… I'm looking for…" },
-  { id: "judges", name: "ask-judges", title: "A little guidance goes a long way.", description: "Ask judges and mentors general questions. Keep private judging notes and scores out of chat.", placeholder: "Ask a question or offer advice to other builders…" },
-] as const;
-export type CommunityChannelId = typeof COMMUNITY_CHANNELS[number]["id"];
+export { COMMUNITY_CHANNELS, getCommunityChannel, canPostCommunityMessage, type CommunityChannel, type CommunityChannelId } from "@/lib/communityChannels";
 export type CommunityChatRole = "participant" | "judge" | "mentor" | "host" | "admin" | "member";
 export const CHAT_MESSAGE_LIMIT = 2000;
 export const CHAT_HISTORY_LIMIT = 100;
@@ -25,10 +21,6 @@ export type CommunityMessage = {
   pending: boolean;
 };
 
-export function getCommunityChannel(id: string | null) {
-  return COMMUNITY_CHANNELS.find(channel => channel.id === id) ?? COMMUNITY_CHANNELS[0];
-}
-
 export function getCommunityChatRole(user: SessionUser): CommunityChatRole {
   if ((user.role === "judge" || user.role === "mentor") && user.judgeApprovalStatus !== "approved") return "member";
   if (user.role === "host" && user.hostApprovalStatus !== "approved") return "member";
@@ -36,7 +28,7 @@ export function getCommunityChatRole(user: SessionUser): CommunityChatRole {
 }
 
 function messagesPath(channelId: CommunityChannelId) {
-  if (!COMMUNITY_CHANNELS.some(channel => channel.id === channelId)) throw new Error("Unknown community channel.");
+  if (!isCommunityChannelId(channelId)) throw new Error("Invalid community channel ID.");
   return `community_channels/${channelId}/messages`;
 }
 
@@ -71,7 +63,7 @@ export function subscribeToCommunityMessages(
 
 export async function sendCommunityMessage(db: Firestore, channelId: CommunityChannelId, user: SessionUser, text: string) {
   const body = text.trim();
-  if (!user.id || !user.role) throw new Error("Sign in with a registered portal account to chat.");
+  if (!user.id || !user.role || !["participant", "judge", "mentor", "host", "admin"].includes(user.role)) throw new Error("Sign in with a registered portal account to chat.");
   if (!body || body.length > CHAT_MESSAGE_LIMIT) throw new Error(`Write a message between 1 and ${CHAT_MESSAGE_LIMIT} characters.`);
   const reference = doc(collection(db, messagesPath(channelId)));
   const batch = writeBatch(db);

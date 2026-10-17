@@ -1,19 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Firestore } from "firebase/firestore";
-import { CHAT_MESSAGE_LIMIT, getCommunityChannel, getCommunityChatRole, sendCommunityMessage, subscribeToCommunityMessages } from "@/lib/communityChat";
+import { CHAT_MESSAGE_LIMIT, deleteCommunityMessage, getCommunityChannel, getCommunityChatRole, sendCommunityMessage, subscribeToCommunityMessages } from "@/lib/communityChat";
 import type { SessionUser } from "@/types/portal";
 
-const mocks = vi.hoisted(() => ({ set: vi.fn(), commit: vi.fn(), snapshot: vi.fn(), unsub: vi.fn() }));
+const mocks = vi.hoisted(() => ({ set: vi.fn(), commit: vi.fn(), snapshot: vi.fn(), unsub: vi.fn(), remove: vi.fn() }));
 vi.mock("firebase/firestore", () => ({
   collection: (_db: unknown, path: string) => ({ path }),
-  doc: (...args: unknown[]) => args.length === 1 ? { path: "message", id: "a".repeat(20) } : { path: args.slice(1).join("/") },
+  doc: (...args: unknown[]) => args.length === 1 ? { path: `${(args[0] as { path: string }).path}/${"a".repeat(20)}`, id: "a".repeat(20) } : { path: args.slice(1).join("/") },
   writeBatch: () => ({ set: mocks.set, commit: mocks.commit }),
   serverTimestamp: () => "server-timestamp",
   query: (...args: unknown[]) => args,
   orderBy: (...args: unknown[]) => ({ orderBy: args }),
   limit: (value: number) => ({ limit: value }),
   onSnapshot: mocks.snapshot,
-  deleteDoc: vi.fn(),
+  deleteDoc: mocks.remove,
+  setDoc: vi.fn(),
 }));
 const db = {} as Firestore;
 const user: SessionUser = { id: "p", email: "private@example.com", role: "participant", profile: { fullName: "  Aki  " } };
@@ -53,6 +54,25 @@ describe("community message service", () => {
     expect(getCommunityChannel("teams").id).toBe("teams");
     expect(getCommunityChannel("private").id).toBe("general");
     expect(getCommunityChannel(null).id).toBe("general");
+  });
+
+  it("supports safe dynamically configured rooms for message sending, reading and moderation", async () => {
+    const channel = "Design-help_2026";
+    await sendCommunityMessage(db, channel, user, "Hello designers");
+    expect(mocks.set.mock.calls[0][0].path).toBe(`community_channels/${channel}/messages/${"a".repeat(20)}`);
+    subscribeToCommunityMessages(db, channel, vi.fn(), vi.fn());
+    expect(mocks.snapshot.mock.calls[0][0][0]).toEqual({ path: `community_channels/${channel}/messages` });
+    await deleteCommunityMessage(db, channel, "b".repeat(20));
+    expect(mocks.remove).toHaveBeenCalledWith({ path: `community_channels/${channel}/messages/${"b".repeat(20)}` });
+  });
+
+  it.each(["", "../general", "general/messages", "_hidden", "a".repeat(65)])("rejects malformed channel IDs before any message action: %j", async channel => {
+    await expect(sendCommunityMessage(db, channel, user, "Hello")).rejects.toThrow("channel ID");
+    expect(() => subscribeToCommunityMessages(db, channel, vi.fn(), vi.fn())).toThrow("channel ID");
+    await expect(deleteCommunityMessage(db, channel, "b".repeat(20))).rejects.toThrow("channel ID");
+    expect(mocks.commit).not.toHaveBeenCalled();
+    expect(mocks.snapshot).not.toHaveBeenCalled();
+    expect(mocks.remove).not.toHaveBeenCalled();
   });
 
   it("subscribes to a bounded, ordered room and exposes pending/cache state", () => {

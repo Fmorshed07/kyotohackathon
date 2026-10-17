@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CommunityChatPage from "@/pages/CommunityChatPage";
 import type { CommunityMessage } from "@/lib/communityChat";
+import { COMMUNITY_CHANNELS, type CommunityChannel } from "@/lib/communityChannels";
 import type { SessionUser } from "@/types/portal";
 
-const mocks = vi.hoisted(() => ({ auth: { sessionUser: null as SessionUser | null, loading: false }, uid: "participant", subscribe: vi.fn(), send: vi.fn(), remove: vi.fn(), unsubscribe: vi.fn(), signOut: vi.fn(), layout: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: { sessionUser: null as SessionUser | null, loading: false }, uid: "participant", subscribe: vi.fn(), catalog: vi.fn(), catalogUnsubscribe: vi.fn(), send: vi.fn(), remove: vi.fn(), unsubscribe: vi.fn(), signOut: vi.fn(), layout: vi.fn() }));
 vi.mock("@/hooks/usePortalAuth", () => ({ usePortalAuth: () => ({ ...mocks.auth, signOut: mocks.signOut }) }));
 vi.mock("@/components/dashboard/DashboardLayout", () => ({
   DashboardLayout: (props: { children: ReactNode; role: string; sessionUser: SessionUser; onSignOut: () => Promise<void> }) => {
@@ -16,11 +17,15 @@ vi.mock("@/components/dashboard/DashboardLayout", () => ({
 }));
 vi.mock("@/lib/firebaseClient", () => ({ getFirestoreDb: () => ({}), getFirebaseAuth: () => ({ currentUser: { uid: mocks.uid } }) }));
 vi.mock("@/lib/communityChat", async original => ({ ...await original<typeof import("@/lib/communityChat")>(), subscribeToCommunityMessages: mocks.subscribe, sendCommunityMessage: mocks.send, deleteCommunityMessage: mocks.remove }));
+vi.mock("@/lib/communityChannels", async original => ({ ...await original<typeof import("@/lib/communityChannels")>(), subscribeToCommunityChannels: mocks.catalog }));
+vi.mock("@/components/community/CommunityChannelManager", () => ({ CommunityChannelManager: () => <button>Manage channels</button> }));
 
 const user: SessionUser = { id: "participant", email: "private@example.com", role: "participant", profile: { fullName: "Aki" } };
 const message = (patch: Partial<CommunityMessage> = {}): CommunityMessage => ({ id: "a".repeat(20), userId: "participant", authorName: "Aki", authorRole: "participant", body: "Looking for a designer", createdAt: 1792250000000, pending: false, ...patch });
 let receive: (messages: CommunityMessage[], cached: boolean) => void;
 let fail: (error: Error) => void;
+let receiveChannels: (channels: CommunityChannel[], fromCache: boolean) => void;
+let failChannels: (error: Error) => void;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -29,6 +34,12 @@ beforeEach(() => {
   mocks.send.mockReset().mockResolvedValue(undefined);
   mocks.remove.mockReset().mockResolvedValue(undefined);
   mocks.subscribe.mockImplementation((_db, _channel, next, error) => { receive = next; fail = error; return mocks.unsubscribe; });
+  mocks.catalog.mockImplementation((_db, next, error) => {
+    receiveChannels = next;
+    failChannels = error;
+    next([...COMMUNITY_CHANNELS], false);
+    return mocks.catalogUnsubscribe;
+  });
   vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -65,6 +76,7 @@ describe("community networking channel", () => {
     expect(screen.queryByRole("navigation", { name: "Community channels" })).not.toBeInTheDocument();
     expect(mocks.layout).not.toHaveBeenCalled();
     expect(mocks.subscribe).not.toHaveBeenCalled();
+    expect(mocks.catalog).not.toHaveBeenCalled();
   });
 
   it("waits for authentication and requires a registered role", () => {
@@ -226,5 +238,79 @@ describe("community networking channel", () => {
     first.unmount();
     show("/dashboard/community?channel=private"); connected();
     expect(screen.getByRole("heading", { name: "general" })).toBeInTheDocument();
+  });
+});
+
+describe("managed community channels", () => {
+  it("shows admin management only for administrators", () => {
+    const participantView = show(); connected();
+    expect(screen.queryByRole("button", { name: "Manage channels" })).not.toBeInTheDocument();
+    participantView.unmount();
+    mocks.auth.sessionUser = { ...user, role: "admin" };
+    show(); connected();
+    expect(screen.getByRole("button", { name: "Manage channels" })).toBeInTheDocument();
+  });
+
+  it("offers a read-only announcements channel to members and an announcement composer to admins", async () => {
+    const participantView = show("/dashboard/community?channel=announcements"); connected();
+    expect(screen.getByRole("heading", { name: "announcements" })).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("Only admins can post announcements");
+    expect(screen.queryByRole("textbox", { name: "Message #announcements" })).not.toBeInTheDocument();
+    participantView.unmount();
+
+    mocks.auth.sessionUser = { ...user, role: "admin" };
+    show("/dashboard/community?channel=announcements"); connected();
+    fireEvent.change(screen.getByRole("textbox", { name: "Message #announcements" }), { target: { value: "Welcome to our next event" } });
+    await act(async () => { fireEvent.submit(screen.getByRole("form", { name: "Post an announcement" })); });
+    expect(mocks.send).toHaveBeenCalledWith({}, "announcements", mocks.auth.sessionUser, "Welcome to our next event");
+  });
+
+  it("applies channel closure live and preserves a draft until posting reopens", () => {
+    show(); connected(); write("My unsent idea");
+    const closed = COMMUNITY_CHANNELS.map((room) => room.id === "general" ? { ...room, status: "closed" as const } : room);
+    act(() => receiveChannels(closed, false));
+    expect(screen.getByRole("note")).toHaveTextContent("Posting is closed");
+    expect(screen.queryByRole("form", { name: "Send a community message" })).not.toBeInTheDocument();
+    expect(mocks.send).not.toHaveBeenCalled();
+    act(() => receiveChannels([...COMMUNITY_CHANNELS], false));
+    expect(screen.getByRole("textbox", { name: "Message #general" })).toHaveValue("My unsent idea");
+  });
+
+  it("renders new sections and keeps archived history read-only", () => {
+    const custom: CommunityChannel = { ...COMMUNITY_CHANNELS[0], id: "build-night", name: "build-night", section: "Hackathons", status: "archived" };
+    mocks.catalog.mockImplementation((_db, next, error) => { receiveChannels = next; failChannels = error; next([...COMMUNITY_CHANNELS, custom], false); return mocks.catalogUnsubscribe; });
+    show("/dashboard/community?channel=build-night"); connected([message({ body: "Past build night conversation" })]);
+    expect(screen.getByRole("heading", { name: /build-night/ })).toBeInTheDocument();
+    expect(screen.getByText("Past build night conversation")).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("archived");
+    expect(screen.queryByRole("form", { name: "Send a community message" })).not.toBeInTheDocument();
+    act(() => receiveChannels([...COMMUNITY_CHANNELS, { ...custom, status: "open" }], false));
+    expect(screen.getByText("Hackathons")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Message #build-night" })).toBeInTheDocument();
+  });
+
+  it("disables posting for cached channel settings and recovers from catalog failures", () => {
+    show(); connected();
+    act(() => receiveChannels([...COMMUNITY_CHANNELS], true));
+    expect(screen.getByRole("note")).toHaveTextContent("Syncing channel settings");
+    expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    act(() => failChannels(new Error("Disconnected")));
+    expect(screen.getByRole("alert")).toHaveTextContent("couldn’t load channel settings");
+    expect(mocks.unsubscribe).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Retry channels" }));
+    connected();
+    expect(screen.getByRole("textbox", { name: "Message #general" })).toBeInTheDocument();
+    expect(mocks.catalog).toHaveBeenCalledTimes(2);
+    expect(mocks.catalogUnsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it("lets admins moderate another member's message only after confirmation", async () => {
+    mocks.auth.sessionUser = { ...user, role: "admin" };
+    show(); connected([message({ userId: "judge", authorName: "Rin" })]);
+    fireEvent.click(screen.getByRole("button", { name: "Remove message from Rin" }));
+    expect(mocks.remove).not.toHaveBeenCalled();
+    expect(screen.getByText("Remove this message from the community permanently?")).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Confirm delete" })); });
+    expect(mocks.remove).toHaveBeenCalledWith({}, "general", "a".repeat(20));
   });
 });
