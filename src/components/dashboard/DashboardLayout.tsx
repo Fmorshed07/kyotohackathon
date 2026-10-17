@@ -16,7 +16,7 @@ import {
   Menu,
   X,
   LayoutGrid,
-  Play,
+  ListVideo,
   ExternalLink,
   MessageCircle,
   Settings,
@@ -909,18 +909,10 @@ function DashboardLayoutContent({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild className={menuButtonClass}>
+                <SidebarMenuButton asChild className={menuButtonClass} isActive={location.pathname === "/feed" || location.pathname === "/videos"}>
                   <DashboardNavLink href="/feed" onNavigate={closeMobileNav}>
-                    <Sparkles className={navIconClass} />
-                    <span>Project feed</span>
-                  </DashboardNavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild className={menuButtonClass}>
-                  <DashboardNavLink href="/videos" onNavigate={closeMobileNav}>
-                    <Play className={navIconClass} />
-                    <span>Video previews</span>
+                    <ListVideo className={navIconClass} />
+                    <span>Project feed & videos</span>
                   </DashboardNavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

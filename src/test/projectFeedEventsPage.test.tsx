@@ -77,8 +77,9 @@ afterEach(() => {
   else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
 });
 
-async function showFeed(videoOnly = false) {
-  render(<MemoryRouter initialEntries={[videoOnly ? "/videos" : "/feed"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ProjectFeedPage videoOnly={videoOnly} /></MemoryRouter>);
+async function showFeed(videoOnly = false, eventId?: string) {
+  const path = `${videoOnly ? "/videos" : "/feed"}${eventId ? `?event=${encodeURIComponent(eventId)}` : ""}`;
+  render(<MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ProjectFeedPage videoOnly={videoOnly} /></MemoryRouter>);
   await act(async () => {});
 }
 
@@ -124,15 +125,61 @@ describe("current events in the public project feed", () => {
     expect(screen.queryByText("Try another event, search term, or preview filter.")).not.toBeInTheDocument();
   });
 
-  it("keeps zero-video current events selectable without inflating the video event count", async () => {
+  it("keeps zero-video current events selectable and shows complete community counts in the video filter", async () => {
     await showFeed(true);
     expect(articleNames()).toEqual(["Live build by Builders", "Archive build by Builders"]);
     expect(eventSidebar().getByRole("button", { name: /Beta gathering/ })).toHaveTextContent("0");
-    expect(eventSidebar().getByRole("button", { name: /Gamma tomorrow/ })).toHaveTextContent("0");
+    expect(eventSidebar().getByRole("button", { name: /Gamma tomorrow/ })).toHaveTextContent("1");
 
     const stats = within(screen.getByText("Community in motion").closest("section")!);
-    expect(stats.getByText("events").parentElement).toHaveTextContent(/^2events$/);
-    expect(stats.getByText("video previews").parentElement).toHaveTextContent(/^2video previews$/);
+    expect(stats.getByText("shared projects").parentElement).toHaveTextContent(/^3shared projects$/);
+    expect(stats.getByText("video demos").parentElement).toHaveTextContent(/^2video demos$/);
+
+    const zeroVideoEvent = eventSidebar().getByRole("button", { name: /Gamma tomorrow/ });
+    fireEvent.click(zeroVideoEvent);
+    expect(zeroVideoEvent).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Everything" }));
+    expect(articleNames()).toEqual(["Future build by Builders"]);
+    expect(zeroVideoEvent).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows video and text projects together by default and restores them after filtering to videos", async () => {
+    await showFeed();
+    const everything = screen.getByRole("button", { name: "Everything" });
+    const videos = screen.getByRole("button", { name: "Video demos" });
+    expect(everything).toHaveAttribute("aria-pressed", "true");
+    expect(articleNames()).toEqual(["Live build by Builders", "Future build by Builders", "Archive build by Builders"]);
+
+    fireEvent.click(videos);
+
+    expect(videos).toHaveAttribute("aria-pressed", "true");
+    expect(everything).toHaveAttribute("aria-pressed", "false");
+    expect(articleNames()).toEqual(["Live build by Builders", "Archive build by Builders"]);
+
+    fireEvent.click(everything);
+
+    expect(articleNames()).toEqual(["Live build by Builders", "Future build by Builders", "Archive build by Builders"]);
+    expect(everything).toHaveAttribute("aria-pressed", "true");
+    expect(backend.getDocs).toHaveBeenCalledOnce();
+  });
+
+  it("starts the legacy videos view with videos and lets Everything restore text projects within the chosen event", async () => {
+    backend.getDocs.mockResolvedValue({ docs: [
+      ...projects,
+      project("live-text-project", "live", "Live written update", "2026-10-08T11:00:00Z"),
+    ] });
+    await showFeed(true, "live");
+    expect(screen.getByRole("button", { name: "Video demos" })).toHaveAttribute("aria-pressed", "true");
+    expect(eventSidebar().getByRole("button", { name: /Zeta live/ })).toHaveAttribute("aria-pressed", "true");
+    expect(articleNames()).toEqual(["Live build by Builders"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Everything" }));
+
+    expect(articleNames()).toEqual(["Live build by Builders", "Live written update by Builders"]);
+    expect(eventSidebar().getByRole("button", { name: /Zeta live/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("combobox", { name: "Filter by event" })).toHaveTextContent("Zeta live");
+    expect(backend.getDocs).toHaveBeenCalledOnce();
   });
 
   it("reorders visible projects when an upcoming event starts and the live event ends", async () => {

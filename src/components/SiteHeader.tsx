@@ -15,8 +15,7 @@ type NavLink = { label: string; href: string };
 const navLinks: NavLink[] = [
   { label: "Hackathons", href: "/hackathons" },
   { label: "Projects & demos", href: "/projects" },
-  { label: "Feed", href: "/feed" },
-  { label: "Videos", href: "/videos" },
+  { label: "Feed & videos", href: "/feed" },
   { label: "Resources", href: "/resources" },
   { label: "Get Hired", href: "#get-hired" },
   { label: "Host", href: "#host" },
@@ -172,7 +171,7 @@ const SiteHeader = () => {
             <div className="mx-auto flex min-w-max items-center gap-0.5">
               {navLinks.map((link) => {
                 const isRoute = !link.href.startsWith("#");
-                const isActive = isRoute && location.pathname === link.href;
+                const isActive = isRoute && (location.pathname === link.href || (link.href === "/feed" && location.pathname === "/videos"));
                 const className = cn(
                   "font-nav inline-flex items-center whitespace-nowrap rounded-md px-3 py-2 text-[13px] font-medium",
                   "transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

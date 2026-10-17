@@ -387,8 +387,7 @@ export default function ProjectGalleryPage() {
               <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Projects & demos</h1>
               <nav aria-label="Project views" className="mt-4 flex flex-wrap gap-2">
                 <Button asChild variant="secondary" size="sm"><Link to={`/projects${eventQuery}`} aria-current="page"><LayoutGrid className="mr-2 h-4 w-4" />Gallery</Link></Button>
-                <Button asChild variant="outline" size="sm"><Link to={`/feed${eventQuery}`}><Sparkles className="mr-2 h-4 w-4" />Feed</Link></Button>
-                <Button asChild variant="outline" size="sm"><Link to={`/videos${eventQuery}`}><Play className="mr-2 h-4 w-4" />Video previews</Link></Button>
+                <Button asChild variant="outline" size="sm"><Link to={`/feed${eventQuery}`}><Sparkles className="mr-2 h-4 w-4" />Feed & videos</Link></Button>
               </nav>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
                 Explore projects participants chose to share. Star a project with your email — no account needed. Subscribe for more hackathons, send a link to friends, and open the live demo, repo, or document.
