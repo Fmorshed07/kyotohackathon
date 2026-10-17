@@ -529,6 +529,7 @@ export default function AdminDashboardPage() {
       return {
         id: submission.id,
         hackathonId: getSubmissionHackathonId(submission),
+        track_id: submission.track_id ?? null,
         participantId,
         participantEmail,
         teamName: team.teamName === "Unnamed team" ? submission.team_name ?? null : team.teamName,

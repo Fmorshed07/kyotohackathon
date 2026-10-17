@@ -37,6 +37,7 @@ import {
   type PortalHackathon,
 } from "@/lib/hackathons";
 import { formatSubmissionDate, formatSubmissionTime } from "@/lib/datetime";
+import { getSubmissionTrackLabel } from "@/lib/impactOsaka";
 import {
   buildSubmissionsCsv,
   downloadCsv,
@@ -204,6 +205,9 @@ function SubmissionTable({
               </TableCell>
               <TableCell className="align-top">
                 <p className="text-sm font-medium">{submission.title || "Untitled Project"}</p>
+                {submission.track_id ? <p className="mt-1 text-xs text-primary">
+                  {getSubmissionTrackLabel(submission.hackathonId, submission.track_id)}
+                </p> : null}
                 <p className="mt-1 line-clamp-3 text-[0.7rem] text-muted-foreground">
                   {submission.shortDescription || "No description provided."}
                 </p>

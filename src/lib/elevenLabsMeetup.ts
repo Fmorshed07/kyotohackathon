@@ -1,5 +1,4 @@
 import type { HostedHackathon } from "@/lib/aiHackathons";
-import type { HackathonStatus } from "@/lib/hackathons";
 
 export const ELEVENLABS_MEETUP_ID = "elevenlabs-meetup-tokyo-2026";
 export const ELEVENLABS_MEETUP_SOURCE_URL = "https://luma.com/1phsvlq5";
@@ -98,27 +97,3 @@ export const ELEVENLABS_MEETUP: HostedHackathon = {
   layoutStyle: "stage",
   tagline: "Explore ElevenLabs. Create with ElevenCreative. Share your work.",
 };
-
-export function getBundledEventStatus(startAt: string, endAt: string, now = new Date()): HackathonStatus {
-  if (now.getTime() >= new Date(endAt).getTime()) return "past";
-  return now.getTime() >= new Date(startAt).getTime() ? "active" : "upcoming";
-}
-
-export function getBundledHackathon(id: string, now = new Date()): HostedHackathon | null {
-  if (id !== ELEVENLABS_MEETUP_ID) return null;
-  const status = getBundledEventStatus(ELEVENLABS_MEETUP.startAt!, ELEVENLABS_MEETUP.endAt!, now);
-  return { ...ELEVENLABS_MEETUP, status, submissionMode: status === "past" ? "closed" : "open" };
-}
-
-export function getBundledHackathons(now = new Date()): HostedHackathon[] {
-  return [getBundledHackathon(ELEVENLABS_MEETUP_ID, now)!];
-}
-
-/** Cloud rows win, including an explicit unpublished override. */
-export function mergeBundledHackathons(events: HostedHackathon[], now = new Date()): HostedHackathon[] {
-  const byId = new Map(getBundledHackathons(now).map((event) => [event.id, event]));
-  for (const event of events) {
-    byId.set(event.id, { ...byId.get(event.id), ...event });
-  }
-  return [...byId.values()];
-}

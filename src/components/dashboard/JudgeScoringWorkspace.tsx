@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { formatSubmissionDateTime } from "@/lib/datetime";
+import { getSubmissionTrackLabel } from "@/lib/impactOsaka";
 import type { Submission } from "@/types/portal";
 import {
   calculateTotalFromCriteria,
@@ -187,6 +188,9 @@ export function JudgeScoringWorkspace({
             <h3 className={cn("text-lg font-semibold sm:text-xl", ideaAccent.teamName)}>
               {activeSubmission.title || "Untitled Project"}
             </h3>
+            {activeSubmission.track_id ? <p className="text-sm font-medium text-primary">
+              {getSubmissionTrackLabel(activeSubmission.hackathon_id ?? "", activeSubmission.track_id)}
+            </p> : null}
             <p className="line-clamp-2 text-sm text-muted-foreground">
               {activeSubmission.short_description || "No description provided."}
             </p>

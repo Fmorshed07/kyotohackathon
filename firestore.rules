@@ -215,15 +215,26 @@ service cloud.firestore {
         || validSubmissionModeValue(request.resource.data.submissionMode);
     }
 
-    // Missing docs and missing/unknown mode stay open so legacy events keep working.
-    // Pause and close only block participants — admins, hosts, and judges can still write.
+    // The same gate protects creates and updates. Explicit open can reopen a past
+    // event; otherwise respect unpublished/past listings and imported deadlines.
+    function eventAllowsParticipantProjectWrites(data) {
+      let mode = data.get("submissionMode", "");
+      let endAtMs = data.get("endAtMs", null);
+      return data.get("published", true) != false && (
+        mode == "open" || (
+          mode != "paused" && mode != "closed"
+          && data.get("status", "upcoming") != "past"
+          && !(data.get("sourceLifecycleAutomatic", false) == true
+            && endAtMs is number && request.time.toMillis() >= endAtMs)
+        )
+      );
+    }
+
+    // Absent legacy listings remain writable. Judge/organiser marks use separate rules.
     function hackathonAllowsParticipantProjectWrites(hackathonId) {
       return !(hackathonId is string && hackathonId.size() > 0)
         || !exists(hackathonPath(hackathonId))
-        || (
-          get(hackathonPath(hackathonId)).data.get("submissionMode", "open") != "paused"
-          && get(hackathonPath(hackathonId)).data.get("submissionMode", "open") != "closed"
-        );
+        || eventAllowsParticipantProjectWrites(get(hackathonPath(hackathonId)).data);
     }
 
     function requestHackathonId() {
@@ -442,6 +453,7 @@ service cloud.firestore {
 
       function teammateEditableKeys() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "track_id",
           "title",
           "short_description",
           "project_url",

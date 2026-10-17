@@ -40,12 +40,12 @@ import {
 } from "@/lib/eventBranding";
 import { slugifyCriterionId, type JudgingCriterion } from "@/components/dashboard/judgingCriteria";
 import {
-  ELEVENLABS_MEETUP_SOURCE_URL,
   getBundledEventStatus,
   getBundledHackathon,
   getBundledHackathons,
   mergeBundledHackathons,
-} from "@/lib/elevenLabsMeetup";
+} from "@/lib/bundledHackathons";
+import { IMPACT_OSAKA_ID, IMPACT_OSAKA_DEFAULT_CRITERIA } from "@/lib/impactOsaka";
 
 export type HackathonGuest = {
   name: string;
@@ -125,6 +125,8 @@ export type HostedHackathon = PortalHackathon & {
   sourceDescription?: string;
   startAt?: string;
   endAt?: string;
+  /** UTC event end used by rules to enforce automatic imported-event deadlines. */
+  endAtMs?: number;
   timezone?: string;
   registrationStatus?: "open" | "waitlist" | "closed";
   registrationNote?: string;
@@ -153,6 +155,9 @@ function eventSlug(value: string) {
 function externalUrl(value?: string) {
   const candidate = value?.trim();
   if (!candidate) return "";
+  // Bundled event artwork is served from the same deployment. Reject protocol-
+  // relative and backslash paths so a local asset cannot change the origin.
+  if (/^\/(?!\/)/.test(candidate) && !/[\\\r\n]/.test(candidate)) return candidate;
   try {
     const url = new URL(candidate);
     return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
@@ -483,9 +488,10 @@ function asHostedHackathon(
   const requirePublished = options?.requirePublished !== false;
   if (typeof data.name !== "string") return null;
   if (requirePublished && data.published !== true) return null;
-  const event = { ...getBundledHackathon(id), ...data } as Partial<HostedHackathon>;
-  const sourceLifecycleAutomatic = Boolean(getBundledHackathon(id)) &&
-    event.sourceUrl === ELEVENLABS_MEETUP_SOURCE_URL && event.sourceLifecycleAutomatic !== false;
+  const bundled = getBundledHackathon(id);
+  const event = { ...bundled, ...data } as Partial<HostedHackathon>;
+  const sourceLifecycleAutomatic = Boolean(bundled) &&
+    event.sourceUrl === bundled?.sourceUrl && event.sourceLifecycleAutomatic !== false;
   const status = sourceLifecycleAutomatic && event.startAt && event.endAt
     ? getBundledEventStatus(event.startAt, event.endAt)
     : event.status === "active" || event.status === "past" ? event.status : "upcoming";
@@ -538,6 +544,7 @@ function asHostedHackathon(
     sourceDescription: typeof event.sourceDescription === "string" ? event.sourceDescription : "",
     startAt: typeof event.startAt === "string" ? event.startAt : "",
     endAt: typeof event.endAt === "string" ? event.endAt : "",
+    endAtMs: typeof event.endAtMs === "number" ? event.endAtMs : undefined,
     timezone: typeof event.timezone === "string" ? event.timezone : "",
     registrationStatus: event.registrationStatus === "waitlist" || event.registrationStatus === "closed" || event.registrationStatus === "open" ? event.registrationStatus : undefined,
     registrationNote: typeof event.registrationNote === "string" ? event.registrationNote : "",
@@ -588,17 +595,21 @@ function mapAdminHackathonDocs(
 
 /**
  * List queries silently omit docs the client cannot read (e.g. unpublished when
- * admin claim is slow). Always re-fetch portal editions by id so Mark past /
- * Unpublish on Kyoto/Tokyo/Dhaka still reach the admin UI.
+ * admin claim is slow). Re-fetch fixed editions and bundled imports by id so
+ * saved lifecycle and visibility decisions still reach the admin UI.
  */
 async function mergePortalEditionOverrides(
   db: Firestore,
   events: HostedHackathon[],
 ): Promise<HostedHackathon[]> {
+  const overrideIds = new Set([
+    ...PORTAL_HACKATHONS.map((portal) => portal.id),
+    ...getBundledHackathons().map((event) => event.id),
+  ]);
   const portalDocs = await Promise.all(
-    PORTAL_HACKATHONS.map((portal) => fetchHackathonForAdmin(db, portal.id)),
+    [...overrideIds].map((id) => fetchHackathonForAdmin(db, id)),
   );
-  const byId = new Map(events.map((event) => [event.id, event]));
+  const byId = new Map(mergeBundledHackathons(events).map((event) => [event.id, event]));
   for (const portalDoc of portalDocs) {
     if (portalDoc) byId.set(portalDoc.id, portalDoc);
   }
@@ -740,15 +751,33 @@ export function portalHackathonAsHosted(hackathon: PortalHackathon): HostedHacka
 }
 
 /**
- * Materialize a fixed portal edition (Kyoto / Tokyo / Dhaka) into Firestore so
- * admin edit / publish / lifecycle controls can persist. No-op if the doc exists
- * or the id is not a portal edition.
+ * Materialize a portal edition or bundled import into Firestore before admin
+ * controls write overrides. Existing documents and judging rubrics are retained.
  */
 export async function ensurePortalCatalogHackathon(
   db: Firestore,
   id: string,
   createdBy?: string,
 ): Promise<boolean> {
+  const bundled = getBundledHackathon(id);
+  if (bundled) {
+    const owner = createdBy?.trim() || getFirebaseAuth().currentUser?.uid?.trim();
+    if (!owner) throw new Error("Sign in as an organiser to manage this event.");
+    return runTransaction(db, async (transaction) => {
+      const ref = doc(db, "hackathons", id);
+      if ((await transaction.get(ref)).exists()) return false;
+      // Reads precede all writes; creating a missing listing must never replace
+      // a rubric saved independently by the organiser.
+      const criteriaRef = doc(db, "hackathon_criteria", id);
+      const criteria = id === IMPACT_OSAKA_ID ? await transaction.get(criteriaRef) : null;
+      const { submissionMode: _derivedGate, ...fields } = bundled;
+      transaction.set(ref, JSON.parse(JSON.stringify({ ...fields, createdBy: owner })));
+      if (criteria && !criteria.exists()) transaction.set(criteriaRef, {
+        criteria: IMPACT_OSAKA_DEFAULT_CRITERIA, updated_at: new Date().toISOString(),
+      });
+      return true;
+    });
+  }
   if (!isPortalEditionId(id)) return false;
   const ref = doc(db, "hackathons", id);
   const existing = await getDoc(ref);
@@ -1109,12 +1138,17 @@ export async function assertSubmissionsWritable(
     }
     throw error;
   }
-  if (!snapshot.exists()) return;
+  if (!snapshot.exists()) {
+    const bundled = getBundledHackathon(hackathonId);
+    if (!bundled || getHackathonSubmissionMode(bundled) === "open") return;
+    throw new Error(getSubmissionLockCopy(getHackathonSubmissionMode(bundled))!);
+  }
   const data = snapshot.data() as Record<string, unknown>;
-  const status: HackathonStatus =
-    data.status === "active" || data.status === "past" || data.status === "upcoming"
-      ? data.status
-      : "upcoming";
+  if (data.published === false) throw new Error("Submissions are locked for this hackathon.");
+  const loaded = asHostedHackathon(hackathonId, data, { requirePublished: false });
+  const status: HackathonStatus = loaded?.status ?? (
+    data.status === "active" || data.status === "past" ? data.status : "upcoming"
+  );
   const mode = getHackathonSubmissionMode({
     status,
     submissionMode: isSubmissionMode(data.submissionMode) ? data.submissionMode : undefined,

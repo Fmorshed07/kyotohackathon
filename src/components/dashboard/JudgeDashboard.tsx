@@ -1,3 +1,4 @@
+import { getSubmissionTracks } from "@/lib/impactOsaka";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -87,10 +88,13 @@ export function JudgeDashboard({
 }: JudgeDashboardProps) {
   const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [trackFilter, setTrackFilter] = useState("");
+  const tracks = getSubmissionTracks(selectedHackathon.id);
 
   useEffect(() => {
     setSelectedTeamName(null);
     setSearchQuery("");
+    setTrackFilter("");
   }, [selectedHackathon.id]);
 
   const teams = Array.from(
@@ -126,9 +130,11 @@ export function JudgeDashboard({
     );
   }, [searchQuery, teams]);
   const filteredSubmissions = useMemo(() => {
-    if (!searchQuery.trim()) return submissions;
-    return submissions.filter((submission) => submissionMatchesSearch(searchQuery, submission));
-  }, [searchQuery, submissions]);
+    return submissions.filter((submission) =>
+      (tracks.length <= 1 || !trackFilter || (trackFilter === "unassigned" ? !submission.track_id : submission.track_id === trackFilter)) &&
+      submissionMatchesSearch(searchQuery, submission),
+    );
+  }, [searchQuery, submissions, trackFilter, tracks.length]);
   const finalShortlist = useMemo(() => getFinalShortlist(submissions), [submissions]);
   const activeTeam =
     filteredTeams.find((team) => team.name === selectedTeamName) ?? filteredTeams[0] ?? null;
@@ -591,6 +597,17 @@ export function JudgeDashboard({
           </div>
         </div>
         <div className="p-4 sm:p-5 md:p-8">
+          {tracks.length > 1 ? (
+            <div className="mb-4 space-y-2">
+              <label htmlFor="judge-track-filter" className="text-sm font-medium">Submission track</label>
+              <select id="judge-track-filter" value={trackFilter} onChange={(event) => setTrackFilter(event.target.value)}
+                className="block min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <option value="">All tracks</option>
+                {tracks.map((track) => <option key={track.id} value={track.id}>{track.name}</option>)}
+                <option value="unassigned">Track not selected</option>
+              </select>
+            </div>
+          ) : null}
           {!isLoadingSubmissions && submissions.length > 0 ? (
             <div className="mb-6 grid gap-3 lg:grid-cols-[minmax(0,0.56fr)_minmax(0,1fr)] lg:items-center">
               <SubmissionSearchInput

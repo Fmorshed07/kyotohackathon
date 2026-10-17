@@ -83,6 +83,7 @@ export type AdminUser = {
 };
 
 export type AdminSubmissionRow = {
+  track_id?: string | null;
   id: string;
   hackathonId: HackathonId;
   participantId: string;

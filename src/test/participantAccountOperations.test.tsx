@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ParticipantDashboardPage from "@/pages/ParticipantDashboardPage";
 import type { ParticipantDashboardProps } from "@/components/dashboard/ParticipantDashboard";
 import type { PortalHackathon } from "@/lib/hackathons";
-import { formDraftStorageKey, readFormDraft } from "@/lib/formDrafts";
+import { formDraftStorageKey, readFormDraft, writeFormDraft } from "@/lib/formDrafts";
 
 const backend = vi.hoisted(() => ({
+  selectedEvent: "event-one",
   db: {},
   sessionUser: { id: "account-a", email: "a@example.com", role: "participant", hackathonId: "event-one" },
   auth: { currentUser: { uid: "account-a" } as { uid: string } | null },
@@ -47,7 +48,7 @@ vi.mock("@/hooks/usePortalAuth", () => ({
   }),
 }));
 vi.mock("@/hooks/useHackathonSelection", () => ({
-  useHackathonSelection: () => ({ selectedHackathonId: "event-one", setSelectedHackathonId: backend.selectEvent }),
+  useHackathonSelection: () => ({ selectedHackathonId: backend.selectedEvent, setSelectedHackathonId: backend.selectEvent }),
 }));
 vi.mock("@/lib/aiHackathons", () => ({
   assertSubmissionsWritable: backend.assertWritable,
@@ -69,6 +70,7 @@ vi.mock("@/components/dashboard/ParticipantDashboard", () => ({
   ParticipantDashboard: ({ isLoadingWorkspace, isReadOnly, isSubmittingProject, participantForm, setParticipantForm, submissionMessage, autosaveStatus, onSave, onJoinHackathon }: ParticipantDashboardProps) => (
     <div>
       <input aria-label="Project title" value={participantForm.title} onChange={(event) => setParticipantForm((form) => ({ ...form, title: event.target.value }))} />
+      <output data-testid="submission-track">{participantForm.trackId ?? ""}</output>
       <input type="checkbox" aria-label="Public preview" checked={participantForm.allowPublicPreview} onChange={(event) => setParticipantForm((form) => ({ ...form, allowPublicPreview: event.target.checked }))} />
       <button disabled={isLoadingWorkspace || isReadOnly || isSubmittingProject} onClick={() => void onSave()}>Save project</button>
       <button disabled={isLoadingWorkspace} onClick={() => void onJoinHackathon("event-two")}>Join event</button>
@@ -93,6 +95,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  backend.selectedEvent = "event-one";
   vi.clearAllMocks();
   localStorage.clear();
   backend.auth.currentUser = { uid: "account-a" };
@@ -130,6 +133,45 @@ async function showDashboard() {
 }
 
 describe("participant operations during account changes", () => {
+  it("automatically saves the Osaka video challenge under the correct event and restores it on reload", async () => {
+    const osaka = "impact-osaka-2026";
+    backend.selectedEvent = osaka;
+    backend.sessionUser.hackathonId = osaka;
+    backend.catalog.mockResolvedValue([event(osaka)]);
+    backend.getDoc.mockImplementation(async ({ path }: { path: string }) => path.startsWith("users/")
+      ? snapshot("account-a", { fullName: "Account A", hackathon_id: osaka })
+      : snapshot("new-project", { user_id: "account-a", hackathon_id: osaka, title: "AI video demo", track_id: "ai-video" }));
+    const view = await showDashboard();
+    expect(screen.getByTestId("submission-track")).toHaveTextContent("ai-video");
+    fireEvent.change(screen.getByRole("textbox", { name: "Project title" }), { target: { value: "AI video demo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+    expect(await screen.findByText("Submission saved successfully.")).toBeInTheDocument();
+    expect(backend.setDoc).toHaveBeenCalledWith(expect.objectContaining({ path: "submissions/new-project" }), expect.objectContaining({ hackathon_id: osaka, track_id: "ai-video", title: "AI video demo" }));
+    view.unmount();
+    backend.submissions.mockResolvedValue([{ id: "new-project", user_id: "account-a", hackathon_id: osaka, title: "AI video demo", track_id: "ai-video" }]);
+    await showDashboard();
+    expect(screen.getByTestId("submission-track")).toHaveTextContent("ai-video");
+    expect(screen.getByRole("textbox", { name: "Project title" })).toHaveValue("AI video demo");
+  });
+
+  it("normalizes an older Osaka draft to the single challenge without losing the participant's edits", async () => {
+    const osaka = "impact-osaka-2026";
+    backend.selectedEvent = osaka;
+    backend.sessionUser.hackathonId = osaka;
+    backend.catalog.mockResolvedValue([event(osaka)]);
+    const key = formDraftStorageKey(["participant-project", "account-a", osaka, "new"]);
+    writeFormDraft(key, { trackId: "working-agent", title: "My unfinished video" });
+
+    const view = await showDashboard();
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Project title" })).toHaveValue("My unfinished video"));
+    expect(screen.getByTestId("submission-track")).toHaveTextContent("ai-video");
+    view.unmount();
+
+    expect(readFormDraft<{ trackId: string; title: string }>(key)?.value).toMatchObject({
+      trackId: "ai-video", title: "My unfinished video",
+    });
+    expect(backend.setDoc).not.toHaveBeenCalled();
+  });
   it("reuses the created project when a secondary write fails and the participant retries", async () => {
     backend.setDoc.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("Enrollment write failed"));
     await showDashboard();

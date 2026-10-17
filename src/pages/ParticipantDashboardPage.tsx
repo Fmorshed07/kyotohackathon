@@ -46,9 +46,11 @@ import {
 } from "@/lib/portalInvites";
 import { buildTeamRoster, rosterDisplayNames } from "@/lib/teamRoster";
 import { queueParticipantEmail } from "@/lib/participantEmail";
+import { getSubmissionTracks } from "@/lib/impactOsaka";
 import type { Submission, TeamMemberRecord, UserProfile } from "@/types/portal";
 
 const initialParticipantForm = {
+  trackId: "",
   title: "",
   shortDescription: "",
   projectUrl: "",
@@ -83,6 +85,7 @@ const initialParticipantForm = {
 };
 
 const emptyProjectFields = {
+  trackId: "",
   title: "",
   shortDescription: "",
   projectUrl: "",
@@ -97,7 +100,13 @@ const emptyProjectFields = {
 
 type ParticipantProjectDraft = typeof emptyProjectFields;
 
-const pickProjectDraft = (form: typeof initialParticipantForm): ParticipantProjectDraft => ({
+const resolveFormTrackId = (eventId: string, trackId?: string | null) => {
+  const tracks = getSubmissionTracks(eventId);
+  return tracks.length === 1 ? tracks[0].id : trackId ?? "";
+};
+
+const pickProjectDraft = (form: typeof initialParticipantForm, eventId: string): ParticipantProjectDraft => ({
+  trackId: resolveFormTrackId(eventId, form.trackId),
   title: form.title,
   shortDescription: form.shortDescription,
   projectUrl: form.projectUrl,
@@ -250,6 +259,7 @@ export default function ParticipantDashboardPage() {
     isMountedRef.current && isCurrentAccount() && workspaceKeyRef.current === workspaceKey;
 
   const mapSubmissionToForm = (data: Submission): ParticipantProjectDraft => ({
+    trackId: resolveFormTrackId(selectedHackathonId, data.track_id),
     title: data.title ?? "",
     shortDescription: data.short_description ?? "",
     projectUrl: data.project_url ?? "",
@@ -515,20 +525,24 @@ export default function ParticipantDashboardPage() {
     setParticipantForm((current) => ({
       ...current,
       ...emptyProjectFields,
+      trackId: resolveFormTrackId(selectedHackathonId),
       ...mapUserProfileToForm(userProfile),
     }));
   }, [participantSubmissions, selectedHackathonId, userProfile, joinedTeamName]);
 
   const projectDraftValue = useMemo(
-    () => pickProjectDraft(participantForm),
-    [participantForm]
+    () => pickProjectDraft(participantForm, selectedHackathonId),
+    [participantForm, selectedHackathonId]
   );
   const projectDraftValueRef = useRef(projectDraftValue);
   projectDraftValueRef.current = projectDraftValue;
 
   const projectDraftBaseline = useMemo(
-    () => (participantSubmission ? mapSubmissionToForm(participantSubmission) : emptyProjectFields),
-    [participantSubmission]
+    () => (participantSubmission ? mapSubmissionToForm(participantSubmission) : {
+      ...emptyProjectFields,
+      trackId: resolveFormTrackId(selectedHackathonId),
+    }),
+    [participantSubmission, selectedHackathonId]
   );
 
   const projectDraftKey = formDraftStorageKey([
@@ -558,10 +572,14 @@ export default function ParticipantDashboardPage() {
   useEffect(() => {
     if (!pendingProjectRestore) return;
     const restored = pendingProjectRestore.value as ParticipantProjectDraft;
-    setParticipantForm((current) => ({ ...current, ...restored }));
+    setParticipantForm((current) => ({
+      ...current,
+      ...restored,
+      trackId: resolveFormTrackId(selectedHackathonId, restored.trackId),
+    }));
     setAutosaveStatus("Restored unsaved draft from this browser.");
     consumeProjectRestore();
-  }, [pendingProjectRestore, consumeProjectRestore]);
+  }, [pendingProjectRestore, consumeProjectRestore, selectedHackathonId]);
 
   useEffect(() => {
     if (!draftSavedAt || !isProjectDraftDirty) return;
@@ -597,6 +615,13 @@ export default function ParticipantDashboardPage() {
     queueEmail?: boolean;
   }) => {
     if (!sessionUser || !isCurrentWorkspace() || isLoadingWorkspace || workspaceError) return null;
+    const tracks = getSubmissionTracks(selectedHackathonId);
+    const trackId = resolveFormTrackId(selectedHackathonId, participantForm.trackId);
+    if (tracks.length > 1 && !tracks.some((track) => track.id === trackId)) {
+      if (options.announce) throw new Error("Choose your submission track before saving.");
+      setAutosaveStatus("Draft saved on this device. Choose a track to save it to the event.");
+      return null;
+    }
     await assertSubmissionsWritable(db, selectedHackathonId);
     if (!isCurrentWorkspace()) return null;
     if (!areSubmissionsWritable(selectedHackathonRef.current)) {
@@ -637,6 +662,7 @@ export default function ParticipantDashboardPage() {
     const payload: Record<string, unknown> = {
       user_id: ownerId,
       hackathon_id: selectedHackathonId,
+      ...(tracks.length ? { track_id: trackId } : {}),
       title: participantForm.title,
       short_description: participantForm.shortDescription,
       project_url: participantForm.projectUrl,

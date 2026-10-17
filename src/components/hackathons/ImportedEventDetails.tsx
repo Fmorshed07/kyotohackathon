@@ -28,7 +28,7 @@ export default function ImportedEventDetails({ event }: { event: HostedHackathon
         </article>
         <article className="rounded-2xl border border-white/10 bg-card/70 p-5 sm:p-7">
           <MapPin className="h-6 w-6 text-primary" />
-          <h2 className="mt-4 font-display text-xl font-semibold">Meet us in Tokyo</h2>
+          <h2 className="mt-4 font-display text-xl font-semibold">Location & joining</h2>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{event.location}</p>
           <p className="mt-3 text-sm font-medium text-foreground">{event.eventDate}</p>
           {event.timezone ? <p className="mt-1 text-xs text-muted-foreground">All programme times use {event.timezone}.</p> : null}

@@ -1,0 +1,30 @@
+{
+  "score": 1,
+  "summary": "Focused participant deadline and gate changes pass the local emulator suite. Existing authorization and private-data issues prevent a full production security sign-off. These are static-code findings; no production exploitation or account changes were attempted.",
+  "findings": [
+    {
+      "check": "Authority Source / Admin Bootstrapping",
+      "severity": "critical",
+      "issue": "The existing isPortalAdminAccount helper trusts any authenticated email matching portal-admin\\..*@firebase\\.app without email_verified or binding to the established administrator UID. That identity can bootstrap an admin user document. This predates the event change.",
+      "recommendation": "Migrate the established administrator to a server-managed claim or pinned verified identity. Retain access for the existing administrator through a coordinated migration; do not silently create or reset accounts."
+    },
+    {
+      "check": "Field-Level vs. Identity-Level Security",
+      "severity": "major",
+      "issue": "Approved staff can read submissions globally, and judge-map ownership validation does not establish event-assignment isolation. UI event selection alone is not a database authorization boundary.",
+      "recommendation": "Enforce trusted event assignments in read and scoring rules, validate the associated queries, and cover cross-event denials without breaking legacy assignments."
+    },
+    {
+      "check": "Private Data Separation",
+      "severity": "moderate",
+      "issue": "The existing users rules allow signed-in readers to read participant documents containing emails and profile fields; private judge notes also share a submission document readable by its owner and teammates.",
+      "recommendation": "Separate public profile snapshots, private account data and judge-only notes into documents with appropriate ownership and staff access."
+    },
+    {
+      "check": "Type Safety / Business Logic vs. Rules",
+      "severity": "moderate",
+      "issue": "Dynamic criterion-specific bounds and Osaka's automatic ai-video assignment are handled in the normal client flow; the existing rules do not validate every configured criterion key, weight or track membership. Score-map ownership tests do not prove full scoring-value integrity.",
+      "recommendation": "Add server-authoritative submission and scoring validation tied to the saved event rubric and track catalog, with tests for direct SDK bypasses."
+    }
+  ]
+}

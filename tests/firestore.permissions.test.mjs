@@ -54,6 +54,46 @@ beforeEach(async () => {
 });
 
 describe("participant submissions", () => {
+  it("closes past/unpublished listings without an explicit gate for creates and updates", async () => {
+    for (const fields of [{ status: "past" }, { published: false }]) {
+      await seed(`hackathons/${eventId}`, { published: true, status: "upcoming", ...fields });
+      await assertFails(save("participant", "past-entry", project()));
+      await assertFails(edit("participant", { title: "Late change" }));
+      await assertFails(edit("teammate", { title: "Late team change" }));
+    }
+  });
+  it("honours imported deadlines even when the saved lifecycle is still upcoming", async () => {
+    await seed(`hackathons/${eventId}`, {
+      published: true, status: "upcoming", sourceLifecycleAutomatic: true, endAtMs: Date.now() - 60_000,
+    });
+    await assertFails(save("participant", "late-entry", project()));
+    await assertFails(edit("participant", { title: "Late change" }));
+    await assertFails(edit("teammate", { title: "Late team change" }));
+    await assertSucceeds(edit("judge", scoreUpdate("judge")));
+  });
+  it("keeps future imported events writable and allows an explicit organiser reopening", async () => {
+    await seed(`hackathons/${eventId}`, {
+      published: true, status: "upcoming", sourceLifecycleAutomatic: true, endAtMs: Date.now() + 60_000,
+    });
+    await assertSucceeds(save("participant", "future-entry", project()));
+    await seed(`hackathons/${eventId}`, {
+      published: true, status: "past", sourceLifecycleAutomatic: true, endAtMs: 0, submissionMode: "open",
+    });
+    await assertSucceeds(edit("participant", { title: "Reopened" }));
+    await seed(`hackathons/${eventId}`, { published: true, status: "active", sourceLifecycleAutomatic: false, endAtMs: 0 });
+    await assertSucceeds(edit("participant", { title: "Organiser lifecycle override" }));
+  });
+  it("persists Osaka's video challenge for owners and linked teammates, then locks participant edits", async () => {
+    const osaka = "impact-osaka-2026";
+    await seed(`hackathons/${osaka}`, { published: true, status: "upcoming", sourceLifecycleAutomatic: true, endAtMs: Date.now() + 60_000 });
+    await seed("submissions/entry", project({ hackathon_id: osaka, member_user_ids: ["teammate"] }));
+    await assertSucceeds(edit("participant", { track_id: "ai-video", title: "Osaka AI video" }));
+    await assertSucceeds(edit("teammate", { track_id: "ai-video", short_description: "Updated team video description" }));
+    await seed(`hackathons/${osaka}`, { published: true, submissionMode: "paused" });
+    await assertFails(edit("participant", { track_id: "ai-video", title: "Late owner edit" }));
+    await assertFails(edit("teammate", { track_id: "ai-video", short_description: "Late teammate edit" }));
+    await assertSucceeds(edit("judge", scoreUpdate("judge")));
+  });
   it("creates and edits for the imported ElevenLabs listing without submissionMode", async () => {
     await assertSucceeds(save("participant", "new-entry", project()));
     await assertSucceeds(edit("participant", { title: "Updated video" }));

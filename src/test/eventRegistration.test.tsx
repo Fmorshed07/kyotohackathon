@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import GeneratedHackathonPage from "@/pages/GeneratedHackathonPage";
 import type { HostedHackathon } from "@/lib/aiHackathons";
 import { ELEVENLABS_MEETUP } from "@/lib/elevenLabsMeetup";
+import { IMPACT_OSAKA } from "@/lib/impactOsaka";
 import { eventRegistrationLabel, isEventRegistrationClosed } from "@/lib/eventRegistration";
 
 const mocks = vi.hoisted(() => ({ fetchEvent: vi.fn(), getDoc: vi.fn() }));
@@ -84,6 +85,19 @@ describe("event registration availability", () => {
 });
 
 describe("public event registration CTAs", () => {
+  it("opens Osaka registration on Luma and shows the single AI-video challenge", async () => {
+    await renderEvent({ ...IMPACT_OSAKA, status: "upcoming" });
+    const links = screen.getAllByRole("link", { name: /Register now|Open registration/i });
+    expect(links.length).toBeGreaterThan(0);
+    expect(links.every((link) => link.getAttribute("href") === IMPACT_OSAKA.lumaUrl)).toBe(true);
+    expect(screen.getAllByText(/18 October 2026/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/one AI-video challenge/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/17:00–21:00 JST/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Track 01|Track 02|two tracks/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Video Execution & Storytelling/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "Location & joining" })).toBeInTheDocument();
+    expect(screen.queryByText("Meet us in Tokyo")).toBeNull();
+  });
   it.each(["stage", "folio", "signal"])("shows the finished AI Ideathon archive without registration in the %s layout", async (layoutStyle) => {
     await renderEvent({ ...ideathon, layoutStyle });
     expect(screen.getAllByText("Event finished").length).toBeGreaterThan(0);

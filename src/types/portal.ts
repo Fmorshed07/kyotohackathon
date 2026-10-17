@@ -47,6 +47,7 @@ export type Submission = {
   id: string;
   user_id: string;
   hackathon_id?: string | null;
+  track_id?: string | null;
   title: string | null;
   team_name?: string | null;
   member_names?: string | null;

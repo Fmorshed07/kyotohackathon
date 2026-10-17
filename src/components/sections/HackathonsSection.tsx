@@ -13,7 +13,7 @@ import { getFirestoreDb } from "@/lib/firebaseClient";
 import { PORTAL_HACKATHONS, type PortalHackathon } from "@/lib/hackathons";
 import { HackathonSubscribeForm } from "@/components/hackathons/HackathonSubscribeForm";
 import { cn } from "@/lib/utils";
-import { getBundledHackathons } from "@/lib/elevenLabsMeetup";
+import { getBundledHackathons } from "@/lib/bundledHackathons";
 
 type BoardCategory =
   | "Agentic AI"

@@ -39,6 +39,7 @@ import { submissionMatchesSearch } from "@/lib/submissionSearch";
 import { listPublicProjectLinks } from "@/lib/projectSocial";
 import { buildTeamRoster } from "@/lib/teamRoster";
 import { formatSubmissionDateTime } from "@/lib/datetime";
+import { getSubmissionTracks } from "@/lib/impactOsaka";
 import {
   getEventBoardPath,
   getHackathonSubmissionMode,
@@ -106,6 +107,7 @@ const toPdfPreviewUrl = (url: string) => {
 };
 
 export type ParticipantFormState = {
+  trackId?: string;
   title: string;
   shortDescription: string;
   projectUrl: string;
@@ -593,6 +595,24 @@ export function ParticipantDashboard({
                 Solo builders can name themselves too. This shows on the board and gallery.
               </p>
             </div>
+            {getSubmissionTracks(selectedHackathon.id).length > 1 ? (
+              <div className="space-y-2 sm:col-span-2">
+                <label htmlFor="submission-track" className="dash-field-label">Submission track</label>
+                <select
+                  id="submission-track"
+                  value={participantForm.trackId ?? ""}
+                  onChange={(event) => setParticipantForm((form) => ({ ...form, trackId: event.target.value }))}
+                  disabled={isReadOnly}
+                  className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Choose your track</option>
+                  {getSubmissionTracks(selectedHackathon.id).map((track) => (
+                    <option key={track.id} value={track.id}>{track.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">Choose the track for your submission.</p>
+              </div>
+            ) : null}
             <div className="space-y-2 sm:col-span-2">
               <label className="dash-field-label">
                 Project URL

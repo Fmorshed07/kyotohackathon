@@ -30,7 +30,8 @@ import {
 } from "@/lib/eventBranding";
 import { getHackathonSubmissionMode } from "@/lib/hackathons";
 import { getFirestoreDb } from "@/lib/firebaseClient";
-import { ELEVENLABS_MEETUP_ID, getBundledHackathon } from "@/lib/elevenLabsMeetup";
+import { ELEVENLABS_MEETUP_ID } from "@/lib/elevenLabsMeetup";
+import { getBundledHackathon } from "@/lib/bundledHackathons";
 import { cn } from "@/lib/utils";
 
 type PublicCriterion = { id: string; title: string; weight: number; questions: string[] };

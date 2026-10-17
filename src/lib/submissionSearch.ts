@@ -18,6 +18,7 @@ export const submissionMatchesSearch = (
     member_name_list?: string[] | null;
     team_members?: Array<{ name?: string | null }> | null;
     short_description?: string | null;
+    track_id?: string | null;
   }
 ) =>
   matchesSearchQuery(query, [
@@ -27,4 +28,5 @@ export const submissionMatchesSearch = (
     ...(submission.member_name_list ?? []),
     ...(submission.team_members ?? []).map((member) => member.name),
     submission.short_description,
+    submission.track_id,
   ]);

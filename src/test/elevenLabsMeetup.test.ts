@@ -3,10 +3,9 @@ import {
   ELEVENLABS_MEETUP,
   ELEVENLABS_MEETUP_ID,
   ELEVENLABS_MEETUP_SOURCE_URL,
-  getBundledHackathon,
-  getBundledEventStatus,
-  mergeBundledHackathons,
 } from "@/lib/elevenLabsMeetup";
+import { getBundledHackathon, getBundledEventStatus, mergeBundledHackathons } from "@/lib/bundledHackathons";
+import { IMPACT_OSAKA_ID } from "@/lib/impactOsaka";
 import { PORTAL_HACKATHONS } from "@/lib/hackathons";
 import { fetchAiHackathon, fetchPublishedHackathons, subscribeHackathon } from "@/lib/aiHackathons";
 import type { Firestore } from "firebase/firestore";
@@ -75,7 +74,7 @@ describe("verified ElevenLabs meetup", () => {
   it("deduplicates the event while preserving cloud edits and explicit unpublish", () => {
     const override = { ...ELEVENLABS_MEETUP, name: "Host edited title", published: false };
     const merged = mergeBundledHackathons([override, { ...ELEVENLABS_MEETUP, id: "another-event" }]);
-    expect(merged).toHaveLength(2);
+    expect(merged).toHaveLength(3);
     expect(merged.find((event) => event.id === ELEVENLABS_MEETUP_ID)).toMatchObject({
       name: "Host edited title", published: false,
     });
@@ -85,7 +84,7 @@ describe("verified ElevenLabs meetup", () => {
 describe("curated public event loading", () => {
   it("adds the source-backed listing to the published cloud directory", async () => {
     const events = await fetchPublishedHackathons(db);
-    expect(events.map((event) => event.id)).toEqual([ELEVENLABS_MEETUP_ID]);
+    expect(events.map((event) => event.id)).toEqual([IMPACT_OSAKA_ID, ELEVENLABS_MEETUP_ID]);
   });
 
   it("lets a cloud listing override bundled fields without losing source metadata", async () => {
@@ -93,8 +92,8 @@ describe("curated public event loading", () => {
     firestore.getDocs.mockResolvedValue({ docs: [saved] });
     firestore.getDoc.mockResolvedValue(saved);
     const events = await fetchPublishedHackathons(db);
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ name: "Edited by host", status: "past", submissionMode: "closed", timezone: "Asia/Tokyo", sourceUrl: ELEVENLABS_MEETUP_SOURCE_URL });
+    expect(events).toHaveLength(2);
+    expect(events.find((event) => event.id === ELEVENLABS_MEETUP_ID)).toMatchObject({ name: "Edited by host", status: "past", submissionMode: "closed", timezone: "Asia/Tokyo", sourceUrl: ELEVENLABS_MEETUP_SOURCE_URL });
   });
 
   it("derives the imported cloud lifecycle from its actual timestamps", async () => {

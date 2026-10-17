@@ -2,6 +2,7 @@ import { parseTimestamp } from "@/lib/datetime";
 
 export type SubmissionCsvInput = {
   eventName: string;
+  track_id?: string | null;
   participantEmail: string;
   teamName: string | null;
   teamLeaderName: string | null;
@@ -43,6 +44,7 @@ export const SUBMISSION_CSV_HEADERS = [
   "Judges scored",
   "Judges total",
   "Judge scores",
+  "Track",
 ] as const;
 
 export function escapeCsvValue(value: string | number | null | undefined): string {
@@ -118,6 +120,7 @@ export function buildSubmissionsCsv(rows: SubmissionCsvInput[]): string {
         row.scoredByCount,
         row.judgeMarks.length,
         judgeScores(row),
+        row.track_id,
       ]
         .map((value) => escapeCsvValue(value))
         .join(","),
