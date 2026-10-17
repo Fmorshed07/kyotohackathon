@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
-import { getUserAllowedHackathonIds, getUserHackathonId } from "@/lib/hackathons";
+import { getUserAllowedHackathonIds } from "@/lib/hackathons";
 import type {
   HostApprovalStatus,
   JudgeApprovalStatus,
@@ -107,10 +107,8 @@ function startAuthSubscription() {
             role,
             judgeApprovalStatus,
             hostApprovalStatus,
-            hackathonId: hackathonIds[0] ?? getUserHackathonId({
-              hackathon_id: data.hackathon_id,
-              hackathon_ids: data.hackathon_ids,
-            }),
+            // A display fallback must never become a claimed event membership.
+            hackathonId: hackathonIds[0],
             hackathonIds,
             onboardingCompletedAt:
               typeof data.onboardingCompletedAt === "string" ? data.onboardingCompletedAt : null,

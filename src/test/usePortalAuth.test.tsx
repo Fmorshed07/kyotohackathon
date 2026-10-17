@@ -120,6 +120,50 @@ describe("shared portal authentication", () => {
     expect(header.result.current.sessionUser?.id).toBe(accountA.uid);
   });
 
+  it("keeps a new participant unenrolled until an event is explicitly joined", () => {
+    const view = renderHook(() => usePortalAuth());
+    act(() => {
+      emitAuth(accountA);
+      mocks.profiles[0].next({ data: () => ({ role: "participant" }) });
+    });
+
+    expect(view.result.current.sessionUser?.hackathonIds).toEqual([]);
+    expect(view.result.current.sessionUser?.hackathonId).toBeUndefined();
+
+    act(() => {
+      mocks.profiles[0].next({ data: () => ({
+        role: "participant",
+        hackathon_id: "impact-osaka-2026",
+        hackathon_ids: ["impact-osaka-2026"],
+      }) });
+    });
+
+    expect(view.result.current.sessionUser?.hackathonIds).toEqual(["impact-osaka-2026"]);
+    expect(view.result.current.sessionUser?.hackathonId).toBe("impact-osaka-2026");
+  });
+
+  it("preserves an explicit legacy event without adding it to the next account", () => {
+    const view = renderHook(() => usePortalAuth());
+    act(() => {
+      emitAuth(accountA);
+      mocks.profiles[0].next({ data: () => ({
+        role: "participant",
+        hackathon_id: "impact-kyoto",
+      }) });
+    });
+
+    expect(view.result.current.sessionUser?.hackathonIds).toEqual(["impact-kyoto"]);
+    expect(view.result.current.sessionUser?.hackathonId).toBe("impact-kyoto");
+
+    act(() => {
+      emitAuth(accountB);
+      mocks.profiles[1].next({ data: () => ({ role: "participant", hackathon_ids: [] }) });
+    });
+
+    expect(view.result.current.sessionUser?.hackathonIds).toEqual([]);
+    expect(view.result.current.sessionUser?.hackathonId).toBeUndefined();
+  });
+
   it("clears the previous identity and ignores late profile updates and errors during a switch", () => {
     const view = renderHook(() => usePortalAuth());
     act(() => { emitAuth(accountA); emitProfile(0, "Participant A"); });

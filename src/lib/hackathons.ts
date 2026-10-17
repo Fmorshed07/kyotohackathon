@@ -476,8 +476,9 @@ export const collectAccessibleHackathonIds = (input: {
     }
   };
   for (const id of input.enrolledIds ?? []) push(id);
-  for (const id of input.sessionHackathonIds ?? []) push(id);
-  push(input.sessionHackathonId);
+  for (const id of normalizeHackathonIds(input.sessionHackathonIds, input.sessionHackathonId)) {
+    push(id);
+  }
   for (const submission of input.submissions ?? []) {
     push(getSubmissionHackathonId(submission));
   }
@@ -569,7 +570,7 @@ export type HackathonUserRef = {
   hackathonIds?: HackathonId[];
 };
 
-/** Parse Firestore `hackathon_ids` (+ optional primary `hackathon_id`) into a unique list. */
+/** An explicit enrollment list is authoritative; use the primary only for legacy profiles without one. */
 export const normalizeHackathonIds = (
   value: unknown,
   fallbackHackathonId?: unknown
@@ -589,16 +590,16 @@ export const normalizeHackathonIds = (
     for (const item of value) {
       push(item);
     }
+  } else {
+    push(fallbackHackathonId);
   }
-
-  push(fallbackHackathonId);
   return ids;
 };
 
 export const getUserAllowedHackathonIds = (
   user: Pick<HackathonUserRef, "hackathon_id" | "hackathon_ids" | "hackathonId" | "hackathonIds">
 ): HackathonId[] => {
-  if (Array.isArray(user.hackathonIds) && user.hackathonIds.length > 0) {
+  if (Array.isArray(user.hackathonIds)) {
     return normalizeHackathonIds(user.hackathonIds, user.hackathonId ?? user.hackathon_id);
   }
   return normalizeHackathonIds(user.hackathon_ids, user.hackathonId ?? user.hackathon_id);

@@ -3,10 +3,14 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ParticipantOnboardingPage from "@/pages/ParticipantOnboardingPage";
 import { formDraftStorageKey, readFormDraft } from "@/lib/formDrafts";
+import type { SessionUser } from "@/types/portal";
+import type { PortalHackathon } from "@/lib/hackathons";
 
 const backend = vi.hoisted(() => ({
   db: {}, auth: { currentUser: { uid: "participant" } as { uid: string } | null },
   getDoc: vi.fn(), setDoc: vi.fn(), checkEnrollment: vi.fn(), queueEmail: vi.fn(),
+  sessionUser: {} as SessionUser,
+  joinableEvents: [] as PortalHackathon[],
 }));
 vi.mock("@/lib/firebaseClient", () => ({ getFirestoreDb: () => backend.db, getFirebaseAuth: () => backend.auth }));
 vi.mock("firebase/firestore", async (original) => ({
@@ -15,10 +19,10 @@ vi.mock("firebase/firestore", async (original) => ({
   getDoc: backend.getDoc, setDoc: backend.setDoc,
 }));
 vi.mock("@/hooks/usePortalAuth", () => ({
-  usePortalAuth: () => ({ sessionUser: { id: "participant", email: "participant@example.com", role: "participant" }, loading: false, signOut: vi.fn() }),
+  usePortalAuth: () => ({ sessionUser: backend.sessionUser, loading: false, signOut: vi.fn() }),
 }));
 vi.mock("@/lib/aiHackathons", () => ({
-  fetchJoinablePortalHackathons: async () => [{ id: "open-event", name: "Open event", shortName: "Open event", status: "active", eventDate: "", location: "", theme: "" }],
+  fetchJoinablePortalHackathons: async () => backend.joinableEvents,
   fetchAiHackathon: vi.fn(), hostedToPortalHackathon: vi.fn(), isAiIdeathonEvent: vi.fn(),
 }));
 vi.mock("@/lib/participantEventEnrollment", () => ({ checkParticipantEventEnrollment: backend.checkEnrollment }));
@@ -26,8 +30,8 @@ vi.mock("@/lib/participantEmail", () => ({ queueParticipantEmail: backend.queueE
 vi.mock("@/components/AnimatedBackground", () => ({ default: () => null }));
 vi.mock("@/components/BrandLogo", () => ({ default: () => null }));
 
-const view = () => (
-  <MemoryRouter initialEntries={["/onboarding"]}>
+const view = (path = "/onboarding") => (
+  <MemoryRouter initialEntries={[path]}>
     <Routes>
       <Route path="/onboarding" element={<ParticipantOnboardingPage />} />
       <Route path="/dashboard/participant" element={<p>Participant workspace</p>} />
@@ -47,6 +51,8 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   backend.auth.currentUser = { uid: "participant" };
+  backend.sessionUser = { id: "participant", email: "participant@example.com", role: "participant" };
+  backend.joinableEvents = [{ id: "open-event", name: "Open event", shortName: "Open event", status: "active", eventDate: "", location: "", theme: "" }];
   backend.getDoc.mockReset().mockResolvedValue({ data: () => ({ fullName: "Participant", publicRole: "Engineer" }) });
   backend.setDoc.mockReset().mockResolvedValue(undefined);
   backend.checkEnrollment.mockReset().mockResolvedValue("new");
@@ -54,6 +60,23 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("participant onboarding safety", () => {
+  it.each([
+    { name: "an explicit empty membership list", existingIds: [], expectedIds: ["impact-osaka-2026"] },
+    { name: "a legacy primary without a membership list", existingIds: undefined, expectedIds: ["impact-osaka-2026", "impact-kyoto"] },
+  ])("saves Osaka with $name", async ({ existingIds, expectedIds }) => {
+    backend.sessionUser = { ...backend.sessionUser, hackathonId: "impact-kyoto", hackathonIds: existingIds };
+    backend.joinableEvents = [{ ...backend.joinableEvents[0], id: "impact-osaka-2026", name: "Impact Osaka", shortName: "Impact Osaka" }];
+    render(view("/onboarding?hackathon=impact-osaka-2026"));
+    await finishBasics();
+    fireEvent.click(screen.getByRole("button", { name: "Finish & open dashboard" }));
+
+    await waitFor(() => expect(backend.setDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "users/participant" }),
+      expect.objectContaining({ hackathon_id: "impact-osaka-2026", hackathon_ids: expectedIds }),
+      { merge: true },
+    ));
+  });
+
   it("shows a retry screen after a failed profile load instead of allowing an empty overwrite", async () => {
     backend.getDoc.mockRejectedValueOnce(new Error("Offline"));
     render(view());

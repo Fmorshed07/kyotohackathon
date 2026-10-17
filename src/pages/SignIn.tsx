@@ -18,6 +18,7 @@ import {
 } from "@/lib/inviteTokens";
 import {
   clearPendingHackathon,
+  getUserAllowedHackathonIds,
   isHackathonId,
   readPendingHackathon,
   stashPendingHackathon,
@@ -227,9 +228,12 @@ export default function SignIn() {
     const outcome = await checkParticipantEventEnrollment(db, pendingEventId, existingIds, primaryEventId);
     if (auth.currentUser?.uid !== userId) return null;
     if (outcome === "new") {
-      const priorIds = Array.isArray(existingIds) ? existingIds : [];
+      const priorIds = getUserAllowedHackathonIds({
+        hackathon_ids: existingIds,
+        hackathon_id: typeof primaryEventId === "string" ? primaryEventId : undefined,
+      });
       const nextIds = enrollPendingHackathonIds(
-        typeof primaryEventId === "string" && isHackathonId(primaryEventId) ? [...priorIds, primaryEventId] : priorIds,
+        priorIds,
         pendingEventId,
       );
       await setDoc(doc(db, "users", userId), { hackathon_id: pendingEventId, hackathon_ids: nextIds }, { merge: true });

@@ -9,7 +9,9 @@ import { formDraftStorageKey, readFormDraft, writeFormDraft } from "@/lib/formDr
 const backend = vi.hoisted(() => ({
   selectedEvent: "event-one",
   db: {},
-  sessionUser: { id: "account-a", email: "a@example.com", role: "participant", hackathonId: "event-one" },
+  sessionUser: { id: "account-a", email: "a@example.com", role: "participant", hackathonId: "event-one" } as {
+    id: string; email: string; role: string; hackathonId: string; hackathonIds?: string[];
+  },
   auth: { currentUser: { uid: "account-a" } as { uid: string } | null },
   getDoc: vi.fn(),
   setDoc: vi.fn(),
@@ -64,11 +66,15 @@ vi.mock("@/lib/portalInvites", () => ({
 vi.mock("@/lib/profileMedia", () => ({ uploadProfileImage: vi.fn() }));
 vi.mock("@/lib/participantEmail", () => ({ queueParticipantEmail: backend.queueEmail }));
 vi.mock("@/components/dashboard/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DashboardLayout: ({ children, hackathons = [] }: { children: React.ReactNode; hackathons?: PortalHackathon[] }) => <div>
+    <output data-testid="accessible-events">{hackathons.map(event => event.id).join(",")}</output>
+    {children}
+  </div>,
 }));
 vi.mock("@/components/dashboard/ParticipantDashboard", () => ({
-  ParticipantDashboard: ({ isLoadingWorkspace, isReadOnly, isSubmittingProject, participantForm, setParticipantForm, submissionMessage, autosaveStatus, onSave, onJoinHackathon }: ParticipantDashboardProps) => (
+  ParticipantDashboard: ({ isLoadingWorkspace, isReadOnly, isSubmittingProject, participantForm, setParticipantForm, submissionMessage, autosaveStatus, onSave, onJoinHackathon, hackathonSummaries }: ParticipantDashboardProps) => (
     <div>
+      <output data-testid="registered-events">{hackathonSummaries.map(summary => summary.hackathon.id).join(",")}</output>
       <input aria-label="Project title" value={participantForm.title} onChange={(event) => setParticipantForm((form) => ({ ...form, title: event.target.value }))} />
       <output data-testid="submission-track">{participantForm.trackId ?? ""}</output>
       <input type="checkbox" aria-label="Public preview" checked={participantForm.allowPublicPreview} onChange={(event) => setParticipantForm((form) => ({ ...form, allowPublicPreview: event.target.checked }))} />
@@ -133,6 +139,35 @@ async function showDashboard() {
 }
 
 describe("participant operations during account changes", () => {
+  it("does not mark Kyoto registered for a new account with an explicitly empty enrollment list", async () => {
+    backend.selectedEvent = "impact-osaka-2026";
+    backend.sessionUser = { ...backend.sessionUser, hackathonId: "impact-kyoto", hackathonIds: [] };
+    backend.catalog.mockResolvedValue([event("impact-osaka-2026"), event("impact-kyoto")]);
+    backend.getDoc.mockResolvedValue(snapshot("account-a", { fullName: "Account A", hackathon_id: "impact-kyoto", hackathon_ids: [] }));
+
+    await showDashboard();
+
+    expect(screen.getByTestId("registered-events")).toBeEmptyDOMElement();
+    expect(screen.getByTestId("accessible-events")).toBeEmptyDOMElement();
+    expect(backend.selectEvent).not.toHaveBeenCalledWith("impact-kyoto");
+    expect(backend.setDoc).not.toHaveBeenCalled();
+  });
+
+  it("keeps an Osaka membership without adding a stale Kyoto primary to registered events", async () => {
+    const osaka = "impact-osaka-2026";
+    backend.selectedEvent = osaka;
+    backend.sessionUser = { ...backend.sessionUser, hackathonId: "impact-kyoto", hackathonIds: [osaka] };
+    backend.catalog.mockResolvedValue([event(osaka), event("impact-kyoto")]);
+    backend.getDoc.mockResolvedValue(snapshot("account-a", { fullName: "Account A", hackathon_id: "impact-kyoto", hackathon_ids: [osaka] }));
+
+    await showDashboard();
+
+    expect(screen.getByTestId("registered-events")).toHaveTextContent(/^impact-osaka-2026$/);
+    expect(screen.getByTestId("accessible-events")).toHaveTextContent(/^impact-osaka-2026$/);
+    expect(backend.selectEvent).not.toHaveBeenCalledWith("impact-kyoto");
+    expect(backend.setDoc).not.toHaveBeenCalled();
+  });
+
   it("automatically saves the Osaka video challenge under the correct event and restores it on reload", async () => {
     const osaka = "impact-osaka-2026";
     backend.selectedEvent = osaka;

@@ -1,23 +1,23 @@
 {
   "score": 1,
-  "summary": "Scoped submission and score-write regressions are fixed and emulator-tested locally. This is not an overall security approval: existing authentication and event-isolation risks require a separate migration before a broad rollout. Live rules could not be inspected because the CLI account lacks project permissions.",
+  "summary": "Scoped submission and score-write fixes passed 42 emulator tests and were deployed to hackathon-tokyo on 2026-10-18 (Asia/Tokyo) using contact@cognisorai.com. The live release was read back and matched the tested rules exactly. This is not an overall security approval: existing authentication and event-isolation risks remain and require a separate migration. No production records or judge marks were modified.",
   "findings": [
     {
       "check": "Automatic host workflow and ownership continuity",
       "severity": "major",
-      "issue": "Fixed locally: admin-assisted publishing could lock the original host out of republishing, legacy linked listings could fail on missing creator metadata, and republishing reset the judging rubric.",
-      "recommendation": "Deploy the ownership-preserving publishing change and rules after review. Full host, participant, invite/approval and judging workflows are now tested with arbitrary new event IDs; keep approval and pause/close restrictions in place."
+      "issue": "Fixed in the repository, with ownership rules now deployed: admin-assisted publishing could lock the original host out of republishing, legacy linked listings could fail on missing creator metadata, and republishing reset the judging rubric.",
+      "recommendation": "Keep the ownership-preserving publishing change and seed-once rubric logic. Full host, participant, invite/approval and judging workflows are tested with arbitrary new event IDs; retain approval, deadline and pause/close restrictions."
     },
     {
       "check": "Business logic and optional fields",
       "severity": "major",
-      "issue": "Fixed locally: the ElevenLabs document omits submissionMode and the previous direct field read denied legitimate submissions. A teammate array query also failed when evaluating an unrelated missing owner field.",
-      "recommendation": "Review and deploy the patched rules; retain the emulator regressions for participant and teammate queries and writes."
+      "issue": "Fixed and deployed: the ElevenLabs document omits submissionMode and the previous direct field read denied legitimate submissions. A teammate array query also failed when evaluating an unrelated missing owner field.",
+      "recommendation": "Retain the emulator regressions for participant and teammate queries and writes, including imported deadlines, closed events and explicit organiser reopening."
     },
     {
       "check": "Create/update bypass and judge ownership",
       "severity": "major",
-      "issue": "Fixed locally: participants could inject preliminary marks, and approved staff could overwrite another judge's maps or project content.",
+      "issue": "Fixed and deployed: participants could inject preliminary marks, and approved staff could overwrite another judge's maps or project content.",
       "recommendation": "Keep score fields organiser/judge-controlled and enforce per-UID map diffs, with separate final-round shortlist validation."
     },
     {

@@ -38,6 +38,18 @@ describe("participant event enrollment eligibility", () => {
     await expect(checkParticipantEventEnrollment(db, "event-one")).rejects.toThrow("Connection unavailable");
   });
 
+  it("checks eligibility instead of granting membership from a primary when enrollment is explicitly empty", async () => {
+    vi.mocked(fetchAiHackathon).mockResolvedValue(event({ status: "past" }));
+    await expect(checkParticipantEventEnrollment(db, "event-one", [], "event-one")).rejects.toThrow("This event has ended. Registration is closed.");
+    expect(fetchAiHackathon).toHaveBeenCalledWith(db, "event-one");
+  });
+
+  it("requires a new enrollment when the selected primary is absent from a nonempty enrollment list", async () => {
+    vi.mocked(fetchAiHackathon).mockResolvedValue(event());
+    await expect(checkParticipantEventEnrollment(db, "event-one", ["another-event"], "event-one")).resolves.toBe("new");
+    expect(fetchAiHackathon).toHaveBeenCalledWith(db, "event-one");
+  });
+
   it.each([
     [["event-one"], "another-event"],
     [undefined, "event-one"],

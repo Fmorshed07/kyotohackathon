@@ -21,12 +21,12 @@ vi.mock("firebase/auth", async (importOriginal) => ({ ...await importOriginal<ty
 vi.mock("@/components/AnimatedBackground", () => ({ default: () => null }));
 vi.mock("@/components/BrandLogo", () => ({ default: () => <span>Cognisor</span> }));
 
-const renderSignup = () => {
+const renderSignup = (path = "/signup?hackathon=ended-ideathon") => {
   mocks.auth.currentUser = mocks.sessionUser ? { uid: mocks.sessionUser.id } : null;
-  return render(<MemoryRouter initialEntries={["/signup?hackathon=ended-ideathon"]}><Routes><Route path="/signup" element={<SignIn />} /><Route path="/dashboard/participant" element={<p>Participant workspace</p>} /></Routes></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/signup" element={<SignIn />} /><Route path="/dashboard/participant" element={<p>Participant workspace</p>} /></Routes></MemoryRouter>);
 };
 
-describe("closed-event signup", () => {
+describe("event signup", () => {
   beforeEach(() => {
     mocks.sessionUser = null;
     mocks.auth.currentUser = null;
@@ -36,6 +36,22 @@ describe("closed-event signup", () => {
     sessionStorage.clear();
   });
   afterEach(cleanup);
+
+  it("joins Osaka without copying a stale primary into explicit empty memberships", async () => {
+    mocks.sessionUser = {
+      id: "builder", email: "builder@example.com", role: "participant",
+      hackathonIds: [], hackathonId: "impact-kyoto", onboardingCompletedAt: "2026-01-01",
+    };
+    mocks.fetchEvent.mockResolvedValue({ id: "impact-osaka-2026", published: true, status: "active", registrationStatus: "open" });
+    renderSignup("/signup?hackathon=impact-osaka-2026");
+
+    await waitFor(() => expect(mocks.setDoc).toHaveBeenCalledWith(
+      undefined,
+      { hackathon_id: "impact-osaka-2026", hackathon_ids: ["impact-osaka-2026"] },
+      { merge: true },
+    ));
+    expect(await screen.findByText("Participant workspace")).toBeInTheDocument();
+  });
 
   it("shows closure before Google signup and performs no enrollment write", async () => {
     renderSignup();

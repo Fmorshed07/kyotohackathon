@@ -41,6 +41,7 @@ import {
 import {
   SITE_HACKATHON_ID,
   clearPendingHackathon,
+  getUserAllowedHackathonIds,
   isHackathonId,
   isJoinableHackathon,
   mergeHackathonCatalogs,
@@ -296,14 +297,10 @@ export default function ParticipantOnboardingPage() {
         }
 
         const data = snap.data() ?? {};
-        const enrolled =
-          typeof data.hackathon_id === "string" && isHackathonId(data.hackathon_id)
-            ? data.hackathon_id
-            : Array.isArray(data.hackathon_ids) &&
-                typeof data.hackathon_ids[0] === "string" &&
-                isHackathonId(data.hackathon_ids[0])
-              ? data.hackathon_ids[0]
-              : sessionUser.hackathonId;
+        const enrolled = getUserAllowedHackathonIds({
+          hackathon_id: data.hackathon_id,
+          hackathon_ids: data.hackathon_ids,
+        })[0];
 
         const preferredOrEnrolled =
           (preferred && nextJoinable.some((entry) => entry.id === preferred)
@@ -532,8 +529,7 @@ export default function ParticipantOnboardingPage() {
           hackathon_id: hackathonId,
           hackathon_ids: Array.from(new Set([
             hackathonId,
-            ...(sessionUser.hackathonIds ?? []),
-            ...(sessionUser.hackathonId ? [sessionUser.hackathonId] : []),
+            ...getUserAllowedHackathonIds(sessionUser),
           ])),
           profileUpdatedAt: now,
           onboardingCompletedAt: now,

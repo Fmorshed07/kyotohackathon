@@ -10,6 +10,7 @@ import {
   getHackathonPublicUrl,
   getJudgeEventWorkspacePath,
   getParticipantEventWorkspacePath,
+  getUserAllowedHackathonIds,
   nextEnrolledHackathonIds,
   pickDefaultHackathonId,
   pickPreferredHackathonId,
@@ -78,6 +79,27 @@ describe("event paths and enrollment", () => {
       SITE_HACKATHON_ID,
       hostedIdeathonId,
     ]);
+  });
+});
+
+describe("explicit enrollment lists", () => {
+  it("does not register a raw profile's primary event when its enrollment list is empty", () => {
+    expect(getUserAllowedHackathonIds({ hackathon_ids: [], hackathon_id: SITE_HACKATHON_ID })).toEqual([]);
+  });
+
+  it("does not append a stale primary to an explicit nonempty enrollment list", () => {
+    expect(getUserAllowedHackathonIds({ hackathon_ids: [hostedIdeathonId], hackathon_id: SITE_HACKATHON_ID })).toEqual([hostedIdeathonId]);
+  });
+
+  it("treats the normalized session's empty array as authoritative over legacy fields", () => {
+    expect(getUserAllowedHackathonIds({
+      hackathonIds: [], hackathonId: SITE_HACKATHON_ID, hackathon_ids: [hostedIdeathonId],
+    })).toEqual([]);
+  });
+
+  it("retains membership for legacy profiles that only have a primary event", () => {
+    expect(getUserAllowedHackathonIds({ hackathon_id: SITE_HACKATHON_ID })).toEqual([SITE_HACKATHON_ID]);
+    expect(getUserAllowedHackathonIds({ hackathonId: hostedIdeathonId })).toEqual([hostedIdeathonId]);
   });
 });
 
@@ -195,6 +217,25 @@ describe("groupByHackathon", () => {
 });
 
 describe("collectAccessibleHackathonIds", () => {
+  it("does not promote a selected primary into membership when session enrollment is empty", () => {
+    expect(collectAccessibleHackathonIds({
+      enrolledIds: [], sessionHackathonIds: [], sessionHackathonId: SITE_HACKATHON_ID,
+    })).toEqual([]);
+  });
+
+  it("keeps explicit memberships without appending a stale selected primary", () => {
+    expect(collectAccessibleHackathonIds({
+      enrolledIds: [hostedIdeathonId], sessionHackathonIds: [hostedIdeathonId], sessionHackathonId: SITE_HACKATHON_ID,
+    })).toEqual([hostedIdeathonId]);
+  });
+
+  it("preserves legacy primary access and actual submission access", () => {
+    expect(collectAccessibleHackathonIds({ sessionHackathonId: SITE_HACKATHON_ID })).toEqual([SITE_HACKATHON_ID]);
+    expect(collectAccessibleHackathonIds({
+      enrolledIds: [], sessionHackathonIds: [], submissions: [{ hackathon_id: hostedIdeathonId }],
+    })).toEqual([hostedIdeathonId]);
+  });
+
   it("includes hosted event ids from submissions, not only the static catalog", () => {
     expect(
       collectAccessibleHackathonIds({
