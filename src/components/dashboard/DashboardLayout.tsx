@@ -1037,8 +1037,8 @@ function DashboardLayoutContent({
 
           <NavSection label="Resources">
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className={menuButtonClass} isActive={location.pathname === "/community"}>
-                <DashboardNavLink href="/community" onNavigate={closeMobileNav}>
+              <SidebarMenuButton asChild className={menuButtonClass} isActive={location.pathname === "/dashboard/community"}>
+                <DashboardNavLink href={withHackathonQuery("/dashboard/community", selectedHackathonId)} onNavigate={closeMobileNav}>
                   <MessageCircle className={navIconClass} />
                   <span>Community chat</span>
                 </DashboardNavLink>

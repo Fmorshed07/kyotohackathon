@@ -42,7 +42,7 @@ function CurrentLocation() {
   return <output data-testid="dashboard-location">{pathname}{search}{hash}</output>;
 }
 
-function showDashboard() {
+function showDashboard(selectedHackathonId = events[0].id) {
   const onHackathonChange = vi.fn();
   render(
     <MemoryRouter
@@ -53,7 +53,7 @@ function showDashboard() {
         sessionUser={participant}
         role="participant"
         hackathons={events}
-        selectedHackathonId={events[0].id}
+        selectedHackathonId={selectedHackathonId}
         onHackathonChange={onHackathonChange}
         onSignOut={vi.fn().mockResolvedValue(undefined)}
       >
@@ -120,5 +120,20 @@ describe("dashboard sidebar navigation", () => {
     fireEvent.click(tokyo);
     expect(onHackathonChange).toHaveBeenCalledExactlyOnceWith("impact-tokyo-2026");
     expect(screen.getByTestId("dashboard-location")).toHaveTextContent("/dashboard/participant");
+  });
+
+  it("opens community chat inside the dashboard with the selected event and active menu styling", () => {
+    showDashboard(events[1].id);
+    const community = screen.getByRole("link", { name: "Community chat" });
+    expect(community).toHaveAttribute("href", "/dashboard/community?hackathon=impact-tokyo-2026");
+    expect(community).toHaveAttribute("data-sidebar", "menu-button");
+    expect(community).toHaveClass("dash-nav-item");
+    expect(community).toHaveAttribute("data-active", "false");
+
+    fireEvent.click(community);
+
+    expect(screen.getByTestId("dashboard-location")).toHaveTextContent("/dashboard/community?hackathon=impact-tokyo-2026");
+    expect(screen.getByRole("link", { name: "Community chat" })).toHaveAttribute("data-active", "true");
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("data-active", "false");
   });
 });

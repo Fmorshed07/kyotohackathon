@@ -1,6 +1,6 @@
 # Community networking channels
 
-Open `/community` from the site navigation or **Community chat** in the dashboard's Resources section.
+Open `/dashboard/community` from **Community chat** in the dashboard's Resources section. Chat uses the signed-in user's dashboard layout and is absent from the public header and footer. Signed-out visitors are redirected to sign-in with a return link; accounts without a portal role must complete signup. Old `/community` links redirect into the dashboard and preserve their channel, event query, and anchor.
 
 - `?channel=general`: introductions, networking and discussion.
 - `?channel=teams`: find teammates; share the event, idea, skills and availability.

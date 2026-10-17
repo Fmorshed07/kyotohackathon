@@ -1,13 +1,19 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CommunityChatPage from "@/pages/CommunityChatPage";
 import type { CommunityMessage } from "@/lib/communityChat";
 import type { SessionUser } from "@/types/portal";
 
-const mocks = vi.hoisted(() => ({ auth: { sessionUser: null as SessionUser | null, loading: false }, uid: "participant", subscribe: vi.fn(), send: vi.fn(), remove: vi.fn(), unsubscribe: vi.fn() }));
-vi.mock("@/hooks/usePortalAuth", () => ({ usePortalAuth: () => mocks.auth }));
-vi.mock("@/components/SiteHeader", () => ({ default: () => <header>Cognisor</header> }));
+const mocks = vi.hoisted(() => ({ auth: { sessionUser: null as SessionUser | null, loading: false }, uid: "participant", subscribe: vi.fn(), send: vi.fn(), remove: vi.fn(), unsubscribe: vi.fn(), signOut: vi.fn(), layout: vi.fn() }));
+vi.mock("@/hooks/usePortalAuth", () => ({ usePortalAuth: () => ({ ...mocks.auth, signOut: mocks.signOut }) }));
+vi.mock("@/components/dashboard/DashboardLayout", () => ({
+  DashboardLayout: (props: { children: ReactNode; role: string; sessionUser: SessionUser; onSignOut: () => Promise<void> }) => {
+    mocks.layout(props);
+    return <section aria-label={`${props.role} dashboard`}>{props.children}</section>;
+  },
+}));
 vi.mock("@/lib/firebaseClient", () => ({ getFirestoreDb: () => ({}), getFirebaseAuth: () => ({ currentUser: { uid: mocks.uid } }) }));
 vi.mock("@/lib/communityChat", async original => ({ ...await original<typeof import("@/lib/communityChat")>(), subscribeToCommunityMessages: mocks.subscribe, sendCommunityMessage: mocks.send, deleteCommunityMessage: mocks.remove }));
 
@@ -27,8 +33,20 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
-function show(path = "/community") {
-  const view = () => <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><CommunityChatPage /></MemoryRouter>;
+function CurrentLocation() {
+  const location = useLocation();
+  return <p data-testid="community-location">{location.pathname}{location.search}{location.hash}</p>;
+}
+
+function show(path = "/dashboard/community") {
+  const view = () => <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <Routes>
+      <Route path="/dashboard/community" element={<CommunityChatPage />} />
+      <Route path="/signin" element={<p>Sign-in page</p>} />
+      <Route path="/signup" element={<p>Account setup</p>} />
+    </Routes>
+    <CurrentLocation />
+  </MemoryRouter>;
   const result = render(view());
   return { ...result, redraw: () => result.rerender(view()) };
 }
@@ -36,26 +54,39 @@ const connected = (messages: CommunityMessage[] = []) => act(() => receive(messa
 const write = (text = "Hello community") => fireEvent.change(screen.getByRole("textbox", { name: /Message #/ }), { target: { value: text } });
 
 describe("community networking channel", () => {
-  it("invites signed-out visitors without opening a Firestore listener", () => {
+  it("redirects signed-out visitors to sign-in without showing chat channels or opening a Firestore listener", () => {
     mocks.auth.sessionUser = null;
-    show();
-    expect(screen.getByRole("link", { name: "Sign in to chat" })).toHaveAttribute("href", "/signin");
+    const requestedPath = "/dashboard/community?channel=teams&hackathon=past-ai#latest";
+    show(requestedPath);
+    expect(screen.getByText("Sign-in page")).toBeInTheDocument();
+    expect(screen.getByTestId("community-location")).toHaveTextContent(/^\/signin/);
+    const signInUrl = new URL(screen.getByTestId("community-location").textContent!, "https://example.test");
+    expect(signInUrl.searchParams.get("next")).toBe(requestedPath);
+    expect(screen.queryByRole("navigation", { name: "Community channels" })).not.toBeInTheDocument();
+    expect(mocks.layout).not.toHaveBeenCalled();
     expect(mocks.subscribe).not.toHaveBeenCalled();
   });
 
   it("waits for authentication and requires a registered role", () => {
     mocks.auth.loading = true;
     const view = show();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading community…");
+    expect(screen.queryByRole("navigation", { name: "Community channels" })).not.toBeInTheDocument();
     expect(mocks.subscribe).not.toHaveBeenCalled();
     mocks.auth = { loading: false, sessionUser: { ...user, role: undefined } };
     view.redraw();
-    expect(screen.getByRole("link", { name: "Complete your account" })).toHaveAttribute("href", "/signup");
+    expect(screen.getByText("Account setup")).toBeInTheDocument();
+    expect(screen.getByTestId("community-location")).toHaveTextContent(/^\/signup/);
+    expect(screen.queryByRole("navigation", { name: "Community channels" })).not.toBeInTheDocument();
+    expect(mocks.layout).not.toHaveBeenCalled();
     expect(mocks.subscribe).not.toHaveBeenCalled();
   });
 
   it.each(["participant", "judge", "mentor", "host", "admin"] as const)("allows %s networking without event membership or staff approval", role => {
     mocks.auth.sessionUser = { ...user, role, hackathonIds: [], judgeApprovalStatus: "pending", hostApprovalStatus: "pending" };
     show(); connected();
+    expect(screen.getByRole("region", { name: `${role} dashboard` })).toBeInTheDocument();
+    expect(mocks.layout).toHaveBeenLastCalledWith(expect.objectContaining({ role, sessionUser: mocks.auth.sessionUser, onSignOut: mocks.signOut }));
     expect(screen.getByRole("heading", { name: "general" })).toBeInTheDocument();
     expect(screen.getByText("Connected")).toBeInTheDocument();
   });
@@ -65,7 +96,7 @@ describe("community networking channel", () => {
     expect(screen.getByText("Looking for a designer")).toBeInTheDocument();
     expect(document.querySelector("script")).toBeNull();
     expect(screen.getByRole("link", { name: "https://example.com/team" })).toHaveAttribute("rel", "noopener noreferrer");
-    expect(screen.queryByText(user.email)).not.toBeInTheDocument();
+    expect(within(screen.getByRole("log", { name: "Messages in general" })).queryByText(user.email)).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox", { name: "Search recent messages" }), { target: { value: "designer" } });
     expect(screen.queryByText("Judge Rin")).not.toBeInTheDocument();
     expect(screen.getByText("Looking for a designer")).toBeInTheDocument();
@@ -132,15 +163,37 @@ describe("community networking channel", () => {
   });
 
   it("cleans up room listeners and ignores stale snapshots after switching channels", () => {
-    show(); connected([message()]); write("General draft");
+    show("/dashboard/community?channel=general&hackathon=past-ai&ref=dashboard"); connected([message()]); write("General draft");
     const oldReceive = receive;
     fireEvent.click(within(screen.getByRole("navigation", { name: "Community channels" })).getByRole("button", { name: "find-a-team" }));
     expect(mocks.unsubscribe).toHaveBeenCalledOnce();
     expect(screen.getByRole("textbox", { name: "Message #find-a-team" })).toHaveValue("");
+    const params = new URL(screen.getByTestId("community-location").textContent!, "https://example.test").searchParams;
+    expect(params.get("channel")).toBe("teams");
+    expect(params.get("hackathon")).toBe("past-ai");
+    expect(params.get("ref")).toBe("dashboard");
     act(() => oldReceive([message({ body: "Stale message" })], false));
     expect(screen.queryByText("Stale message")).not.toBeInTheDocument();
     connected([message({ body: "Team room message" })]);
     expect(screen.getByText("Team room message")).toBeInTheDocument();
+  });
+
+  it("removes the previous conversation and closes its listener while authentication changes", () => {
+    const view = show();
+    connected([message({ body: "Previous account conversation" })]);
+    mocks.auth.loading = true;
+    view.redraw();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading community…");
+    expect(screen.queryByText("Previous account conversation")).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Community channels" })).not.toBeInTheDocument();
+    expect(mocks.unsubscribe).toHaveBeenCalledOnce();
+
+    mocks.auth = { sessionUser: null, loading: false };
+    view.redraw();
+
+    expect(screen.getByText("Sign-in page")).toBeInTheDocument();
+    expect(mocks.subscribe).toHaveBeenCalledOnce();
   });
 
   it("does not clear a new account's draft when an old send finishes", async () => {
@@ -168,10 +221,10 @@ describe("community networking channel", () => {
   });
 
   it("supports channel deep links and safe unknown-channel fallback", () => {
-    const first = show("/community?channel=judges"); connected();
+    const first = show("/dashboard/community?channel=judges"); connected();
     expect(screen.getByRole("heading", { name: "ask-judges" })).toBeInTheDocument();
     first.unmount();
-    show("/community?channel=private"); connected();
+    show("/dashboard/community?channel=private"); connected();
     expect(screen.getByRole("heading", { name: "general" })).toBeInTheDocument();
   });
 });

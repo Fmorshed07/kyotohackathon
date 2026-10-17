@@ -13,6 +13,7 @@ import {
 import Index from "./pages/Index";
 import CommunityWorkPage from "./pages/CommunityWorkPage";
 import CommunityChatPage from "./pages/CommunityChatPage";
+import LegacyCommunityRedirect from "./components/community/LegacyCommunityRedirect";
 import SignIn from "./pages/SignIn";
 import AdminSignIn from "./pages/AdminSignIn";
 import HostSignIn from "./pages/HostSignIn";
@@ -127,7 +128,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/work" element={<CommunityWorkPage />} />
-          <Route path="/community" element={<CommunityChatPage />} />
+          <Route path="/community" element={<LegacyCommunityRedirect />} />
           <Route path="/hackathons" element={<HackathonsPage />} />
           <Route path="/events/:hackathonId" element={<GeneratedHackathonPage />} />
           <Route path="/signin" element={<SignIn />} />
@@ -136,6 +137,7 @@ const App = () => (
           <Route path="/admin" element={<AdminSignIn />} />
           <Route path="/host/signin" element={<HostSignIn />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/dashboard/community" element={<CommunityChatPage />} />
           <Route path="/dashboard/participant" element={<ParticipantProtectedRoute><ParticipantDashboardPage /></ParticipantProtectedRoute>} />
           <Route path="/dashboard/participant/profile" element={<ParticipantProtectedRoute><ParticipantProfilePage /></ParticipantProtectedRoute>} />
           <Route path="/dashboard/participant/team" element={<ParticipantProtectedRoute><ParticipantTeamPage /></ParticipantProtectedRoute>} />
