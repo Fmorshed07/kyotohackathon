@@ -3,6 +3,7 @@ import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebaseClient";
 import { getUserAllowedHackathonIds } from "@/lib/hackathons";
+import { claimImportedParticipantEnrollment } from "@/lib/importedParticipantEnrollment";
 import type {
   HostApprovalStatus,
   JudgeApprovalStatus,
@@ -85,6 +86,7 @@ function startAuthSubscription() {
     updateSnapshot({ sessionUser: null, loading: true });
     const db = getFirestoreDb();
     const userRef = doc(db, "users", user.uid);
+    let importedClaimStarted = false;
     unsubscribeRoleDoc = onSnapshot(
       userRef,
       (userSnap) => {
@@ -120,6 +122,13 @@ function startAuthSubscription() {
           },
           loading: false,
         });
+        if (!importedClaimStarted && role === "participant" && user.emailVerified === true && user.email?.trim()) {
+          importedClaimStarted = true;
+          // Optional private-import matching must never delay sign-in or bypass
+          // onboarding. The normal profile listener receives any membership edit.
+          void claimImportedParticipantEnrollment(db, user, () => authSubscription === subscription
+            && generation === authGeneration && auth.currentUser?.uid === user.uid).catch(() => {});
+        }
       },
       () => {
         if (generation !== authGeneration || auth.currentUser?.uid !== user.uid) return;

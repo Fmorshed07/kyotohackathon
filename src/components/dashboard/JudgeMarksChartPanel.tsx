@@ -60,16 +60,20 @@ function fromAdminRows(submissions: AdminSubmissionRow[]): JudgeMarkChartInput[]
   }));
 }
 
+function judgeParticipantLabel(value?: string | null): string | null {
+  const label = value?.trim();
+  return label && !label.includes("@") ? label : null;
+}
+
 function fromJudgeSubmissions(submissions: Submission[]): JudgeMarkChartInput[] {
   return submissions.map((submission) => ({
     id: submission.id,
     title: submission.title,
-    teamName: submission.team_name,
+    teamName: judgeParticipantLabel(submission.team_name),
     participantLabel:
-      submission.owner_email?.trim() ||
-      submission.owner_name?.trim() ||
-      submission.team_name?.trim() ||
-      "Builder",
+      judgeParticipantLabel(submission.owner_name) ||
+      judgeParticipantLabel(submission.team_name) ||
+      "Participant",
     averageScore: typeof submission.judge_score === "number" ? submission.judge_score : null,
     scoredByCount: typeof submission.judge_score === "number" ? 1 : 0,
     judgeMarks: [

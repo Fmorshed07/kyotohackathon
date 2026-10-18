@@ -8,6 +8,7 @@ import { useHackathonCriteria } from "@/hooks/useHackathonCriteria";
 import { useHackathonSelection } from "@/hooks/useHackathonSelection";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { formDraftStorageKey } from "@/lib/formDrafts";
+import { subscribeToEventParticipants, type EventParticipant } from "@/lib/eventParticipants";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { JudgeDashboard } from "@/components/dashboard/JudgeDashboard";
 import { JudgeFinalShortlistPanel } from "@/components/dashboard/JudgeFinalShortlistPanel";
@@ -204,6 +205,37 @@ export default function JudgeDashboardPage() {
     { syncUrl: true, preferCurrent: true },
   );
   const canAccessSelectedHackathon = allowedHackathonIds.includes(selectedHackathonId);
+  const sessionAssignedIds = sessionUser ? getUserAllowedHackathonIds(sessionUser) : [];
+  const canReadRoster = !authLoading && !isFinalShortlistPage
+    && canAccessStaffDashboard(sessionUser?.role, sessionUser?.judgeApprovalStatus)
+    && sessionAssignedIds.includes(selectedHackathonId);
+  const participantScope = canReadRoster ? `${sessionUser!.id}:${sessionUser!.role}:${selectedHackathonId}` : null;
+  const [participantRoster, setParticipantRoster] = useState<{
+    scope: string | null; rows: EventParticipant[]; loading: boolean; error: string | null;
+  }>({ scope: null, rows: [], loading: false, error: null });
+  const [participantRetry, setParticipantRetry] = useState(0);
+
+  useEffect(() => {
+    setParticipantRoster({ scope: participantScope, rows: [], loading: Boolean(participantScope), error: null });
+    if (!participantScope) return;
+    let current = true;
+    let unsubscribe: (() => void) | undefined;
+    const fail = () => {
+      if (current) setParticipantRoster({ scope: participantScope, rows: [], loading: false, error: "Could not load registered participants. Please try again." });
+    };
+    try {
+      unsubscribe = subscribeToEventParticipants(db, selectedHackathonId, (rows) => {
+        if (current) setParticipantRoster({ scope: participantScope, rows, loading: false, error: null });
+      }, fail);
+    } catch {
+      fail();
+    }
+    return () => { current = false; unsubscribe?.(); };
+  }, [db, participantScope, selectedHackathonId, participantRetry]);
+
+  const visibleParticipants = participantRoster.scope === participantScope && participantScope ? participantRoster.rows : [];
+  const isLoadingParticipants = Boolean(participantScope) && (participantRoster.scope !== participantScope || participantRoster.loading);
+  const participantRosterError = participantRoster.scope === participantScope ? participantRoster.error : null;
   const { criteria: judgingCriteria, isLoading: isLoadingCriteria } =
     useHackathonCriteria(selectedHackathonId);
 
@@ -934,6 +966,10 @@ export default function JudgeDashboardPage() {
       ) : (
         <JudgeDashboard
           selectedHackathon={selectedHackathon}
+          participants={visibleParticipants}
+          isLoadingParticipants={isLoadingParticipants}
+          participantRosterError={participantRosterError}
+          onRetryParticipants={() => setParticipantRetry((current) => current + 1)}
           judgingCriteria={judgingCriteria}
           submissions={filteredJudgeSubmissions}
           isLoadingSubmissions={isWorkspaceLoading}

@@ -1,0 +1,23 @@
+{
+  "verifiedOn": "2026-10-18",
+  "timezone": "Asia/Tokyo",
+  "projectId": "hackathon-tokyo",
+  "databaseId": "(default)",
+  "databaseEdition": "STANDARD",
+  "eventId": "impact-osaka-2026",
+  "source": "approved Luma guest CSV supplied by the organizer",
+  "sourceRows": 80,
+  "approvedRegistrationsImported": 80,
+  "safeRosterEntriesReadbackVerified": 80,
+  "matchingExistingParticipantAccounts": 10,
+  "existingParticipantAccountsUpdatedWithMembership": 5,
+  "existingOtherRoleAccountsPreserved": 3,
+  "guestRegistrationsWithoutPortalAccount": 67,
+  "authAccountsCreated": 0,
+  "emailsSent": 0,
+  "rawCsvCommitted": false,
+  "judgeRosterFields": ["display_name", "attendance_mode", "approval_status", "source"],
+  "privateContactCollection": "participant_registrations",
+  "rulesValidation": { "emulatorTestsPassed": 175, "productionCompilation": "passed", "productionDeployment": "successful" },
+  "notes": "Registrations are separate from teams and submitted projects. New guests claim event enrollment through the same verified email after choosing participant access. Imported names never overwrite profiles or bypass onboarding."
+}

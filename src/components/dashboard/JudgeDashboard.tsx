@@ -14,6 +14,8 @@ import { HackathonContextBanner } from "@/components/dashboard/HackathonSelector
 import { JudgingStatsPanel } from "@/components/dashboard/JudgingStatsPanel";
 import { JudgeScoringWorkspace } from "@/components/dashboard/JudgeScoringWorkspace";
 import { JudgeMarksChartPanel } from "@/components/dashboard/JudgeMarksChartPanel";
+import { JudgeParticipantRoster } from "@/components/dashboard/JudgeParticipantRoster";
+import type { EventParticipant } from "@/lib/eventParticipants";
 import {
   getSubmissionAccentStyle,
   getTeamAccentStyle,
@@ -32,8 +34,9 @@ import { formatSubmissionDateTime } from "@/lib/datetime";
 import { getFinalShortlist } from "@/lib/finalShortlist";
 
 const JUDGE_JUMP_LINKS = [
-  { href: "#teams", label: "1. Teams", icon: Users },
-  { href: "#submissions", label: "2. Score", icon: ClipboardList },
+  { href: "#participants", label: "1. Participants", icon: Users },
+  { href: "#teams", label: "2. Teams", icon: Users },
+  { href: "#submissions", label: "3. Score", icon: ClipboardList },
 ] as const;
 
 type TeamSummary = {
@@ -67,6 +70,10 @@ export type JudgeDashboardProps = {
   onNotesChange: (id: string, value: string) => void;
   onSave: (submissionId: string) => Promise<void>;
   savingSubmissionId?: string | null;
+  participants?: readonly EventParticipant[];
+  isLoadingParticipants?: boolean;
+  participantRosterError?: string | null;
+  onRetryParticipants?: () => void;
 };
 
 export function JudgeDashboard({
@@ -82,6 +89,10 @@ export function JudgeDashboard({
   onNotesChange,
   onSave,
   savingSubmissionId,
+  participants = [],
+  isLoadingParticipants = false,
+  participantRosterError = null,
+  onRetryParticipants,
 }: JudgeDashboardProps) {
   const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -340,6 +351,9 @@ export function JudgeDashboard({
           </div>
         ) : null}
       </section>
+
+      <JudgeParticipantRoster key={selectedHackathon.id} eventName={selectedHackathon.name}
+        participants={participants} isLoading={isLoadingParticipants} error={participantRosterError} onRetry={onRetryParticipants} />
 
       <section className={`${sectionClass} scroll-mt-24`} id="teams" aria-label="Teams">
         <div className="mb-5 flex items-start gap-3 border-b border-white/10 pb-4">

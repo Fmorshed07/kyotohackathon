@@ -1,0 +1,42 @@
+{
+  "score": 1,
+  "summary": "Scoped local audit of private imported participant registrations and email-free per-event judge rosters on 2026-10-18 JST. All 175 Firestore emulator tests passed: 42 new import-privacy and roster cases plus 133 existing permission regressions. The tested firestore.rules LF-normalized SHA-256 is e86d9b937623395553e8ad507b43f8fac594b0b4c2c9946c9b40d23675eb0db2. New registration emails are readable only by current stored database admins or an authenticated owner with a verified matching email; roster readers receive a separate four-field document without email or private registration metadata. This is local verification, not confirmation of a production deployment, database edition or participant import. This audit subtask made no production document writes. The overall repository score remains 1 because inherited administrator authority, staff assignment and legacy profile/submission privacy risks remain outside this additive change.",
+  "findings": [
+    {
+      "check": "Inherited administrator authority",
+      "severity": "critical",
+      "issue": "The new paths grant administration only from a current stored admin/admins role, exclude anonymous identities, and do not directly inherit the legacy portal-admin email shortcut or request role claims. However, existing user provisioning and role-authority paths can affect the stored role itself. The broader administrator bootstrap risks documented in submission-permissions-audit.json remain unchanged.",
+      "recommendation": "Manage administrator identity through trusted provisioning in a separate coordinated authority change. Retain current-role, anonymous-account, forged-claim and legacy email-shortcut regressions for these new paths. Do not present a stored-role check as a repair of upstream role escalation."
+    },
+    {
+      "check": "Imported email isolation and verified ownership",
+      "severity": "minor",
+      "issue": "No scoped bypass found: participant_registrations is separate from broadly readable user profiles. Assigned judges, mentors, hosts, participants with different verified emails, signed-out users and unverified email identities cannot read another registrant's email. A verified auth email can read its own matching registration even before a portal profile exists, including a query constrained to that normalized email with a maximum limit of 100. Owners cannot create, update, claim or delete registration documents.",
+      "recommendation": "Keep email matching tied to the verified authentication token rather than a submitted email or user profile field. Keep private records out of judge roster fetches, application logs, URLs and committed CSV exports. Any future registration claim write requires a separate trusted or tightly validated authority path."
+    },
+    {
+      "check": "Event-scoped roster visibility and inherited self-editable assignments",
+      "severity": "moderate",
+      "issue": "Roster reads require a current approved judge/mentor role and the requested event in the current stored hackathon_ids list. An explicit empty or malformed list denies legacy primary-event fallback; only an absent list permits hackathon_id fallback. Pending/unassigned staff, participants, public visitors and approved event-owning hosts are denied. However, legacy canUpdateOwnProfile permits a user to edit their own hackathon_id/hackathon_ids, including approved staff. Such staff can change their stored assignment and gain access to another event's email-free roster. The new private registration email rules do not depend on event assignment and remain protected from this path.",
+      "recommendation": "Restrict staff assignment changes to trusted administrators or valid assignment invitations in a separate coordinated fix, preserving legitimate participant self-enrollment. Until then, describe the roster gate as current stored assignment enforcement rather than tamper-proof administrator-managed assignment."
+    },
+    {
+      "check": "Existing user and submission privacy boundary",
+      "severity": "moderate",
+      "issue": "The existing users rules allow approved staff to read user documents and permit signed-in reads of participant profiles; existing submissions reads also grant approved staff broad access. These records can already contain email fields. This additive import stores new registration emails privately and does not copy them into the roster, but it does not remove emails from existing profiles/submissions or prevent their legacy reads.",
+      "recommendation": "Avoid claiming that all portal emails are hidden from judges. Review legacy user/submission schemas and read permissions separately before promising broader privacy. Keep imported registration and safe roster documents separate even if a UI chooses not to display an email."
+    },
+    {
+      "check": "Create/update consistency, types and bounded payloads",
+      "severity": "minor",
+      "issue": "No scoped bypass found: both registration create and update require exactly ten fields, normalized valid bounded email, bounded event/name/source guest/registration timestamp/matched-user values, an approved Luma registration, a recognized attendance enum, and imported_at equal to the server request time. Both roster create and update allow only display_name, attendance_mode, approval_status and source. Roster names must be nonblank, at most 120 characters and contain no @ character. Both document types require a lowercase 64-character hexadecimal opaque ID. Missing/extra fields, extra email fields, email-bearing roster names, invalid values and timestamp manipulation were denied.",
+      "recommendation": "Preserve the same validators on every write path. Trusted Admin SDK writes bypass these rules, so keep importer validation and exact roster projection tests as well. Do not add raw CSV rows, email-derived plaintext IDs, contact links or private source metadata to the safe projection."
+    },
+    {
+      "check": "Read bounds, mutations and role separation",
+      "severity": "minor",
+      "issue": "No scoped bypass found: authorized roster queries are limited to 500 entries; public parent-event visibility does not grant child-roster reads. Collection-group attempts by a judge do not bypass event scoping. Only current database admins may write or delete either document type. Assigned staff cannot edit, replace or delete roster entries. Admin private-registration listing is intentionally not limited by this rules layer to support controlled imports.",
+      "recommendation": "Keep import scripts restricted to an explicitly verified project/event and provide a count-only dry run before production writes. Add pagination deliberately when the roster exceeds its current 500-entry read window. Keep registrations separate from scored submissions so approved registrants without projects do not create synthetic judging entries."
+    }
+  ]
+}

@@ -551,6 +551,94 @@ service cloud.firestore {
         );
     }
 
+    // Imported registrations contain private email addresses. The judge roster is
+    // a separate, email-free projection; parent event visibility does not apply.
+    function isParticipantRegistrationAdmin() {
+      return userDocExists()
+        && request.auth.token.get("firebase", {}).get("sign_in_provider", "") != "anonymous"
+        && currentUserRole() in ["admin", "admins"];
+    }
+
+    function isOwnVerifiedParticipantRegistration() {
+      return isSignedIn()
+        && request.auth.token.get("email_verified", false) == true
+        && request.auth.token.get("email", null) is string
+        && request.auth.token.get("firebase", {}).get("sign_in_provider", "") != "anonymous"
+        && resource.data.email == request.auth.token.email.lower();
+    }
+
+    function isAssignedParticipantRosterStaff(hackathonId) {
+      let user = userDocExists() ? get(userDocPath()).data : {};
+      return isApprovedStaff()
+        && request.auth.token.get("firebase", {}).get("sign_in_provider", "") != "anonymous"
+        && (
+          ("hackathon_ids" in user)
+            ? (user.hackathon_ids is list && hackathonId in user.hackathon_ids)
+            : user.get("hackathon_id", "") == hackathonId
+        );
+    }
+
+    function isValidParticipantImportId(value) {
+      return value is string && value.matches('^[a-f0-9]{64}$');
+    }
+
+    function isValidParticipantAttendance(value) {
+      return value in ["online", "onsite", "unspecified"];
+    }
+
+    function isValidImportedParticipantName(value) {
+      return value is string && value.size() > 0 && value.size() <= 120
+        && value.matches('(?s).*[^\\s].*');
+    }
+
+    function isValidPrivateParticipantRegistration(data) {
+      let fields = ["hackathon_id", "email", "display_name", "attendance_mode", "approval_status", "source", "source_guest_id", "registered_at", "imported_at", "matched_user_id"];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && data.hackathon_id is string && data.hackathon_id.matches('^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$')
+        && data.email is string && data.email.size() <= 254
+        && data.email == data.email.lower()
+        && data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && isValidImportedParticipantName(data.display_name)
+        && isValidParticipantAttendance(data.attendance_mode)
+        && data.approval_status == "approved" && data.source == "luma"
+        && data.source_guest_id is string && data.source_guest_id.size() > 0 && data.source_guest_id.size() <= 128
+        && data.registered_at is string && data.registered_at.size() <= 80
+        && data.imported_at is timestamp && data.imported_at == request.time
+        && (data.matched_user_id == null || (
+          data.matched_user_id is string && data.matched_user_id.size() > 0 && data.matched_user_id.size() <= 128
+        ));
+    }
+
+    function isValidParticipantRosterEntry(data) {
+      let fields = ["display_name", "attendance_mode", "approval_status", "source"];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && isValidImportedParticipantName(data.display_name) && !data.display_name.matches('(?s).*@.*')
+        && isValidParticipantAttendance(data.attendance_mode)
+        && data.approval_status == "approved" && data.source == "luma";
+    }
+
+    match /participant_registrations/{registrationId} {
+      allow get: if isParticipantRegistrationAdmin() || isOwnVerifiedParticipantRegistration();
+      allow list: if isParticipantRegistrationAdmin() || (
+        isOwnVerifiedParticipantRegistration()
+        && request.query.limit != null && request.query.limit <= 100
+      );
+      allow create, update: if isParticipantRegistrationAdmin()
+        && isValidParticipantImportId(registrationId)
+        && isValidPrivateParticipantRegistration(request.resource.data);
+      allow delete: if isParticipantRegistrationAdmin();
+    }
+
+    match /hackathons/{hackathonId}/participant_roster/{participantId} {
+      allow get: if isParticipantRegistrationAdmin() || isAssignedParticipantRosterStaff(hackathonId);
+      allow list: if (isParticipantRegistrationAdmin() || isAssignedParticipantRosterStaff(hackathonId))
+        && request.query.limit != null && request.query.limit <= 500;
+      allow create, update: if isParticipantRegistrationAdmin()
+        && isValidParticipantImportId(participantId)
+        && isValidParticipantRosterEntry(request.resource.data);
+      allow delete: if isParticipantRegistrationAdmin();
+    }
+
     // Cross-event community: all registered members, independent of event access.
     function isCommunityMember() {
       return userDocExists()

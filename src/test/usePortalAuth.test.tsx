@@ -3,7 +3,7 @@ import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 
-type AuthUser = { uid: string; email: string };
+type AuthUser = { uid: string; email: string; emailVerified?: boolean };
 type ProfileSnapshot = { data: () => Record<string, unknown> };
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   onAuthStateChanged: vi.fn(),
   onSnapshot: vi.fn(),
   signOut: vi.fn(),
+  claimImported: vi.fn(),
 }));
 
 vi.mock("firebase/auth", () => ({
@@ -36,6 +37,7 @@ vi.mock("@/lib/firebaseClient", () => ({
   getFirebaseAuth: () => mocks.auth,
   getFirestoreDb: () => ({}),
 }));
+vi.mock("@/lib/importedParticipantEnrollment", () => ({ claimImportedParticipantEnrollment: mocks.claimImported }));
 
 const accountA = { uid: "participant-a", email: "a@example.com" };
 const accountB = { uid: "participant-b", email: "b@example.com" };
@@ -71,6 +73,7 @@ beforeEach(() => {
     return unsubscribe;
   });
   mocks.signOut.mockImplementation(async () => { emitAuth(null); });
+  mocks.claimImported.mockReset().mockResolvedValue(false);
 });
 
 afterEach(async () => {
@@ -262,5 +265,58 @@ describe("shared portal authentication", () => {
     expect(mocks.onAuthStateChanged).toHaveBeenCalledTimes(1);
     expect(mocks.authObservers[0].unsubscribe).not.toHaveBeenCalled();
     expect(view.result.current.sessionUser?.id).toBe(accountA.uid);
+  });
+
+  it("claims private imports once after a verified participant profile resolves and observes membership updates normally", () => {
+    const verified = { ...accountA, emailVerified: true };
+    const view = renderHook(() => usePortalAuth());
+    act(() => emitAuth(verified));
+    expect(mocks.claimImported).not.toHaveBeenCalled();
+    act(() => mocks.profiles[0].next({ data: () => ({ role: "participant", fullName: "Saved name", hackathon_ids: ["existing-event"] }) }));
+    expect(mocks.claimImported).toHaveBeenCalledOnce();
+    expect(mocks.claimImported.mock.calls[0][1]).toBe(verified);
+    expect(mocks.claimImported.mock.calls[0][2]()).toBe(true);
+    expect(view.result.current.loading).toBe(false);
+    expect(view.result.current.sessionUser?.onboardingCompletedAt).toBeNull();
+    act(() => mocks.profiles[0].next({ data: () => ({ role: "participant", fullName: "Saved name", hackathon_ids: ["existing-event", "impact-osaka-2026"] }) }));
+    expect(view.result.current.sessionUser?.hackathonIds).toEqual(["existing-event", "impact-osaka-2026"]);
+    expect(view.result.current.sessionUser?.profile?.fullName).toBe("Saved name");
+    expect(mocks.claimImported).toHaveBeenCalledOnce();
+  });
+
+  it.each(["judge", "mentor", "host", "admin", undefined])("does not request a participant import claim for %s", role => {
+    renderHook(() => usePortalAuth());
+    act(() => {
+      emitAuth({ ...accountA, emailVerified: true });
+      mocks.profiles[0].next({ data: () => ({ role }) });
+    });
+    expect(mocks.claimImported).not.toHaveBeenCalled();
+  });
+
+  it("does not match private imports for an unverified participant", () => {
+    renderHook(() => usePortalAuth());
+    act(() => { emitAuth({ ...accountA, emailVerified: false }); emitProfile(0, "Participant A"); });
+    expect(mocks.claimImported).not.toHaveBeenCalled();
+  });
+
+  it("does not block the resolved session when optional import enrollment fails", async () => {
+    mocks.claimImported.mockRejectedValueOnce(new Error("Import lookup unavailable"));
+    const view = renderHook(() => usePortalAuth());
+    await act(async () => { emitAuth({ ...accountA, emailVerified: true }); emitProfile(0, "Participant A"); });
+    expect(view.result.current.loading).toBe(false);
+    expect(view.result.current.sessionUser).toMatchObject({ id: accountA.uid, role: "participant", onboardingCompletedAt: "2026-10-01" });
+    expect(mocks.claimImported).toHaveBeenCalledOnce();
+  });
+
+  it("invalidates an old claim's scope during account switches and does not replay it from stale profiles", () => {
+    renderHook(() => usePortalAuth());
+    act(() => { emitAuth({ ...accountA, emailVerified: true }); emitProfile(0, "Participant A"); });
+    const oldScope = mocks.claimImported.mock.calls[0][2];
+    act(() => emitAuth({ ...accountB, emailVerified: true }));
+    expect(oldScope()).toBe(false);
+    act(() => { emitProfile(0, "Stale A"); emitProfile(1, "Participant B"); });
+    expect(mocks.claimImported).toHaveBeenCalledTimes(2);
+    expect(mocks.claimImported.mock.calls[1][1].uid).toBe(accountB.uid);
+    expect(mocks.claimImported.mock.calls[1][2]()).toBe(true);
   });
 });

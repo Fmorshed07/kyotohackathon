@@ -10,6 +10,7 @@ import { AdminPeopleDirectory, type AdminPeopleFilter } from "./AdminPeopleDirec
 import { AdminTeamsPanel } from "./AdminTeamsPanel";
 import { AdminNewsletterPanel } from "./AdminNewsletterPanel";
 import { JudgeInvitePanel } from "./JudgeInvitePanel";
+import { AdminEventParticipants } from "./AdminEventParticipants";
 import type { AdminDashboardProps } from "./AdminDashboard";
 import { withHackathonQuery } from "@/lib/hackathons";
 
@@ -27,6 +28,7 @@ type Props = Pick<AdminDashboardProps,
 
 const views = [
   { value: "directory", label: "Directory", hash: "manage-all-users", icon: Users },
+  { value: "registrations", label: "Registrations", hash: "event-registrations", icon: Users },
   { value: "requests", label: "Requests", hash: "manage-judge-approvals", icon: ShieldCheck },
   { value: "invites", label: "Invite & access", hash: "judge-invites", icon: UserPlus },
   { value: "teams", label: "Teams", hash: "event-teams", icon: Users },
@@ -35,6 +37,7 @@ const views = [
 ] as const;
 
 function viewForHash(hash: string) {
+  if (hash === "event-registrations") return "registrations";
   if (["manage-judge-approvals", "manage-judge-pending"].includes(hash)) return "requests";
   if (["judge-invites", "grant-admin-access"].includes(hash)) return "invites";
   if (hash === "event-teams") return "teams";
@@ -85,7 +88,7 @@ export function AdminPeopleWorkspace(props: Props) {
         </div>
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-3">
           {[
-            { label: "Event participants", count: users.filter(user => user.role === "participant").length },
+            { label: "Participant accounts", count: users.filter(user => user.role === "participant").length },
             { label: "Awaiting approval", count: pending.length },
             { label: "Event teams", count: props.submissions.length },
           ].map(item => <div key={item.label} className="flex items-baseline gap-2">
@@ -96,7 +99,7 @@ export function AdminPeopleWorkspace(props: Props) {
       </section>
 
       <Tabs value={activeView} onValueChange={value => goTo(views.find(view => view.value === value)!.hash)}>
-        <TabsList aria-label="People workspace views" className="mb-4 grid w-full grid-cols-2 gap-1 p-1.5 sm:grid-cols-3 xl:grid-cols-6">
+        <TabsList aria-label="People workspace views" className="mb-4 grid w-full grid-cols-2 gap-1 p-1.5 sm:grid-cols-4 xl:grid-cols-7">
           {views.map(({ value, label, icon: Icon }) => <TabsTrigger key={value} value={value} className="gap-2 py-2.5">
             <Icon className="h-4 w-4" aria-hidden />{label}
             {value === "requests" && pending.length > 0 && <span className="rounded-full bg-primary/15 px-1.5 text-xs tabular-nums text-primary">{pending.length}</span>}
@@ -116,6 +119,10 @@ export function AdminPeopleWorkspace(props: Props) {
           <div id={hash === "manage-judge-pending" ? hash : "manage-judge-approvals"}>
             <AdminPeopleDirectory key={selectedHackathon.id} {...directoryProps} users={pending} initialFilter="pending" />
           </div>
+        </TabsContent>
+
+        <TabsContent value="registrations">
+          <AdminEventParticipants eventId={selectedHackathon.id} eventName={selectedHackathon.name} />
         </TabsContent>
 
         <TabsContent value="invites" className="space-y-4">
