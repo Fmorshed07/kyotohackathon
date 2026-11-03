@@ -34,17 +34,22 @@ export function getEventReportKey(event: Pick<HostedHackathon, 'id' | 'lumaUrl' 
   return archive?.portalIds?.[0] ?? (archive ? `luma-${archive.slug}` : event.id);
 }
 
-function platformMetrics(eventId: string): ReportMetric[] {
-  type SnapshotRow = {eventId: string; portalParticipantAccounts: number; projectRecords: number; namedProjectRecords: number; videoProjectRecords: number; publicProjectRecords: number; approvedImportedRegistrations: number | null};
-  const row = (snapshot.events as SnapshotRow[]).find(row => row.eventId === eventId);
+export type EventMetricSnapshotRow = {eventId: string; portalParticipantAccounts: number; projectRecords: number; namedProjectRecords: number; videoProjectRecords: number; publicProjectRecords: number; approvedImportedRegistrations: number | null};
+
+export function resolveEventMetricSnapshotRow(rows: readonly EventMetricSnapshotRow[], eventId: string, canonicalId: string) {
+  return rows.find(row => row.eventId === eventId) ?? rows.find(row => row.eventId === canonicalId);
+}
+
+function platformMetrics(eventId: string, canonicalId: string): ReportMetric[] {
+  const row = resolveEventMetricSnapshotRow(snapshot.events as EventMetricSnapshotRow[], eventId, canonicalId);
   if (!row || !snapshot.capturedAt) return [];
-  const fields: Array<[keyof SnapshotRow, string, string]> = [
-    ['portalParticipantAccounts', 'Portal participant accounts', 'Participant accounts with this event in their recorded membership. These are not checked-in attendees; one person may join several events.'],
+  const fields: Array<[keyof EventMetricSnapshotRow, string, string]> = [
+    ['portalParticipantAccounts', 'Portal participant accounts', 'Participant profile records with this event in their membership. These are not checked-in attendees or unique people across events.'],
     ['projectRecords', 'Project records', 'All saved project records assigned to this event, including incomplete drafts. This does not certify valid competition submissions.'],
     ['namedProjectRecords', 'Named project records', 'Saved project records with a nonblank title. These can still be incomplete and are not unique teams.'],
     ['videoProjectRecords', 'Records with video links', 'Saved project records with a nonblank demo-video URL. Links have not been independently validated.'],
-    ['publicProjectRecords', 'Published project records', 'Project records in the public showcase collection for this event.'],
-    ['approvedImportedRegistrations', 'Approved guest registrations', 'Approved imported registration records. Registrations may overlap portal accounts and are not confirmed attendance.'],
+    ['publicProjectRecords', 'Published project records', 'Records available to the public gallery for this event, excluding explicitly withdrawn entries.'],
+    ['approvedImportedRegistrations', 'Approved imported registrations', 'Approved records in the imported-registration collection. Zero means no approved imported records; it does not measure all external signups. Registrations may overlap accounts and are not attendance.'],
   ];
   return fields.map(([key, label, definition]) => ({id:key,label,value:typeof row[key] === 'number' ? row[key] as number : null,definition,sourceLabel:'Platform aggregate snapshot',asOf:snapshot.capturedAt!,qualifier:'Snapshot'}));
 }
@@ -53,7 +58,7 @@ export function getEventReport(event: HostedHackathon): PublicEventReport {
   const key = getEventReportKey(event);
   const evidence = EVENT_REPORT_EVIDENCE[key];
   const checkedAt = evidence ? REPORT_CHECKED_AT : '';
-  const metrics = [...(evidence?.metrics ?? []), ...platformMetrics(key)];
+  const metrics = [...(evidence?.metrics ?? []), ...platformMetrics(event.id, key)];
   const unknowns: ReportMetric[] = [
     {id:'confirmed-attendance',label:'Verified attendance',value:null,definition:'A deduplicated check-in or attendance record has not been supplied for this report. Registration and Luma Went labels are reported separately.',sourceLabel:'Not independently verified',asOf:REPORT_CHECKED_AT},
     {id:'instagram-reach',label:'Instagram event reach',value:null,definition:'Account Insights or an event-specific analytics export is needed. Public access did not expose verified post-level metrics.',sourceLabel:'Instagram Insights required',asOf:REPORT_CHECKED_AT},

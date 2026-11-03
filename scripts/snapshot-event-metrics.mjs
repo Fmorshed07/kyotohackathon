@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, inMemoryPersistence, setPersistence, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, getFirestore, terminate } from 'firebase/firestore';
+import { buildEventMetricsSnapshot } from './lib/eventMetricsSnapshot.mjs';
 
 // Produces public aggregates only. Raw accounts, registrations and project fields
 // stay in memory and are never logged or written to disk. No cloud writes.
@@ -26,29 +27,11 @@ try{
     getDocs(collection(db,'hackathons')),getDocs(collection(db,'users')),getDocs(collection(db,'submissions')),
     getDocs(collection(db,'participant_registrations')),getDocs(collection(db,'public_projects')),
   ]);
-  const published=new Map(events.docs.filter(row=>row.data().published===true).map(row=>[row.id,row.data()]));
-  const hidden=new Set(events.docs.filter(row=>row.data().published!==true).map(row=>row.id));
-  const ids=new Set(['impact-tokyo','impact-kyoto','impact-dhaka',...published.keys()].filter(id=>!hidden.has(id)));
-  const reports=[];
-  for(const id of [...ids].sort()){
-    const members=users.docs.filter(row=>{
-      const data=row.data();if(!['participant','participants'].includes(data.role))return false;
-      const memberships=Array.isArray(data.hackathon_ids)?data.hackathon_ids:typeof data.hackathon_id==='string'?[data.hackathon_id]:[];
-      return memberships.includes(id);
-    });
-    const entries=projects.docs.filter(row=>(row.data().hackathon_id||'impact-tokyo')===id);
-    const approved=registrations.docs.filter(row=>row.data().hackathon_id===id&&row.data().approval_status==='approved');
-    const publicEntries=publicProjects.docs.filter(row=>row.data().hackathon_id===id);
-    const event=published.get(id);
-    reports.push({eventId:id,...(event?{name:event.name,eventDate:event.eventDate,location:event.location,sourceUrl:event.sourceUrl||event.lumaUrl||null}:{}),
-      portalParticipantAccounts:members.length,projectRecords:entries.length,
-      namedProjectRecords:entries.filter(row=>typeof row.data().title==='string'&&row.data().title.trim()).length,
-      videoProjectRecords:entries.filter(row=>typeof row.data().demo_video_url==='string'&&row.data().demo_video_url.trim()).length,
-      publicProjectRecords:publicEntries.length,
-      approvedImportedRegistrations:approved.length?approved.length:null,
-    });
-  }
-  const payload={capturedAt:new Date().toISOString(),basis:'Read-only aggregate snapshot of published event records. Accounts and project records are not attendance or validated submissions; imported registrations may overlap accounts.',events:reports};
+  const payload=buildEventMetricsSnapshot({
+    events:events.docs.map(row=>({id:row.id,data:row.data()})),users:users.docs.map(row=>row.data()),
+    projects:projects.docs.map(row=>row.data()),registrations:registrations.docs.map(row=>row.data()),
+    publicProjects:publicProjects.docs.map(row=>row.data()),
+  },new Date().toISOString());
   const output=fileURLToPath(new URL('../src/data/eventMetricsSnapshot.json',import.meta.url));
   if(apply)writeFileSync(output,JSON.stringify(payload,null,2)+'\n');
   console.log(JSON.stringify({result:apply?'aggregate_snapshot_written':'dry_run_no_files_changed',...payload}));

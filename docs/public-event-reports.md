@@ -28,24 +28,27 @@ new events receive an honest evidence-availability fallback.
 
 ## Optional platform aggregates
 
-The checked-in `eventMetricsSnapshot.json` is intentionally empty. Automatic
-approval review rejected extracting private records and publishing aggregates
-without specific user authorization. No private registrations, user profiles,
-submissions or scores were accessed for this reporting change.
+On 3 November 2026 JST the user explicitly approved admin access to count private
+registrations, participant accounts and project records, and publish only the
+per-event totals. `eventMetricsSnapshot.json` contains the approved read-only
+snapshot. It includes only event IDs, counts, capture time and the counting basis.
+No names, contacts, project details or individual marks are published.
 
-`scripts/snapshot-event-metrics.mjs` is prepared for a separately authorized
-operator run. It requires an explicit approval flag before even a dry run:
+`scripts/snapshot-event-metrics.mjs` requires an explicit approval flag before
+even a dry run:
 
 ```powershell
 node --env-file=.env.local scripts/snapshot-event-metrics.mjs --approved-public-aggregate-access --write
 ```
 
-Do not run this until the user explicitly approves private-record aggregation
-and public disclosure of the per-event totals. It uses the existing admin,
-performs no cloud writes, and outputs only public event metadata and counts.
-An approved snapshot must be reviewed before release. It never publishes names,
-contacts, private project details or individual marks. These counts do not
-certify attendance or valid competition submissions.
+The user's authorization covers this aggregate-only boundary. The script uses
+the existing admin, performs no cloud writes, and outputs only event IDs and
+counts. Review each snapshot before release. The helper preserves explicit
+empty membership lists, uses the portal's legacy Tokyo mapping, excludes
+withdrawn public-project records, and counts legacy video-link formats.
+Imported-registration zero means no approved records in that collection, not
+zero external signups. These counts do not certify attendance or valid
+competition submissions. Measured figures are never multiplied into targets.
 
 Review screenshots are stored under
 `F:/AI Projects/kyotohackathon-reports/review-assets/`. The existing source

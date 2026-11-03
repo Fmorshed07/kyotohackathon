@@ -1,5 +1,51 @@
 {
-  "capturedAt": null,
-  "basis": "No private platform aggregates have been published for this report.",
-  "events": []
+  "capturedAt": "2026-11-03T07:31:08.709Z",
+  "basis": "Read-only aggregate snapshot for public events. Account memberships, saved project records and imported registrations are separate measures, may overlap, and do not certify attendance or valid competition submissions.",
+  "events": [
+    {
+      "eventId": "ai-ideathon-2026-q9pxii",
+      "portalParticipantAccounts": 78,
+      "projectRecords": 28,
+      "namedProjectRecords": 26,
+      "videoProjectRecords": 21,
+      "publicProjectRecords": 15,
+      "approvedImportedRegistrations": 0
+    },
+    {
+      "eventId": "elevenlabs-meetup-tokyo-2026",
+      "portalParticipantAccounts": 11,
+      "projectRecords": 0,
+      "namedProjectRecords": 0,
+      "videoProjectRecords": 0,
+      "publicProjectRecords": 0,
+      "approvedImportedRegistrations": 0
+    },
+    {
+      "eventId": "impact-dhaka",
+      "portalParticipantAccounts": 0,
+      "projectRecords": 0,
+      "namedProjectRecords": 0,
+      "videoProjectRecords": 0,
+      "publicProjectRecords": 0,
+      "approvedImportedRegistrations": 0
+    },
+    {
+      "eventId": "impact-osaka-2026",
+      "portalParticipantAccounts": 16,
+      "projectRecords": 8,
+      "namedProjectRecords": 8,
+      "videoProjectRecords": 7,
+      "publicProjectRecords": 4,
+      "approvedImportedRegistrations": 80
+    },
+    {
+      "eventId": "impact-tokyo",
+      "portalParticipantAccounts": 0,
+      "projectRecords": 13,
+      "namedProjectRecords": 12,
+      "videoProjectRecords": 6,
+      "publicProjectRecords": 0,
+      "approvedImportedRegistrations": 0
+    }
+  ]
 }

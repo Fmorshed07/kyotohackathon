@@ -3,7 +3,8 @@ import { getBundledHackathon } from '@/lib/bundledHackathons';
 import { portalHackathonAsHosted } from '@/lib/aiHackathons';
 import { PORTAL_HACKATHONS } from '@/lib/hackathons';
 import { EVENT_REPORT_EVIDENCE } from '@/data/eventReportEvidence';
-import { getEventReport, getEventReportHref, getEventReportKey, safeReportSourceUrl } from '@/lib/eventReports';
+import { getEventReport, getEventReportHref, getEventReportKey, resolveEventMetricSnapshotRow, safeReportSourceUrl } from '@/lib/eventReports';
+import snapshot from '@/data/eventMetricsSnapshot.json';
 const osaka=getBundledHackathon('impact-osaka-2026')!;
 describe('public event reports',()=>{
   it('keeps unknown attendance and private social analytics unavailable, not zero',()=>{
@@ -35,5 +36,25 @@ describe('public event reports',()=>{
       expect(Number.isFinite(metric.value)).toBe(true);expect(metric.value).toBeGreaterThanOrEqual(0);
       expect(safeReportSourceUrl(metric.sourceUrl)).toBeTruthy();expect(metric.definition.length).toBeGreaterThan(20);expect(metric.asOf).toBe('2026-11-03');
     }
+  });
+  it('prefers actual stored event counts over canonical evidence aliases without adding them',()=>{
+    const base={portalParticipantAccounts:0,projectRecords:0,namedProjectRecords:0,videoProjectRecords:0,publicProjectRecords:0,approvedImportedRegistrations:0};
+    const canonical={...base,eventId:'impact-tokyo'};
+    const stored={...base,eventId:'stored-tokyo',projectRecords:7};
+    expect(resolveEventMetricSnapshotRow([canonical,stored],'stored-tokyo','impact-tokyo')).toBe(stored);
+    expect(resolveEventMetricSnapshotRow([canonical],'luma-2f3omvqa','impact-tokyo')).toBe(canonical);
+    expect(resolveEventMetricSnapshotRow([canonical],'other-event','other-event')).toBeUndefined();
+  });
+  it('publishes only approved snapshot fields and preserves observed zeros',()=>{
+    const allowed=['eventId','portalParticipantAccounts','projectRecords','namedProjectRecords','videoProjectRecords','publicProjectRecords','approvedImportedRegistrations'];
+    expect(Number.isFinite(Date.parse(snapshot.capturedAt))).toBe(true);
+    for(const row of snapshot.events){
+      expect(Object.keys(row).sort()).toEqual([...allowed].sort());
+      for(const [field,value] of Object.entries(row))if(field!=='eventId'){expect(Number.isSafeInteger(value)).toBe(true);expect(value).toBeGreaterThanOrEqual(0);}
+    }
+    expect(JSON.stringify(snapshot)).not.toContain('@');
+    const report=getEventReport({...osaka,id:'elevenlabs-meetup-tokyo-2026'});
+    expect(report.metrics.find(metric=>metric.id==='projectRecords')?.value).toBe(0);
+    expect(report.metrics.find(metric=>metric.id==='confirmed-attendance')?.value).toBeNull();
   });
 });
