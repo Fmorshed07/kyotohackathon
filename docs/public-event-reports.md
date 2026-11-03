@@ -53,9 +53,11 @@ competition submissions. Recorded figures are never replaced by targets.
 
 ## Statistics-only presentation
 
-The current public UI shows recorded numbers with short metric labels. Source
+The current public UI shows recorded numbers of at least 50 with short metric labels. Source
 links, capture dates, counting definitions and explanatory panels are omitted
-from the display. Unavailable metrics are omitted rather than displayed as zero.
+from the display. Figures below 50 and unavailable metrics are omitted, not increased
+or displayed as zero. This display threshold applies to event cards, the Luma
+overview and the available-statistics counts. All events remain navigable.
 Planning targets and projections are not shown. The aggregate snapshot and
 source evidence remain unchanged in the data; event audiences are never summed
 into a unique-people total.

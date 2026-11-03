@@ -17,6 +17,15 @@ export type PublicEventReport = {
   coverage: { instagram: string; linkedin: string };
 };
 
+export const PUBLIC_REPORT_MINIMUM = 50;
+
+/** Display threshold only: reported values and source evidence remain unchanged. */
+export function getVisibleReportMetrics(metrics: readonly ReportMetric[]): Array<ReportMetric & { value: number }> {
+  return metrics.filter((metric): metric is ReportMetric & { value: number } =>
+    typeof metric.value === 'number' && Number.isFinite(metric.value) && metric.value >= PUBLIC_REPORT_MINIMUM,
+  );
+}
+
 export function getEventReportHref(eventId: string) { return `/reports?event=${encodeURIComponent(eventId)}`; }
 
 export function safeReportSourceUrl(value: string | undefined): string | undefined {

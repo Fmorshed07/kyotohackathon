@@ -25,6 +25,8 @@ function report(event: HostedHackathon, patch: Partial<PublicEventReport> = {}):
       { id: "registrations", label: "Approved registrations", value: 80, definition: "Approved event registrations, not confirmed attendance.", sourceLabel: "Organizer registration summary", sourceUrl: "https://luma.com/jnwil7tv", asOf: "2026-10-18" },
       { id: "attendance", label: "Confirmed attendance", value: null, definition: "A confirmed attendance count has not been published.", sourceLabel: "Not measured", asOf: "2026-11-03" },
       { id: "projects", label: "Published projects", value: 0, definition: "Projects included in this dated public snapshot.", sourceLabel: "Public project snapshot", asOf: "2026-11-03" },
+      { id: "below-threshold", label: "Below threshold count", value: 49, definition: "A recorded count below the display threshold.", sourceLabel: "Public snapshot", asOf: "2026-11-03" },
+      { id: "threshold", label: "Threshold count", value: 50, definition: "A recorded count exactly at the display threshold.", sourceLabel: "Public snapshot", asOf: "2026-11-03" },
     ],
     sources: [{ id: "official", platform: "Luma", title: "Official event listing", url: "https://luma.com/jnwil7tv", note: "Programme and registration context.", checkedAt: "2026-11-03" }],
     review: { strengths: ["One shared challenge made the brief easy to follow."], improvements: ["Publish a clearly defined attendance count."] },
@@ -47,7 +49,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("public event report", () => {
-  it("shows actual numeric statistics and measured zero without source, date or explanatory text", () => {
+  it("shows unchanged statistics at or above 50 and omits lower or unavailable values", () => {
     const { container } = render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EventReportSection event={IMPACT_OSAKA} /></MemoryRouter>);
     const metrics = within(screen.getByLabelText("Event statistics"));
     const approved = within(metrics.getByRole("article", { name: "Approved registrations" }));
@@ -56,8 +58,10 @@ describe("public event report", () => {
     expect(approved.queryByRole("link", { name: "Organizer registration summary" })).toBeNull();
     expect(metrics.queryByRole("article", { name: "Confirmed attendance" })).toBeNull();
     expect(metrics.getAllByRole("article")).toHaveLength(2);
-    const projects = within(metrics.getByRole("article", { name: "Published projects" }));
-    expect(projects.getByText("0")).toBeVisible();
+    expect(metrics.queryByRole("article", { name: "Published projects" })).toBeNull();
+    expect(metrics.queryByRole("article", { name: "Below threshold count" })).toBeNull();
+    const threshold = within(metrics.getByRole("article", { name: "Threshold count" }));
+    expect(threshold.getByText("50")).toBeVisible();
     expect(screen.queryByText(IMPACT_OSAKA.eventDate)).toBeNull();
     expect(screen.queryByRole("heading", { name: "Social coverage" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Event review" })).toBeNull();
@@ -69,10 +73,10 @@ describe("public event report", () => {
     expect(container.querySelector("time, details")).toBeNull();
   });
 
-  it("keeps programme figures and units unchanged and omits invalid metrics", () => {
+  it("keeps qualifying programme figures and units unchanged and omits invalid metrics", () => {
     const baseline = report(IMPACT_OSAKA, { metrics: [
       ...report(IMPACT_OSAKA).metrics,
-      { id: "programme-hours", label: "Scheduled programme hours", value: 4, unit: "hours", definition: "Published programme duration.", sourceLabel: "Programme", asOf: "2026-10-18" },
+      { id: "programme-minutes", label: "Creative challenge minutes", value: 60, unit: "minutes", definition: "Published programme duration.", sourceLabel: "Programme", asOf: "2026-10-18" },
       { id: "invalid", label: "Invalid figure", value: Number.NaN, definition: "Invalid count.", sourceLabel: "Not available", asOf: "" },
       { id: "negative", label: "Negative figure", value: -1, definition: "Invalid count.", sourceLabel: "Not available", asOf: "" },
     ] });
@@ -83,9 +87,9 @@ describe("public event report", () => {
     expect(registrations.getByText("80")).toBeVisible();
     expect(registrations.queryByText("Oct 18, 2026")).toBeNull();
     expect(screen.queryByRole("article", { name: "Confirmed attendance" })).toBeNull();
-    const programme = within(screen.getByRole("article", { name: "Scheduled programme hours" }));
-    expect(programme.getByLabelText("Scheduled programme hours recorded figure")).toHaveTextContent("4");
-    expect(programme.getByText(/hours/)).toBeVisible();
+    const programme = within(screen.getByRole("article", { name: "Creative challenge minutes" }));
+    expect(programme.getByLabelText("Creative challenge minutes recorded figure")).toHaveTextContent("60");
+    expect(programme.getByText(/minutes/)).toBeVisible();
     expect(programme.queryByText("Published programme duration.")).toBeNull();
     expect(screen.queryByRole("article", { name: "Invalid figure" })).toBeNull();
     expect(screen.queryByRole("article", { name: "Negative figure" })).toBeNull();
@@ -102,19 +106,23 @@ describe("public event report", () => {
     expect(screen.getByRole("link", { name: "All event reports" })).toHaveAttribute("href", "/reports");
   });
 
-  it("leaves unsafe sources unlinked and clearly handles events with no verified statistics", () => {
+  it("leaves unsafe sources unlinked and handles events with no statistics meeting the threshold", () => {
     mocks.reports.mockReturnValue(report(IMPACT_OSAKA, {
-      metrics: [{ id: "known", label: "Published count", value: 2, definition: "Public count.", sourceLabel: "Unverified link", sourceUrl: "javascript:alert(1)", asOf: "" }],
+      metrics: [{ id: "known", label: "Published count", value: 50, definition: "Public count.", sourceLabel: "Unverified link", sourceUrl: "javascript:alert(1)", asOf: "" }],
       sources: [{ id: "unsafe", platform: "Organizer", title: "Unverified source", url: "https://user:password@example.test", note: "No safe public link.", checkedAt: "invalid" }],
       review: { strengths: [], improvements: [] },
     }));
     const view = render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EventReportSection event={IMPACT_OSAKA} /></MemoryRouter>);
     expect(screen.queryByRole("link", { name: "Unverified link" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Unverified source" })).toBeNull();
-    expect(screen.getByText("2")).toBeVisible();
-    mocks.reports.mockReturnValue(report(IMPACT_OSAKA, { metrics: [{ id: "unknown", label: "Reach", value: null, definition: "Unknown.", sourceLabel: "Unavailable", asOf: "" }] }));
+    expect(screen.getByText("50")).toBeVisible();
+    mocks.reports.mockReturnValue(report(IMPACT_OSAKA, { metrics: [
+      { id: "unknown", label: "Reach", value: null, definition: "Unknown.", sourceLabel: "Unavailable", asOf: "" },
+      { id: "below", label: "Recorded registrations", value: 49, definition: "Recorded but below threshold.", sourceLabel: "Snapshot", asOf: "2026-11-03" },
+      { id: "zero", label: "Recorded projects", value: 0, definition: "Measured zero remains stored.", sourceLabel: "Snapshot", asOf: "2026-11-03" },
+    ] }));
     view.rerender(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EventReportSection event={IMPACT_OSAKA} /></MemoryRouter>);
-    expect(screen.getByText("No verified statistics published yet.")).toBeVisible();
+    expect(screen.getByText("No statistics at 50+ yet.")).toBeVisible();
     expect(screen.queryByRole("article")).toBeNull();
     expect(screen.queryByText("How figures are counted")).toBeNull();
   });
@@ -133,11 +141,15 @@ describe("all public event reports", () => {
     expect(screen.queryByRole("region", { name: `${IMPACT_OSAKA.name} — statistics` })).toBeNull();
   });
 
-  it("lists every catalog event, including reports with no published figures, and searches by location", () => {
-    mocks.reports.mockImplementation((event: HostedHackathon) => report(event, { metrics: [] }));
+  it("lists every catalog event, counts only qualifying statistics, and searches by location", () => {
+    mocks.reports.mockImplementation((event: HostedHackathon) => {
+      const baseline = report(event);
+      return event.id === tokyo.id ? baseline : report(event, { metrics: baseline.metrics.filter(metric => metric.value === null || metric.value < 50) });
+    });
     showPage();
     expect(screen.getByRole("link", { name: "View report for Impact Tokyo 2026" })).toHaveAttribute("href", "/reports?event=impact-tokyo");
-    expect(screen.getAllByText("0 available statistics")).toHaveLength(2);
+    expect(screen.getByText("2 available statistics")).toBeVisible();
+    expect(screen.getByText("0 available statistics")).toBeVisible();
     fireEvent.change(screen.getByRole("textbox", { name: "Search events" }), { target: { value: "Tokyo, Japan" } });
     expect(screen.getByRole("link", { name: "View report for Impact Tokyo 2026" })).toBeVisible();
     expect(screen.queryByRole("link", { name: `View report for ${IMPACT_OSAKA.name}` })).toBeNull();
@@ -175,7 +187,7 @@ describe("all public event reports", () => {
     expect(mocks.reports).not.toHaveBeenCalled();
   });
 
-  it("compares six sourced Luma Went labels without mixing other metrics or adding an audience total", () => {
+  it("shows only the four Luma Went figures at or above 50 without inflating or summing them", () => {
     const values = [126, 66, 65, 52, 47, 46];
     const comparable = values.map((_, index) => ({ ...tokyo, id: `comparable-${index}`, name: `Source event ${index + 1}` }));
     const unknown = { ...tokyo, id: "unknown-went", name: "Unknown Went event" };
@@ -189,8 +201,8 @@ describe("all public event reports", () => {
     showPage();
     const comparison = within(screen.getByRole("region", { name: "Published Luma figures" }));
     const rows = within(comparison.getByRole("list", { name: "Published Luma Went figures" })).getAllByRole("listitem");
-    expect(rows).toHaveLength(6);
-    values.forEach((value, index) => {
+    expect(rows).toHaveLength(4);
+    values.slice(0, 4).forEach((value, index) => {
       const row = within(rows[index]);
       expect(row.getByRole("heading", { name: comparable[index].name })).toBeVisible();
       expect(row.getByText(String(value))).toBeVisible();
@@ -202,8 +214,13 @@ describe("all public event reports", () => {
     });
     expect(comparison.queryByText("Unknown Went event")).toBeNull();
     expect(comparison.queryByText("Programme only event")).toBeNull();
+    for (const index of [4, 5]) {
+      expect(comparison.queryByRole("heading", { name: comparable[index].name })).toBeNull();
+      expect(comparison.queryByText(String(values[index]))).toBeNull();
+    }
     expect(comparison.queryByText(/Programme hours|Portal participant accounts|Total audience/)).toBeNull();
     expect(comparison.queryByText("402")).toBeNull();
+    expect(comparison.queryByText("309")).toBeNull();
     expect(comparison.queryByText(/audiences may overlap|capture date|audited attendance/)).toBeNull();
     fireEvent.change(screen.getByRole("combobox", { name: "Choose an event report" }), { target: { value: comparable[0].id } });
     expect(screen.queryByRole("region", { name: "Published Luma figures" })).toBeNull();
