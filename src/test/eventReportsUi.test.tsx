@@ -47,24 +47,26 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("public event report", () => {
-  it("shows only actual numeric statistics, retaining measured zero, source and date", () => {
-    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EventReportSection event={IMPACT_OSAKA} /></MemoryRouter>);
+  it("shows actual numeric statistics and measured zero without source, date or explanatory text", () => {
+    const { container } = render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EventReportSection event={IMPACT_OSAKA} /></MemoryRouter>);
     const metrics = within(screen.getByLabelText("Event statistics"));
     const approved = within(metrics.getByRole("article", { name: "Approved registrations" }));
     expect(approved.getByText("80")).toBeVisible();
-    expect(approved.getByText("Oct 18, 2026")).toHaveAttribute("datetime", "2026-10-18");
-    expect(approved.getByRole("link", { name: "Organizer registration summary" })).toHaveAttribute("href", "https://luma.com/jnwil7tv");
+    expect(approved.queryByText("Oct 18, 2026")).toBeNull();
+    expect(approved.queryByRole("link", { name: "Organizer registration summary" })).toBeNull();
     expect(metrics.queryByRole("article", { name: "Confirmed attendance" })).toBeNull();
     expect(metrics.getAllByRole("article")).toHaveLength(2);
     const projects = within(metrics.getByRole("article", { name: "Published projects" }));
     expect(projects.getByText("0")).toBeVisible();
-    expect(screen.getByText(IMPACT_OSAKA.eventDate)).toBeVisible();
+    expect(screen.queryByText(IMPACT_OSAKA.eventDate)).toBeNull();
     expect(screen.queryByRole("heading", { name: "Social coverage" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Event review" })).toBeNull();
     expect(screen.queryByText(/planning target|illustrative|Recorded baseline/)).toBeNull();
-    const details = screen.getByText("How figures are counted").closest("details")!;
-    expect(details).not.toHaveAttribute("open");
-    expect(within(details).getByText(/not confirmed attendance/)).not.toBeVisible();
+    expect(screen.queryByText("How figures are counted")).toBeNull();
+    expect(screen.queryByText(/not confirmed attendance/)).toBeNull();
+    expect(screen.queryByText(/A review based on published event records/)).toBeNull();
+    expect(screen.queryByText(/audiences may overlap/)).toBeNull();
+    expect(container.querySelector("time, details")).toBeNull();
   });
 
   it("keeps programme figures and units unchanged and omits invalid metrics", () => {
@@ -79,23 +81,23 @@ describe("public event report", () => {
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EventReportSection event={IMPACT_OSAKA} /></MemoryRouter>);
     const registrations = within(screen.getByRole("article", { name: "Approved registrations" }));
     expect(registrations.getByText("80")).toBeVisible();
-    expect(registrations.getByText("Oct 18, 2026")).toHaveAttribute("datetime", "2026-10-18");
+    expect(registrations.queryByText("Oct 18, 2026")).toBeNull();
     expect(screen.queryByRole("article", { name: "Confirmed attendance" })).toBeNull();
     const programme = within(screen.getByRole("article", { name: "Scheduled programme hours" }));
     expect(programme.getByLabelText("Scheduled programme hours recorded figure")).toHaveTextContent("4");
-    expect(programme.getByText("hours")).toBeVisible();
+    expect(programme.getByText(/hours/)).toBeVisible();
+    expect(programme.queryByText("Published programme duration.")).toBeNull();
     expect(screen.queryByRole("article", { name: "Invalid figure" })).toBeNull();
     expect(screen.queryByRole("article", { name: "Negative figure" })).toBeNull();
     expect(screen.queryByRole("group", { name: /planning target/ })).toBeNull();
     expect(JSON.stringify(baseline)).toBe(before);
   });
 
-  it("links reviewed HTTPS sources safely and ignores private fields on the supplied event", () => {
+  it("keeps report navigation while omitting source links and private fields on the supplied event", () => {
     const event = { ...IMPACT_OSAKA, participantEmail: "private@example.test", registrationEmails: ["hidden@example.test"] };
     const { container } = render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EventReportSection event={event} /></MemoryRouter>);
-    const source = screen.getByRole("link", { name: "Organizer registration summary" });
-    expect(source).toHaveAttribute("target", "_blank");
-    expect(source).toHaveAttribute("rel", "noreferrer");
+    expect(screen.queryByRole("link", { name: "Organizer registration summary" })).toBeNull();
+    expect(screen.queryByText("Official event listing")).toBeNull();
     expect(container.innerHTML).not.toMatch(/private@example|hidden@example|mailto:/);
     expect(screen.getByRole("link", { name: "All event reports" })).toHaveAttribute("href", "/reports");
   });
@@ -193,15 +195,16 @@ describe("all public event reports", () => {
       expect(row.getByRole("heading", { name: comparable[index].name })).toBeVisible();
       expect(row.getByText(String(value))).toBeVisible();
       expect(row.queryByRole("group", { name: /3× planning target/ })).toBeNull();
-      expect(row.getByText("Nov 3, 2026")).toHaveAttribute("datetime", "2026-11-03");
-      expect(row.getByRole("link", { name: `Luma source for ${comparable[index].name}` })).toHaveAttribute("href", `https://luma.com/${comparable[index].id}`);
-      expect(row.getByRole("link", { name: `Open report for ${comparable[index].name}` })).toHaveAttribute("href", `/reports?event=${comparable[index].id}`);
+      expect(row.queryByText("Nov 3, 2026")).toBeNull();
+      expect(row.queryByRole("link", { name: `Luma source for ${comparable[index].name}` })).toBeNull();
+      expect(row.getByRole("link", { name: comparable[index].name })).toHaveAttribute("href", `/reports?event=${comparable[index].id}`);
+      expect(row.queryByText(/Captured|Recorded Luma|Open report/)).toBeNull();
     });
     expect(comparison.queryByText("Unknown Went event")).toBeNull();
     expect(comparison.queryByText("Programme only event")).toBeNull();
     expect(comparison.queryByText(/Programme hours|Portal participant accounts|Total audience/)).toBeNull();
     expect(comparison.queryByText("402")).toBeNull();
-    expect(comparison.getByText(/audiences may overlap. These are not audited attendance/)).toBeVisible();
+    expect(comparison.queryByText(/audiences may overlap|capture date|audited attendance/)).toBeNull();
     fireEvent.change(screen.getByRole("combobox", { name: "Choose an event report" }), { target: { value: comparable[0].id } });
     expect(screen.queryByRole("region", { name: "Published Luma figures" })).toBeNull();
   });

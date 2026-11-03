@@ -53,11 +53,12 @@ competition submissions. Recorded figures are never replaced by targets.
 
 ## Statistics-only presentation
 
-The current public UI shows recorded numeric statistics, their source and capture
-date. Unavailable metrics are omitted rather than displayed as zero. Counting
-definitions remain available on demand. Planning targets, projections and long
-review sections are not shown. The aggregate snapshot and source evidence are
-unchanged; event audiences are never summed into a unique-people total.
+The current public UI shows recorded numbers with short metric labels. Source
+links, capture dates, counting definitions and explanatory panels are omitted
+from the display. Unavailable metrics are omitted rather than displayed as zero.
+Planning targets and projections are not shown. The aggregate snapshot and
+source evidence remain unchanged in the data; event audiences are never summed
+into a unique-people total.
 
 Review screenshots are stored under
 `F:/AI Projects/kyotohackathon-reports/review-assets/`. The existing source
