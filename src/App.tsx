@@ -31,6 +31,7 @@ import PlatformOperationsPage from "./pages/PlatformOperationsPage";
 import EventManagementPage from "./pages/EventManagementPage";
 import HackathonsPage from "./pages/HackathonsPage";
 import GeneratedHackathonPage from "./pages/GeneratedHackathonPage";
+import EventReportsPage from "./pages/EventReportsPage";
 import HackathonBoardsPage from "./pages/HackathonBoardsPage";
 import ProjectGalleryPage from "./pages/ProjectGalleryPage";
 import ProjectFeedPage from "./pages/ProjectFeedPage";
@@ -131,6 +132,7 @@ const App = () => (
           <Route path="/community" element={<LegacyCommunityRedirect />} />
           <Route path="/hackathons" element={<HackathonsPage />} />
           <Route path="/events/:hackathonId" element={<GeneratedHackathonPage />} />
+          <Route path="/reports" element={<EventReportsPage />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignIn />} />
           <Route path="/onboarding" element={<ParticipantOnboardingRoute><ParticipantOnboardingPage /></ParticipantOnboardingRoute>} />

@@ -14,6 +14,7 @@ import { PORTAL_HACKATHONS, type PortalHackathon } from "@/lib/hackathons";
 import { HackathonSubscribeForm } from "@/components/hackathons/HackathonSubscribeForm";
 import { cn } from "@/lib/utils";
 import { getBundledHackathons } from "@/lib/bundledHackathons";
+import { getEventReportHref } from "@/lib/eventReports";
 
 type BoardCategory =
   | "Agentic AI"
@@ -24,14 +25,13 @@ type BoardCategory =
   | "Public services"
   | "Global Good";
 
-type SortMode = "default" | "live-first" | "upcoming-first" | "builders";
+type SortMode = "default" | "live-first" | "upcoming-first";
 
 type HackathonBoard = PortalHackathon & {
   organizer: string;
   organizerInitials: string;
   categories: BoardCategory[];
   tags: string[];
-  builders: number | null;
   prize: string;
   format: string;
   hubUrl: string;
@@ -57,7 +57,6 @@ const BOARD_META: Record<
     organizerInitials: "CK",
     categories: ["Agentic AI", "Public services", "Healthcare", "Education"],
     tags: ["#Agents", "#LangGraph", "#Japan", "#Impact"],
-    builders: 48,
     prize: "Completed",
     format: "Hybrid",
   },
@@ -66,7 +65,6 @@ const BOARD_META: Record<
     organizerInitials: "CT",
     categories: ["Global Good", "Climate", "Healthcare", "Education"],
     tags: ["#Climate", "#Health", "#Education", "#AI"],
-    builders: 62,
     prize: "Completed",
     format: "In-person",
   },
@@ -75,7 +73,6 @@ const BOARD_META: Record<
     organizerInitials: "CD",
     categories: ["Urban", "Public services", "Climate"],
     tags: ["#Mobility", "#City", "#PublicAI", "#Sprint"],
-    builders: 36,
     prize: "Completed",
     format: "In-person",
   },
@@ -101,7 +98,6 @@ const defaultBoardMeta = (
     organizerInitials: initials,
     categories: ["Agentic AI"],
     tags: [`#${hackathon.shortName.replace(/\s+/g, "")}`],
-    builders: null,
     prize: statusPrize(hackathon.status),
     format: "See event",
   };
@@ -165,7 +161,6 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "default", label: "Default" },
   { value: "live-first", label: "Live first" },
   { value: "upcoming-first", label: "Upcoming first" },
-  { value: "builders", label: "Most builders" },
 ];
 
 const getCityFromLocation = (location: string) => {
@@ -251,7 +246,6 @@ const HackathonsSection = () => {
     };
 
     return [...filtered].sort((a, b) => {
-      if (sortMode === "builders") return (b.builders ?? 0) - (a.builders ?? 0);
       if (sortMode === "live-first") return statusRank[a.status] - statusRank[b.status];
       if (sortMode === "upcoming-first") {
         const upcomingRank = { upcoming: 0, active: 1, past: 2 } as const;
@@ -295,6 +289,7 @@ const HackathonsSection = () => {
             Live hosted events and Impact editions in one board — filter by track, sort by status,
             and open the event hub when you are ready to build.
           </p>
+          <Link to="/reports" className="mt-5 inline-flex min-h-10 items-center rounded-lg border border-primary/30 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">All event reports</Link>
         </motion.div>
 
         <div className="mt-12 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -566,22 +561,7 @@ const HackathonsSection = () => {
                             {board.format}
                           </p>
 
-                          {board.builders != null ? <div className="flex items-center gap-2">
-                            <div className="flex -space-x-2" aria-hidden>
-                              {Array.from({ length: 3 }).map((_, avatarIndex) => (
-                                <span
-                                  key={avatarIndex}
-                                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-background bg-gradient-to-br from-primary/40 to-cyan/30 text-[9px] font-semibold text-foreground"
-                                  style={{ opacity: 1 - avatarIndex * 0.15 }}
-                                >
-                                  {String.fromCharCode(65 + avatarIndex)}
-                                </span>
-                              ))}
-                            </div>
-                            <span className="font-body text-xs text-muted-foreground">
-                              {board.builders} Builders
-                            </span>
-                          </div> : <span className="font-body text-xs text-muted-foreground">Community event</span>}
+                          <span className="font-body text-xs text-muted-foreground">Community event</span>
                         </div>
                       </div>
 
@@ -604,6 +584,7 @@ const HackathonsSection = () => {
                             Event page
                           </Link>
                         )}
+                        <Link to={getEventReportHref(board.id)} aria-label={`View report for ${board.name}`} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/15 px-3 py-2 text-center font-body text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">View report</Link>
                       </div>
                     </div>
                   </motion.article>

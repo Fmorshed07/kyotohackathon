@@ -19,6 +19,7 @@ import SiteHeader from "@/components/SiteHeader";
 import { HackathonSubscribeForm } from "@/components/hackathons/HackathonSubscribeForm";
 import ImportedEventDetails from "@/components/hackathons/ImportedEventDetails";
 import ElevenLabsParticipantShowcase from "@/components/hackathons/ElevenLabsParticipantShowcase";
+import { EventReportSection } from "@/components/hackathons/EventReportSection";
 import { eventRegistrationClosedMessage, eventRegistrationLabel, isEventRegistrationClosed } from "@/lib/eventRegistration";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -581,6 +582,7 @@ export default function GeneratedHackathonPage() {
                 >
                   {[
                     { href: "#overview", label: "Overview", show: true },
+                    { href: "#report", label: "Event report", show: true },
                     { href: "#about", label: "About", show: Boolean(event.summary) },
                     { href: "#guests", label: "Guests", show: event.guests.length > 0 },
                     { href: "#gallery", label: "Gallery", show: event.galleryUrls.length > 0 },
@@ -662,6 +664,8 @@ export default function GeneratedHackathonPage() {
                     </p>
                   </article>
                 </section>
+
+                <EventReportSection key={event.id} event={event} />
 
                 {event.guests.length > 0 ? (
                   <section id="guests" className="mt-6 rounded-2xl border border-white/10 bg-card/70 p-4 backdrop-blur sm:mt-8 sm:p-8">
