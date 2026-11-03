@@ -7,7 +7,7 @@ import { EventReportSection } from "@/components/hackathons/EventReportSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCommunityEvents } from "@/hooks/useCommunityEvents";
-import { getEventReport, getEventReportHref, getEventReportKey, safeReportSourceUrl } from "@/lib/eventReports";
+import { getEventReport, getEventReportHref, getEventReportKey, getThreefoldTarget, safeReportSourceUrl } from "@/lib/eventReports";
 
 export default function EventReportsPage() {
   const { events, isLoading, isError, refetch } = useCommunityEvents();
@@ -80,10 +80,12 @@ export default function EventReportsPage() {
       {!selectedId && lumaFigures.length > 0 ? <section aria-labelledby="luma-figures-title" className="mt-8 rounded-2xl border border-white/10 bg-card/70 p-4 sm:p-6">
         <h2 id="luma-figures-title" className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">Published Luma figures</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Luma “Went” labels; audiences may overlap. These are not audited attendance. Each figure retains its own capture date and source.</p>
+        <p className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-relaxed text-muted-foreground">The 3× planning targets are illustrative scenarios, not measured results, forecasts or announced future programmes. Capture dates and sources apply only to the recorded Luma labels; no future date is implied.</p>
         <ul aria-label="Published Luma Went figures" className="mt-5 divide-y divide-white/10">
           {lumaFigures.map(({ event, metric, value, sourceUrl }) => {
             const captureDate = new Date(metric.asOf);
             const captured = Number.isNaN(captureDate.getTime()) ? null : new Intl.DateTimeFormat("en", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }).format(captureDate);
+            const target = getThreefoldTarget(value);
             return <li key={event.id} className="grid min-w-0 gap-3 py-4 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,0.55fr)] sm:items-center sm:gap-6">
               <div className="min-w-0">
                 <h3 className="text-sm font-medium leading-relaxed text-foreground">{event.name}</h3>
@@ -94,8 +96,13 @@ export default function EventReportsPage() {
                 </div>
               </div>
               <div>
-                <p className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground"><span>Luma “Went”</span><span className="text-lg font-semibold tabular-nums text-foreground">{new Intl.NumberFormat("en").format(value)}</span></p>
+                <p className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground"><span>Recorded Luma “Went”</span><span aria-label={`${event.name} recorded Luma Went`} className="text-lg font-semibold tabular-nums text-foreground">{new Intl.NumberFormat("en").format(value)}</span></p>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/5" aria-hidden="true"><div className="h-full rounded-full bg-primary/80" style={{ width: `${Math.max(0, value / largestLumaFigure * 100)}%` }} /></div>
+                {target !== null ? <div role="group" aria-label={`${event.name} 3× planning target`} className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/5 p-3">
+                  <p className="flex flex-wrap items-baseline justify-between gap-2 text-xs font-medium text-amber-200"><span>3× planning target</span><span aria-label={`${event.name} illustrative Luma target`} className="text-lg font-semibold tabular-nums text-amber-100">{new Intl.NumberFormat("en").format(target)}</span></p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{new Intl.NumberFormat("en").format(value)} × 3 = {new Intl.NumberFormat("en").format(target)} · illustrative, not measured</p>
+                  {value === 0 ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">A zero baseline does not establish a positive growth target.</p> : null}
+                </div> : null}
               </div>
             </li>;
           })}

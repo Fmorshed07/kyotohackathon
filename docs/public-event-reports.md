@@ -48,7 +48,20 @@ empty membership lists, uses the portal's legacy Tokyo mapping, excludes
 withdrawn public-project records, and counts legacy video-link formats.
 Imported-registration zero means no approved records in that collection, not
 zero external signups. These counts do not certify attendance or valid
-competition submissions. Measured figures are never multiplied into targets.
+competition submissions. Recorded figures are never replaced by targets.
+
+## Threefold planning scenarios
+
+The user requested a clearly labeled 3× target/projection on 3 November 2026 JST.
+Each available nonnegative numeric baseline has a separate `3× planning target`
+calculated as baseline × 3. These are illustrative arithmetic scenarios, not
+recorded outcomes, forecasts, promises, or changes to the event programme.
+Programme metrics also retain their original values; their scenarios do not
+announce a longer event or additional categories. No target is invented for an
+unavailable baseline. A measured zero produces zero, with a note that it does
+not establish a positive growth goal. Dates, source text, reviewed evidence and
+the aggregate snapshot are unchanged. Event audiences are never summed into a
+unique-people total.
 
 Review screenshots are stored under
 `F:/AI Projects/kyotohackathon-reports/review-assets/`. The existing source

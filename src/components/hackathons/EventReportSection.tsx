@@ -2,7 +2,7 @@ import { useId } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, BookOpen, CheckCircle2, FileText, Lightbulb } from "lucide-react";
 import type { HostedHackathon } from "@/lib/aiHackathons";
-import { getEventReport, safeReportSourceUrl, type PublicEventReport } from "@/lib/eventReports";
+import { getEventReport, getThreefoldTarget, safeReportSourceUrl, type PublicEventReport } from "@/lib/eventReports";
 
 function reportDate(value: string) {
   const date = new Date(value);
@@ -19,9 +19,12 @@ function SourceDate({ value, prefix = "As of" }: { value: string; prefix?: strin
 function ReportMetric({ metric }: { metric: PublicEventReport["metrics"][number] }) {
   const sourceUrl = safeReportSourceUrl(metric.sourceUrl);
   const measured = metric.value !== null && Number.isFinite(metric.value);
+  const target = getThreefoldTarget(metric.value);
+  const targetUnit = metric.unit || (/^(?:hours?|minutes?|days?)$/i.test(metric.qualifier?.trim() ?? "") ? metric.qualifier?.trim() : undefined);
   return <article className="flex min-w-0 flex-col rounded-xl border border-white/10 bg-background/50 p-4 sm:p-5" aria-label={metric.label}>
     <h3 className="text-sm font-medium text-muted-foreground">{metric.label}</h3>
-    <p className={`mt-3 font-semibold tracking-tight text-foreground ${measured ? "text-3xl" : "text-xl"}`}>
+    {measured ? <p className="mt-3 text-xs font-medium text-muted-foreground">Recorded baseline</p> : null}
+    <p aria-label={`${metric.label} recorded figure`} className={`${measured ? "mt-1 text-3xl" : "mt-3 text-xl"} font-semibold tracking-tight text-foreground`}>
       {measured ? new Intl.NumberFormat("en").format(metric.value!) : "Not available"}
       {measured && metric.unit ? <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">{metric.unit}</span> : null}
     </p>
@@ -31,6 +34,15 @@ function ReportMetric({ metric }: { metric: PublicEventReport["metrics"][number]
       <p>{sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline">{metric.sourceLabel}<ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden="true" /></a> : metric.sourceLabel}</p>
       <p><SourceDate value={metric.asOf} /></p>
     </div>
+    {target !== null ? <div role="group" aria-label={`${metric.label} 3× planning target`} className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/5 p-3">
+      <p className="text-xs font-medium text-amber-200">3× planning target</p>
+      <p aria-label={`${metric.label} illustrative target`} className="mt-2 text-2xl font-semibold tracking-tight text-amber-100">
+        {new Intl.NumberFormat("en").format(target)}
+        {targetUnit ? <span className="ml-1.5 text-sm font-normal tracking-normal text-amber-200/80">{targetUnit}</span> : null}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Baseline × 3 · illustrative</p>
+      {metric.value === 0 ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">A zero baseline does not establish a positive growth target.</p> : null}
+    </div> : null}
   </article>;
 }
 
@@ -49,6 +61,7 @@ export function EventReportSection({ event, showAllReportsLink = true }: { event
       {showAllReportsLink ? <Link to="/reports" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">All event reports<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link> : null}
     </div>
     <div className="space-y-7 p-4 sm:space-y-8 sm:p-8">
+      <p className="rounded-xl border border-amber-300/20 bg-amber-300/5 p-4 text-sm leading-relaxed text-muted-foreground">3× planning targets are illustrative scenarios calculated from each recorded baseline. They are not recorded results, forecasts or announced future programmes. Published event dates, schedules and durations remain unchanged.</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Event report metrics">
         {report.metrics.map(metric => <ReportMetric key={metric.id} metric={metric} />)}
       </div>

@@ -58,12 +58,35 @@ describe("public event report", () => {
     const attendance = within(metrics.getByRole("article", { name: "Confirmed attendance" }));
     expect(attendance.getByText("Not available")).toBeVisible();
     expect(attendance.queryByText("0")).not.toBeInTheDocument();
-    expect(within(metrics.getByRole("article", { name: "Published projects" })).getByText("0")).toBeVisible();
+    const projects = within(metrics.getByRole("article", { name: "Published projects" }));
+    expect(projects.getAllByText("0")).toHaveLength(2);
+    expect(within(projects.getByRole("group", { name: /3× planning target/ })).getByText("0")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Social coverage" })).toBeVisible();
     expect(screen.getByText("Event reach has not been published.")).toBeVisible();
     expect(screen.getByText("One shared challenge made the brief easy to follow.")).toBeVisible();
     expect(screen.getByText("Publish a clearly defined attendance count.")).toBeVisible();
     expect(screen.getByText(/Social views and interactions may overlap/)).toBeVisible();
+  });
+
+  it("places illustrative threefold targets beside recorded figures without inventing missing baselines", () => {
+    const baseline = report(IMPACT_OSAKA, { metrics: [
+      ...report(IMPACT_OSAKA).metrics,
+      { id: "programme-hours", label: "Scheduled programme hours", value: 4, definition: "Published programme duration.", sourceLabel: "Programme", asOf: "2026-10-18" },
+    ] });
+    const before = JSON.stringify(baseline);
+    mocks.reports.mockReturnValue(baseline);
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EventReportSection event={IMPACT_OSAKA} /></MemoryRouter>);
+    const registrations = within(screen.getByRole("article", { name: "Approved registrations" }));
+    expect(registrations.getByText("80")).toBeVisible();
+    const target = within(registrations.getByRole("group", { name: /3× planning target/ }));
+    expect(target.getByText("240")).toBeVisible();
+    expect(target.getByText(/Baseline × 3 · illustrative/)).toBeVisible();
+    expect(registrations.getByText("Oct 18, 2026")).toHaveAttribute("datetime", "2026-10-18");
+    expect(within(screen.getByRole("article", { name: "Confirmed attendance" })).queryByRole("group", { name: /3× planning target/ })).toBeNull();
+    const programme = within(screen.getByRole("article", { name: "Scheduled programme hours" }));
+    expect(programme.getByText("4")).toBeVisible();
+    expect(within(programme.getByRole("group", { name: /3× planning target/ })).getByText("12")).toBeVisible();
+    expect(JSON.stringify(baseline)).toBe(before);
   });
 
   it("links reviewed HTTPS sources safely and ignores private fields on the supplied event", () => {
@@ -166,6 +189,7 @@ describe("all public event reports", () => {
       const row = within(rows[index]);
       expect(row.getByRole("heading", { name: comparable[index].name })).toBeVisible();
       expect(row.getByText(String(value))).toBeVisible();
+      expect(within(row.getByRole("group", { name: /3× planning target/ })).getByText(String(value * 3))).toBeVisible();
       expect(row.getByText("Nov 3, 2026")).toHaveAttribute("datetime", "2026-11-03");
       expect(row.getByRole("link", { name: `Luma source for ${comparable[index].name}` })).toHaveAttribute("href", `https://luma.com/${comparable[index].id}`);
       expect(row.getByRole("link", { name: `Open report for ${comparable[index].name}` })).toHaveAttribute("href", `/reports?event=${comparable[index].id}`);
