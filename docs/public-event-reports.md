@@ -21,8 +21,9 @@ access did not provide verifiable event-level posts or engagement. Reach,
 impressions, saves, clicks, watch time and conversions remain unavailable.
 Missing evidence is represented by null, never an invented zero.
 
-The editorial review flags schedule conflicts and gaps in outcomes. Unsupported
-legacy builder counters were removed from hackathon cards. Reviewed evidence
+Reviewed evidence retains notes about schedule conflicts and outcome gaps;
+the public UI focuses on statistics. Unsupported legacy builder counters were
+removed from hackathon cards. Reviewed evidence
 exists for all 12 events currently visible in the public community calendar;
 new events receive an honest evidence-availability fallback.
 
@@ -50,18 +51,13 @@ Imported-registration zero means no approved records in that collection, not
 zero external signups. These counts do not certify attendance or valid
 competition submissions. Recorded figures are never replaced by targets.
 
-## Threefold planning scenarios
+## Statistics-only presentation
 
-The user requested a clearly labeled 3× target/projection on 3 November 2026 JST.
-Each available nonnegative numeric baseline has a separate `3× planning target`
-calculated as baseline × 3. These are illustrative arithmetic scenarios, not
-recorded outcomes, forecasts, promises, or changes to the event programme.
-Programme metrics also retain their original values; their scenarios do not
-announce a longer event or additional categories. No target is invented for an
-unavailable baseline. A measured zero produces zero, with a note that it does
-not establish a positive growth goal. Dates, source text, reviewed evidence and
-the aggregate snapshot are unchanged. Event audiences are never summed into a
-unique-people total.
+The current public UI shows recorded numeric statistics, their source and capture
+date. Unavailable metrics are omitted rather than displayed as zero. Counting
+definitions remain available on demand. Planning targets, projections and long
+review sections are not shown. The aggregate snapshot and source evidence are
+unchanged; event audiences are never summed into a unique-people total.
 
 Review screenshots are stored under
 `F:/AI Projects/kyotohackathon-reports/review-assets/`. The existing source

@@ -17,13 +17,6 @@ export type PublicEventReport = {
   coverage: { instagram: string; linkedin: string };
 };
 
-/** An illustrative planning scenario, never a replacement for a recorded figure. */
-export function getThreefoldTarget(value: number | null | undefined): number | null {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
-  const target = value * 3;
-  return Number.isFinite(target) && target <= Number.MAX_SAFE_INTEGER ? target : null;
-}
-
 export function getEventReportHref(eventId: string) { return `/reports?event=${encodeURIComponent(eventId)}`; }
 
 export function safeReportSourceUrl(value: string | undefined): string | undefined {
